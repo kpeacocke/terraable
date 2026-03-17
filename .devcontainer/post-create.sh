@@ -7,7 +7,7 @@ curl -sSL https://install.python-poetry.org | python3 -
 export PATH="/root/.local/bin:$PATH"
 
 # Install dependencies via Poetry
-poetry install
+poetry install --no-root
 
 echo "Installation complete."
 echo ""
