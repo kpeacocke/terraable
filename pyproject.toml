@@ -1,0 +1,59 @@
+[tool.poetry]
+name = "terraable"
+version = "0.1.0"
+description = "Reference demo: HCP Terraform provisioning + Ansible Automation Platform operationalisation"
+authors = ["kpeacocke <kpeacocke@example.com>"]
+readme = "README.md"
+packages = [{include = "terraable"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ansible = "^2.10.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.12.0"
+pytest-terraform = "^1.0.2"
+mutmut = "^2.4.5"
+ruff = "^0.1.6"
+mypy = "^1.7.0"
+ansible-lint = "^6.20.0"
+snyk = "^1.1260.0"
+types-pyyaml = "^6.0.13"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=terraable --cov-report=html --cov-report=term-missing --strict-markers"
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+    "slow: slow tests"
+]
+
+[tool.coverage.run]
+source = ["terraable"]
+omit = ["*/tests/*", "*/site-packages/*"]
+
+[tool.coverage.report]
+fail_under = 100
+skip_covered = false
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "ansible.*"
+ignore_missing_imports = true
