@@ -8,14 +8,56 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-vscode.makefile-tools",
-        "GitHub.Copilot",
-        "GitHub.Copilot-Chat",
-        "HashiCorp.terraform",
-        "charliermarsh.ruff",
+        // --- Python ---
         "ms-python.python",
         "ms-python.debugpy",
-        "ms-python.vscode-pylance"
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+
+        // --- Terraform / IaC ---
+        "HashiCorp.terraform",
+        "ms-vscode.makefile-tools",
+        "redhat.ansible",
+
+        // --- GitHub ---
+        "GitHub.Copilot",
+        "GitHub.Copilot-Chat",
+        "GitHub.vscode-pull-request-github",
+        "GitHub.vscode-github-actions",
+        "GitHub.codespaces",
+
+        // --- Security scanning ---
+        "snyk-security.snyk-vulnerability-scanner",
+        "SonarSource.sonarlint-vscode",
+
+        // --- Git & diff ---
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "donjayamanne.githistory",
+
+        // --- Docs & Markdown ---
+        "esbenp.prettier-vscode",
+        "DavidAnson.vscode-markdownlint",
+        "bierner.markdown-mermaid",
+        "yzhang.markdown-all-in-one",
+
+        // --- YAML / JSON / TOML ---
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml",
+        "ZainChen.json",
+
+        // --- Shell ---
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+
+        // --- Containers & infra ---
+        "ms-azuretools.vscode-docker",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+
+        // --- General productivity ---
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens",
+        "oderwat.indent-rainbow"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
