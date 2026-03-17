@@ -1,0 +1,12 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "^https://localhost"
+    }
+  ],
+  "replacementPatterns": [],
+  "aliveStatusCodes": [200, 206, 301, 302, 303, 307, 308, 403]
+}
