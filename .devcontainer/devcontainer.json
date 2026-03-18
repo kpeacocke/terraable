@@ -1,7 +1,38 @@
 {
   "name": "terraable",
-  "image": "mcr.microsoft.com/devcontainers/base:debian-13",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  }
+    "ghcr.io/devcontainers/features/terraform:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers-extra/features/poetry:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.makefile-tools",
+        "GitHub.Copilot",
+        "GitHub.Copilot-Chat",
+        "HashiCorp.terraform",
+        "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-python.vscode-pylance"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "snyk.advanced.autoSelectOrganization": true
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+  ]
 }
+
