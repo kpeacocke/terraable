@@ -59,7 +59,16 @@ jobs:
           }
 
           function isCopilotLogin(login) {
-            return typeof login === 'string' && /copilot/i.test(login);
+            if (typeof login !== 'string') {
+              return false;
+            }
+
+            const allowedCopilotLogins = [
+              'github-copilot[bot]',
+              'github-copilot-for-pull-requests[bot]',
+            ];
+
+            return allowedCopilotLogins.includes(login);
           }
 
           async function listAllReviews(owner, repo, pullNumber) {
