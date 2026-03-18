@@ -111,7 +111,11 @@ jobs:
             const reviews = await listAllReviews(owner, repo, pullNumber);
 
             const copilotReviews = reviews.filter((review) => {
-              return isCopilotLogin(review.user && review.user.login) && review.state !== 'PENDING';
+              const state = review.state;
+              return (
+                isCopilotLogin(review.user && review.user.login) &&
+                (state === 'APPROVED' || state === 'COMMENTED' || state === 'CHANGES_REQUESTED')
+              );
             });
 
             const matchingReview = copilotReviews.find((review) => review.commit_id === headSha);
