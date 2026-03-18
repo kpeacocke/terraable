@@ -4,8 +4,8 @@ set -euo pipefail
 echo "Installing Terraform and related tools..."
 
 if ! command -v sudo >/dev/null 2>&1; then
-    echo "Error: sudo is required to install system packages in post-create." >&2
-    exit 1
+  echo "Error: sudo is required to install system packages in post-create." >&2
+  exit 1
 fi
 
 # Update package list
