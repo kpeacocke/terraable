@@ -10,7 +10,7 @@ set -euo pipefail
 usage() {
   cat <<EOF
 Usage:
-  GITHUB_TOKEN=<token> $0 [--owner <owner>] [--repo <repo>] [--branch <branch>] [--dry-run]
+  $0 [--owner <owner>] [--repo <repo>] [--branch <branch>] [--dry-run]
 
 Options:
   --owner   GitHub org/user owner. Auto-detected from origin if omitted.
@@ -18,9 +18,9 @@ Options:
   --branch  Protected branch name (default: main).
   --dry-run Print payload but do not call GitHub API.
 
-Token requirements:
-  - Fine-grained PAT with Repository administration: write
-  - Or classic PAT with repo scope and admin rights on the repository
+Authentication:
+  - Uses GitHub CLI auth session from "gh auth login"
+  - Ensure your logged-in account has repository admin permission
 EOF
 }
 
@@ -51,7 +51,7 @@ parse_origin() {
   echo "$owner" "$repo"
 }
 
-require_cmd curl
+require_cmd gh
 require_cmd git
 
 OWNER=""
@@ -98,7 +98,7 @@ fi
 
 [[ -n "$OWNER" ]] || die "Could not determine owner. Provide --owner."
 [[ -n "$REPO" ]] || die "Could not determine repo. Provide --repo."
-[[ -n "${GITHUB_TOKEN:-}" ]] || die "GITHUB_TOKEN is required."
+gh auth status -h github.com >/dev/null 2>&1 || die "GitHub CLI is not authenticated. Run: gh auth login"
 
 PAYLOAD=$(cat <<'JSON'
 {
@@ -141,26 +141,14 @@ if [[ "$DRY_RUN" == "true" ]]; then
   exit 0
 fi
 
-response_file="$(mktemp)"
-status_code="$({
-  curl -sS -o "$response_file" -w "%{http_code}" \
-    -X PUT \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/${OWNER}/${REPO}/branches/${BRANCH}/protection" \
-    -d "$PAYLOAD"
-} || true)"
-
-if [[ "$status_code" != "200" ]]; then
-  echo "GitHub API returned HTTP ${status_code}" >&2
-  cat "$response_file" >&2
-  rm -f "$response_file"
-  exit 1
-fi
+gh api \
+  --method PUT \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "/repos/${OWNER}/${REPO}/branches/${BRANCH}/protection" \
+  --input - <<<"$PAYLOAD" >/dev/null
 
 echo "Branch protection updated successfully."
-rm -f "$response_file"
 
 cat <<EOF
 
