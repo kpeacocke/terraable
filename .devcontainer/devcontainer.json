@@ -1,0 +1,7 @@
+{
+  "name": "terraable",
+  "image": "mcr.microsoft.com/devcontainers/base:debian-13",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  }
+}
