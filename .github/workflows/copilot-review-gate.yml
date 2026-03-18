@@ -1,0 +1,139 @@
+name: Copilot review gate
+
+"on":
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  copilot-review:
+    name: Copilot review present
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Copilot reviewed the current head commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          async function githubRequest(path) {
+            const response = await fetch(`${process.env.GITHUB_API_URL}${path}`, {
+              headers: {
+                Accept: 'application/vnd.github+json',
+                Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                'X-GitHub-Api-Version': '2022-11-28',
+              },
+            });
+
+            if (!response.ok) {
+              const body = await response.text();
+              throw new Error(`GitHub API request failed for ${path}: ${response.status} ${body}`);
+            }
+
+            return response.json();
+          }
+
+          function appendSummary(lines) {
+            if (!process.env.GITHUB_STEP_SUMMARY) {
+              return;
+            }
+
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          }
+
+          function isCopilotLogin(login) {
+            return typeof login === 'string' && /copilot/i.test(login);
+          }
+
+          async function listAllReviews(owner, repo, pullNumber) {
+            const reviews = [];
+
+            for (let page = 1; page < 11; page += 1) {
+              const batch = await githubRequest(`/repos/${owner}/${repo}/pulls/${pullNumber}/reviews?per_page=100&page=${page}`);
+              reviews.push(...batch);
+
+              if (batch.length < 100) {
+                break;
+              }
+            }
+
+            return reviews;
+          }
+
+          async function main() {
+            const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+            const pullRequest = event.pull_request;
+
+            if (!pullRequest) {
+              throw new Error('This workflow only supports pull request events.');
+            }
+
+            if (pullRequest.draft) {
+              console.log('Draft pull request detected; gate passes until the PR is marked ready for review.');
+              appendSummary([
+                '## Copilot review gate',
+                '',
+                '- Result: passed',
+                '- Reason: pull request is still a draft.',
+              ]);
+              return;
+            }
+
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+            const pullNumber = pullRequest.number;
+            const headSha = pullRequest.head.sha;
+            const reviews = await listAllReviews(owner, repo, pullNumber);
+
+            const copilotReviews = reviews.filter((review) => {
+              return isCopilotLogin(review.user && review.user.login) && review.state !== 'PENDING';
+            });
+
+            const matchingReview = copilotReviews.find((review) => review.commit_id === headSha);
+
+            appendSummary([
+              '## Copilot review gate',
+              '',
+              `- Pull request: #${pullNumber}`,
+              `- Head commit: ${headSha}`,
+              `- Copilot reviews found: ${copilotReviews.length}`,
+              `- Matching current head review: ${matchingReview ? 'yes' : 'no'}`,
+            ]);
+
+            if (!matchingReview) {
+              const reviewers = copilotReviews
+                .map((review) => `${review.user.login} (${review.state} on ${review.commit_id})`)
+                .join(', ');
+
+              throw new Error([
+                'Copilot has not reviewed the current head commit yet.',
+                `Current head SHA: ${headSha}`,
+                reviewers ? `Existing Copilot reviews: ${reviewers}` : 'Existing Copilot reviews: none',
+                'Enable automatic Copilot review or re-request Copilot after each new push.',
+              ].join('\n'));
+            }
+
+            console.log(`Copilot review found for current head commit ${headSha}.`);
+          }
+
+          main().catch((error) => {
+            console.error(error.message);
+            process.exit(1);
+          });
+          NODE
