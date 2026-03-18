@@ -2,8 +2,8 @@
   "name": "terraable",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:latest": {},
-    "ghcr.io/devcontainers-extra/features/poetry:latest": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers-extra/features/poetry:2": {}
   },
   "customizations": {
     "vscode": {
@@ -29,9 +29,6 @@
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
-  "remoteUser": "vscode",
-  "mounts": [
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
-  ]
+  "remoteUser": "vscode"
 }
 
