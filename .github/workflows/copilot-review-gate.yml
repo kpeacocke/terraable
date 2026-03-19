@@ -73,6 +73,7 @@ jobs:
             }
 
             const allowedCopilotLogins = [
+              'copilot-pull-request-reviewer[bot]',
               'copilot-pull-request-reviewer',
               'github-copilot[bot]',
               'github-copilot-for-pull-requests[bot]',
