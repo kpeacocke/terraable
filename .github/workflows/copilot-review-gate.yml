@@ -14,7 +14,7 @@ name: Copilot review gate
       - dismissed
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   copilot-review:
@@ -28,7 +28,6 @@ jobs:
           check-latest: true
       - name: Verify Copilot reviewed the current head commit
         env:
-          COPILOT_REVIEW_MAX_POLL_CHANGED_FILES: ${{ vars.COPILOT_REVIEW_MAX_POLL_CHANGED_FILES }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -106,68 +105,9 @@ jobs:
             });
           }
 
-          async function requestCopilotReview(owner, repo, pullNumber) {
-            const candidates = [
-              'github-copilot-for-pull-requests[bot]',
-              'github-copilot[bot]',
-            ];
-
-            const failures = [];
-
-            for (const reviewer of candidates) {
-              try {
-                await githubRequest(
-                  `/repos/${owner}/${repo}/pulls/${pullNumber}/requested_reviewers`,
-                  {
-                    method: 'POST',
-                    body: { reviewers: [reviewer] },
-                  },
-                );
-                return { requested: true, reviewer, failures };
-              } catch (error) {
-                failures.push(`${reviewer}: ${error.message}`);
-              }
-            }
-
-            return { requested: false, reviewer: null, failures };
-          }
-
-          async function waitForCopilotHeadReview(owner, repo, pullNumber, headSha) {
-            const maxAttempts = 12;
-            const delayMs = 15000;
-
-            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-              const reviews = await listAllReviews(owner, repo, pullNumber);
-              const copilotReviews = parseCopilotReviews(reviews);
-              const matchingReview = copilotReviews.find((review) => review.commit_id === headSha);
-
-              if (matchingReview) {
-                return { matchingReview, copilotReviews, attempts: attempt };
-              }
-
-              if (attempt < maxAttempts) {
-                console.log(`Waiting for Copilot review on ${headSha} (attempt ${attempt}/${maxAttempts})...`);
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
-              }
-            }
-
-            const reviews = await listAllReviews(owner, repo, pullNumber);
-            const copilotReviews = parseCopilotReviews(reviews);
-            return {
-              matchingReview: null,
-              copilotReviews,
-              attempts: maxAttempts,
-            };
-          }
-
           async function main() {
             const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
             const pullRequest = event.pull_request;
-            const action = event.action;
-            const parsedThreshold = Number.parseInt(process.env.COPILOT_REVIEW_MAX_POLL_CHANGED_FILES || '', 10);
-            const maxPollChangedFiles = Number.isFinite(parsedThreshold) && parsedThreshold > 0
-              ? parsedThreshold
-              : 100;
 
             if (!pullRequest) {
               throw new Error('This workflow only supports pull request events.');
@@ -187,61 +127,18 @@ jobs:
             const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
             const pullNumber = pullRequest.number;
             const headSha = pullRequest.head.sha;
-            const changedFiles = typeof pullRequest.changed_files === 'number' ? pullRequest.changed_files : null;
             const reviews = await listAllReviews(owner, repo, pullNumber);
-            let copilotReviews = parseCopilotReviews(reviews);
-            let matchingReview = copilotReviews.find((review) => review.commit_id === headSha);
-
-            let requestOutcome = {
-              attempted: false,
-              requested: false,
-              reviewer: null,
-              failures: [],
-              waitedAttempts: 0,
-              skippedPolling: false,
-            };
-
-            const shouldAttemptAutoRequest = ['opened', 'reopened', 'synchronize', 'ready_for_review'].includes(action);
-
-            if (!matchingReview && shouldAttemptAutoRequest) {
-              requestOutcome.attempted = true;
-              const requestResult = await requestCopilotReview(owner, repo, pullNumber);
-              requestOutcome.requested = requestResult.requested;
-              requestOutcome.reviewer = requestResult.reviewer;
-              requestOutcome.failures = requestResult.failures;
-
-              const skipPollingForLargePr =
-                requestOutcome.requested &&
-                changedFiles !== null &&
-                changedFiles > maxPollChangedFiles;
-
-              if (skipPollingForLargePr) {
-                requestOutcome.skippedPolling = true;
-                console.log(
-                  `Skipping Copilot poll for PR #${pullNumber}: changed_files=${changedFiles} exceeds threshold=${maxPollChangedFiles}.`,
-                );
-              } else {
-                const waited = await waitForCopilotHeadReview(owner, repo, pullNumber, headSha);
-                matchingReview = waited.matchingReview;
-                copilotReviews = waited.copilotReviews;
-                requestOutcome.waitedAttempts = waited.attempts;
-              }
-            }
+            const copilotReviews = parseCopilotReviews(reviews);
+            const matchingReview = copilotReviews.find((review) => review.commit_id === headSha);
 
             appendSummary([
               '## Copilot review gate',
               '',
               `- Pull request: #${pullNumber}`,
               `- Head commit: ${headSha}`,
-              `- Changed files: ${changedFiles === null ? 'unknown' : changedFiles}`,
-              `- Large PR poll threshold: ${maxPollChangedFiles}`,
               `- Copilot reviews found: ${copilotReviews.length}`,
               `- Matching current head review: ${matchingReview ? 'yes' : 'no'}`,
-              `- Auto-request attempted: ${requestOutcome.attempted ? 'yes' : 'no'}`,
-              `- Auto-request accepted: ${requestOutcome.requested ? 'yes' : 'no'}`,
-              `- Polling skipped for large PR: ${requestOutcome.skippedPolling ? 'yes' : 'no'}`,
-              requestOutcome.reviewer ? `- Requested reviewer: ${requestOutcome.reviewer}` : '- Requested reviewer: n/a',
-              requestOutcome.waitedAttempts ? `- Poll attempts: ${requestOutcome.waitedAttempts}` : '- Poll attempts: n/a',
+              '- Re-request support: use GitHub automatic Copilot review ruleset or manual re-request in the Reviewers menu',
             ]);
 
             if (!matchingReview) {
@@ -253,13 +150,8 @@ jobs:
                 'Copilot has not reviewed the current head commit yet.',
                 `Current head SHA: ${headSha}`,
                 reviewers ? `Existing Copilot reviews: ${reviewers}` : 'Existing Copilot reviews: none',
-                requestOutcome.failures.length
-                  ? `Auto-request failures: ${requestOutcome.failures.join(' | ')}`
-                  : 'Auto-request failures: none',
-                requestOutcome.skippedPolling
-                  ? `Polling skipped because changed_files=${changedFiles} exceeded threshold=${maxPollChangedFiles}.`
-                  : 'Polling skipped: no',
-                'Enable automatic Copilot review or re-request Copilot after each new push.',
+                'GitHub Actions cannot reliably re-request Copilot review by posting to requested_reviewers.',
+                'Enable the repository ruleset option "Automatically request Copilot code review" with "Review new pushes", or manually re-request Copilot from the Reviewers menu.',
               ].join('\n'));
             }
 
