@@ -3,8 +3,8 @@
 ## Quick start
 
 ```bash
-# Clone
-git clone https://github.com/kpeacocke/terraable.git
+# Clone your fork or the canonical repo URL shown on GitHub
+git clone https://github.com/<your-org-or-username>/terraable.git
 cd terraable
 
 # Option A: Use VS Code dev container

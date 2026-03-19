@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Reference demo: HCP Terraform provisioning + Ansible Automation Platform operationalisation"
 authors = ["kpeacocke <kpeacocke@example.com>"]
 readme = "README.md"
-packages = [{include = "terraable"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
