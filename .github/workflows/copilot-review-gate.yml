@@ -73,11 +73,20 @@ jobs:
             }
 
             const allowedCopilotLogins = [
+              'copilot-pull-request-reviewer',
               'github-copilot[bot]',
               'github-copilot-for-pull-requests[bot]',
             ];
 
             return allowedCopilotLogins.includes(login);
+          }
+
+          function listCopilotLikeLogins(reviews) {
+            return [...new Set(
+              reviews
+                .map((review) => review.user && review.user.login)
+                .filter((login) => typeof login === 'string' && login.toLowerCase().includes('copilot')),
+            )].sort();
           }
 
           async function listAllReviews(owner, repo, pullNumber) {
@@ -128,6 +137,7 @@ jobs:
             const pullNumber = pullRequest.number;
             const headSha = pullRequest.head.sha;
             const reviews = await listAllReviews(owner, repo, pullNumber);
+            const copilotLikeLogins = listCopilotLikeLogins(reviews);
             const copilotReviews = parseCopilotReviews(reviews);
             const matchingReview = copilotReviews.find((review) => review.commit_id === headSha);
 
@@ -136,6 +146,7 @@ jobs:
               '',
               `- Pull request: #${pullNumber}`,
               `- Head commit: ${headSha}`,
+              `- Copilot-like reviewer logins seen: ${copilotLikeLogins.length ? copilotLikeLogins.join(', ') : 'none'}`,
               `- Copilot reviews found: ${copilotReviews.length}`,
               `- Matching current head review: ${matchingReview ? 'yes' : 'no'}`,
               '- Re-request support: use GitHub automatic Copilot review ruleset or manual re-request in the Reviewers menu',
@@ -149,6 +160,7 @@ jobs:
               throw new Error([
                 'Copilot has not reviewed the current head commit yet.',
                 `Current head SHA: ${headSha}`,
+                `Copilot-like reviewer logins seen: ${copilotLikeLogins.length ? copilotLikeLogins.join(', ') : 'none'}`,
                 reviewers ? `Existing Copilot reviews: ${reviewers}` : 'Existing Copilot reviews: none',
                 'GitHub Actions cannot reliably re-request Copilot review by posting to requested_reviewers.',
                 'Enable the repository ruleset option "Automatically request Copilot code review" with "Review new pushes", or manually re-request Copilot from the Reviewers menu.',
