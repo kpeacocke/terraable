@@ -1,0 +1,13 @@
+---
+- name: Record selected security profile
+  debug:
+    msg: "Applying baseline hardening with profile={{ security_profile | default('baseline') }}"
+
+- name: Ensure SSH daemon root login is hardened
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PermitRootLogin'
+    line: 'PermitRootLogin no'
+    create: true
+    backup: true
+  become: true

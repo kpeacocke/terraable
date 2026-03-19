@@ -1,0 +1,10 @@
+---
+- name: Deploy RHDH path
+  debug:
+    msg: "Deploying Red Hat Developer Hub path"
+  when: portal_impl == 'rhdh'
+
+- name: Deploy Backstage path
+  debug:
+    msg: "Deploying Backstage path"
+  when: portal_impl == 'backstage'

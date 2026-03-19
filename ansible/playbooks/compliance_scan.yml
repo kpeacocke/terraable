@@ -1,0 +1,21 @@
+---
+- name: Compliance scan workflow
+  hosts: "{{ target_group | default('all') }}"
+  gather_facts: false
+  tasks:
+    - name: Validate SSH root login control
+      include_role:
+        name: ssh_root_control
+      vars:
+        ssh_control_mode: validate
+
+    - name: Emit machine-readable scan summary
+      copy:
+        dest: "{{ scan_output_path | default('/tmp/terraable-scan.json') }}"
+        content: |
+          {
+            "control": "ssh_root_login",
+            "status": "{{ ssh_root_login_status | default('unknown') }}",
+            "evidence": "{{ ssh_root_login_evidence | default('not-collected') }}"
+          }
+        mode: "0644"

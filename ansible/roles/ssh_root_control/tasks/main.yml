@@ -1,0 +1,28 @@
+---
+- name: Validate SSH root login is disabled
+  when: ssh_control_mode == 'validate'
+  block:
+    - name: Read sshd_config
+      slurp:
+        src: /etc/ssh/sshd_config
+      register: sshd_config
+      become: true
+
+    - name: Set scan facts
+      set_fact:
+        ssh_root_login_status: >-
+          {{
+            'pass' if ('PermitRootLogin no' in (sshd_config.content | b64decode))
+            else 'fail'
+          }}
+        ssh_root_login_evidence: "PermitRootLogin validation executed"
+
+- name: Remediate SSH root login to approved state
+  when: ssh_control_mode == 'remediate'
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PermitRootLogin'
+    line: 'PermitRootLogin no'
+    create: true
+    backup: true
+  become: true
