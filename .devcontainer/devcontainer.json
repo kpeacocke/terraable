@@ -1,6 +1,8 @@
 {
   "name": "terraable",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "features": {
     "ghcr.io/devcontainers/features/terraform:1": {},
     "ghcr.io/devcontainers/features/node:1": {
@@ -8,59 +10,26 @@
     },
     "ghcr.io/devcontainers-extra/features/poetry:2": {}
   },
+  "overrideFeatureInstallOrder": [
+    "ghcr.io/devcontainers/features/terraform",
+    "ghcr.io/devcontainers/features/node",
+    "ghcr.io/devcontainers-extra/features/poetry"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
-        // --- Python ---
+        // Core language and workflow extensions only. Keep this list small to
+        // avoid surprising users with a heavy extension footprint on rebuild.
         "ms-python.python",
         "ms-python.debugpy",
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
-
-        // --- Terraform / IaC ---
-        "HashiCorp.terraform",
-        "ms-vscode.makefile-tools",
+        "hashicorp.terraform",
         "redhat.ansible",
-
-        // --- GitHub ---
         "GitHub.Copilot",
         "GitHub.Copilot-Chat",
         "GitHub.vscode-pull-request-github",
-        "GitHub.vscode-github-actions",
-        "GitHub.codespaces",
-
-        // --- Security scanning ---
-        "snyk-security.snyk-vulnerability-scanner",
-        "SonarSource.sonarlint-vscode",
-
-        // --- Git & diff ---
-        "eamodio.gitlens",
-        "mhutchie.git-graph",
-        "donjayamanne.githistory",
-
-        // --- Docs & Markdown ---
-        "esbenp.prettier-vscode",
-        "DavidAnson.vscode-markdownlint",
-        "bierner.markdown-mermaid",
-        "yzhang.markdown-all-in-one",
-
-        // --- YAML / JSON / TOML ---
-        "redhat.vscode-yaml",
-        "tamasfe.even-better-toml",
-        "ZainChen.json",
-
-        // --- Shell ---
-        "timonwong.shellcheck",
-        "foxundermoon.shell-format",
-
-        // --- Containers & infra ---
-        "ms-azuretools.vscode-docker",
-        "ms-kubernetes-tools.vscode-kubernetes-tools",
-
-        // --- General productivity ---
-        "streetsidesoftware.code-spell-checker",
-        "usernamehw.errorlens",
-        "oderwat.indent-rainbow"
+        "SonarSource.sonarlint-vscode"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -78,19 +47,23 @@
           }
         },
         "[markdown]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
+          "editor.defaultFormatter": "vscode.markdown-language-features"
         },
         "[terraform]": {
-          "editor.defaultFormatter": "HashiCorp.terraform",
+          "editor.defaultFormatter": "hashicorp.terraform",
           "editor.formatOnSave": true
         },
-        "snyk.advanced.autoSelectOrganization": true
+        "sonarlint.ls.javaHome": "/opt/java-home"
       }
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "remoteUser": "vscode",
-  "mounts": [
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
-  ]
+  // Forward the host SSH agent socket rather than bind-mounting ~/.ssh.
+  // This avoids exposing key material inside the container and works correctly
+  // on Linux, macOS, and WSL without path-concatenation issues.
+  // To opt in to a key mount instead, see DEVELOP.md § SSH access.
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK}"
+  }
 }

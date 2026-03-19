@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "Installing Poetry and dependencies..."
-curl -sSL https://install.python-poetry.org | python3 -
+echo "Installing dependencies..."
 
-export PATH="/root/.local/bin:$PATH"
+if ! command -v poetry >/dev/null 2>&1; then
+	echo "Poetry is not available in the dev container PATH. Rebuild the container so the Poetry feature is installed." >&2
+	exit 1
+fi
 
 # Install dependencies via Poetry
 poetry install --no-root
