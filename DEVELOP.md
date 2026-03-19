@@ -136,11 +136,11 @@ poetry run pytest tests -m integration -v
    - Implementation -> `platform-builder` agent
    - Security/compliance -> `security-compliance` agent
    - Demo/runbook -> `demo-readiness` agent
-4. **Test**:
-  - For scaffold changes, run `pytest tests -v` and `ruff check terraable tests`.
-  - Add `mypy terraable` once Python modules are in place.
-  - Add coverage and mutation gates (`pytest --cov`, `mutmut run`) once baseline tests exist.
-  - Run integration tests (`pytest tests -m integration -v`) after integration suites are added.
+4. **Test**: For scaffold changes, run `pytest tests -v` and
+  `ruff check terraable tests`. Add `mypy terraable` once Python modules are in
+  place. Add coverage and mutation gates (`pytest --cov`, `mutmut run`) once
+  baseline tests exist. Run integration tests (`pytest tests -m integration -v`)
+  after integration suites are added.
 5. **Docs**: Update relevant `.md` files in Australian English.
 6. **Push and open a PR**: Include test evidence and security review in the PR summary.
 
