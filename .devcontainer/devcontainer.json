@@ -12,9 +12,9 @@
     "ghcr.io/devcontainers-extra/features/poetry:2": {}
   },
   "overrideFeatureInstallOrder": [
-    "ghcr.io/devcontainers/features/terraform",
-    "ghcr.io/devcontainers/features/node",
-    "ghcr.io/devcontainers-extra/features/poetry"
+    "ghcr.io/devcontainers/features/terraform:1",
+    "ghcr.io/devcontainers/features/node:1",
+    "ghcr.io/devcontainers-extra/features/poetry:2"
   ],
   "customizations": {
     "vscode": {
