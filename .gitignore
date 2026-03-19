@@ -36,3 +36,4 @@ override.tf.json
 .env.*
 secrets/
 tmp/
+ansible/inventory.local.yml

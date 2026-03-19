@@ -195,7 +195,9 @@ terraform plan
 
 **Ansible connectivity issues:**
 
-Check `ansible/inventory.yml` and ensure target systems are reachable.
+Check [`ansible/inventory.yml`](ansible/inventory.yml) and ensure target systems are reachable.
+This file is a stub — copy it to `ansible/inventory.local.yml` (git-ignored) and populate it
+with your actual hosts before running playbooks. Do not commit real hostnames or credentials.
 
 **Coverage gaps:**
 
