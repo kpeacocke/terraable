@@ -1,9 +1,8 @@
-[tool.ruff]
 line-length = 100
 target-version = "py311"
 src = ["terraable", "tests"]
 
-[tool.ruff.lint]
+[lint]
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
@@ -24,13 +23,13 @@ ignore = [
     "ARG001", # Unused function argument (common in callbacks)
 ]
 
-[tool.ruff.format]
+[format]
 quote-style = "double"
-indent-size = 4
+indent-style = "space"
 line-ending = "auto"
 
-[tool.ruff.lint.pydocstyle]
+[lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.lint.isort]
+[lint.isort]
 known-first-party = ["terraable"]
