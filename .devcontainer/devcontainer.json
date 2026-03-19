@@ -36,8 +36,6 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "python.linting.enabled": true,
-        "python.linting.ruffEnabled": true,
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
           "tests"
