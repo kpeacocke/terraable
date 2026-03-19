@@ -1,34 +1,69 @@
 {
   "name": "terraable",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/terraform:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
     "ghcr.io/devcontainers-extra/features/poetry:2": {}
   },
+  "overrideFeatureInstallOrder": [
+    "ghcr.io/devcontainers/features/terraform:1",
+    "ghcr.io/devcontainers/features/node:1",
+    "ghcr.io/devcontainers-extra/features/poetry:2"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
+        // Core language and workflow extensions only. Keep this list small to
+        // avoid surprising users with a heavy extension footprint on rebuild.
         "ms-vscode.makefile-tools",
-        "GitHub.Copilot",
-        "GitHub.Copilot-Chat",
-        "HashiCorp.terraform",
-        "charliermarsh.ruff",
-        "esbenp.prettier-vscode",
         "ms-python.python",
         "ms-python.debugpy",
-        "ms-python.vscode-pylance"
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
+        "hashicorp.terraform",
+        "redhat.ansible",
+        "GitHub.Copilot",
+        "GitHub.Copilot-Chat",
+        "GitHub.vscode-pull-request-github",
+        "SonarSource.sonarlint-vscode"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
           "tests"
         ],
-        "snyk.advanced.autoSelectOrganization": true
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "explicit"
+          }
+        },
+        "[markdown]": {
+          "editor.defaultFormatter": "vscode.markdown-language-features"
+        },
+        "[terraform]": {
+          "editor.defaultFormatter": "hashicorp.terraform",
+          "editor.formatOnSave": true
+        },
+        "sonarlint.ls.javaHome": "/opt/java-home"
       }
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  // Forward the host SSH agent socket rather than bind-mounting ~/.ssh.
+  // This avoids exposing key material inside the container and works correctly
+  // on Linux, macOS, and WSL without path-concatenation issues.
+  // To opt in to a key mount instead, see DEVELOP.md § SSH access.
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK}"
+  }
 }
-

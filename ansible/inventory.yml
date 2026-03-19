@@ -1,0 +1,26 @@
+# ansible/inventory.yml
+#
+# Stub inventory — populate with real targets before running playbooks.
+#
+# This file is intentionally minimal. The full inventory structure will be
+# defined as part of the Ansible Automation Platform integration (MVP phase).
+#
+# Example structure (do not commit real hostnames, IPs, or credentials):
+#
+# all:
+#   children:
+#     openshift:
+#       hosts:
+#         ocp-node-01:
+#           ansible_host: <node-ip>
+#     rhel:
+#       hosts:
+#         baseline-host-01:
+#           ansible_host: <host-ip>
+#
+# For local development, copy this file to ansible/inventory.local.yml
+# (git-ignored) and populate it with your actual targets.
+# ansible/inventory.local.yml is excluded via .gitignore to prevent
+# accidental credential or IP address exposure.
+all:
+  children: {}
