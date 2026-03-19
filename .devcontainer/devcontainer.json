@@ -4,6 +4,7 @@
     "dockerfile": "Dockerfile"
   },
   "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/terraform:1": {},
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
@@ -20,10 +21,12 @@
       "extensions": [
         // Core language and workflow extensions only. Keep this list small to
         // avoid surprising users with a heavy extension footprint on rebuild.
+        "ms-vscode.makefile-tools",
         "ms-python.python",
         "ms-python.debugpy",
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
         "hashicorp.terraform",
         "redhat.ansible",
         "GitHub.Copilot",
