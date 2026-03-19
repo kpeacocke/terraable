@@ -216,6 +216,10 @@ poetry run mypy terraable --show-error-codes
 - Never commit secrets. Use environment variables (`.env.example` provided).
 - Validate externally sourced input in automation workflows.
 - Run `snyk code test` before pushing feature branches with first-party code.
+- Snyk organisation: the extension auto-selects based on your authenticated account. If you need to
+  pin a specific org, add `"snyk.advanced.organization": "<your-org-id>"` to your personal
+  `.vscode/settings.json` (not committed) or configure it via the Snyk extension settings UI.
+  Never commit org IDs or account identifiers to version control.
 - Responsible disclosure expectations are in [SECURITY.md](SECURITY.md).
 
 ## Questions?
