@@ -13,7 +13,7 @@ RUN set -eux; \
     # SonarQube for IDE uses a Java language server. Install a minimal runtime
     # so analysis works reliably in fresh containers.
     apt-get update; \
-    apt-get install -y --no-install-recommends openjdk-21-jre-headless; \
+    apt-get install -y --no-install-recommends default-jre-headless; \
     rm -rf /var/lib/apt/lists/*; \
     # Provide a stable Java home path for tools that fail to auto-detect JRE.
     JAVA_BIN="$(readlink -f "$(command -v java)")"; \
