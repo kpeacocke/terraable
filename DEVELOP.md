@@ -213,7 +213,7 @@ poetry run mypy terraable --show-error-codes
 
 ## Security notes
 
-- Never commit secrets. Use environment variables (`.env.example` provided).
+- Never commit secrets. Use environment variables (for local development, use an untracked `.env` file or your shell environment).
 - Validate externally sourced input in automation workflows.
 - Run `snyk code test` before pushing feature branches with first-party code.
 - Snyk organisation: the extension auto-selects based on your authenticated account. If you need to
