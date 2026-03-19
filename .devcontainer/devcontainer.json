@@ -35,7 +35,6 @@
         "SonarSource.sonarlint-vscode"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
           "tests"
