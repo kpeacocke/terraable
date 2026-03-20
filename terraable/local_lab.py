@@ -7,9 +7,10 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .contract import build_handoff_payload
 from .orchestrator import ActionName, ActionStatus
@@ -555,7 +556,8 @@ class LocalLabBackend:
                 "scan_count": 0,
                 "eda_enabled": False,
             }
-        return json.loads(self.state_file.read_text(encoding="utf-8"))
+        raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
+        return raw_state if isinstance(raw_state, dict) else {}
 
     def _save_state(self, state: dict[str, Any]) -> None:
         self.runtime_root.mkdir(parents=True, exist_ok=True)

@@ -46,8 +46,7 @@ def _extract_relationship_data_id(relationship: dict[str, Any]) -> str | None:
         return rel_id if isinstance(rel_id, str) and rel_id else None
 
     if isinstance(rel_data, list) and rel_data:
-        rel_data_list = cast(list[Any], rel_data)
-        first = rel_data_list[0]
+        first = rel_data[0]
         if isinstance(first, dict):
             first_dict = cast(dict[str, Any], first)
             rel_id = first_dict.get("id")
@@ -121,7 +120,10 @@ class HcpTerraformClient:
 
         try:
             with urlopen(request, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8"))
+                payload = json.loads(response.read().decode("utf-8"))
+                if isinstance(payload, dict):
+                    return cast(dict[str, Any], payload)
+                raise RuntimeError(f"HCP Terraform response was not a JSON object for {path}")
         except URLError as exc:
             raise RuntimeError(f"HCP Terraform request failed for {path}") from exc
 

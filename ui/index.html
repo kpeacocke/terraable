@@ -565,7 +565,8 @@
 
       if (authState.ready) {
         authStatusEl.className = "auth-status ok";
-        authStatusEl.textContent = `Authenticated and ready for ${selectedTarget}/${selectedPortal}.${sourceSummary ? ` Sources: ${sourceSummary}` : ""}`;
+        const sourceSuffix = sourceSummary ? ` Sources: ${sourceSummary}` : "";
+        authStatusEl.textContent = `Authenticated and ready for ${selectedTarget}/${selectedPortal}.${sourceSuffix}`;
         return;
       }
 

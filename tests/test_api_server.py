@@ -16,7 +16,7 @@ from terraable import api_server
 class _FakeBackend:
     def __init__(self, workspace_root: Path) -> None:
         self.workspace_root = workspace_root
-        self.auth_configured = {}
+        self.auth_configured: dict[str, str] = {}
 
     def get_state(self) -> dict[str, object]:
         return {"mode": "live-local-lab", "controls": {"ssh_root_login": True}}
