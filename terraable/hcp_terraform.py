@@ -98,8 +98,17 @@ class HcpTerraformClient:
         """Return the current run status string."""
 
         run = self.get_run(run_id)
-        return str(run["data"]["attributes"]["status"])
+        data = _as_str_dict(run.get("data"))
+        attributes = _as_str_dict(data.get("attributes"))
+        status = attributes.get("status")
 
+        if status is None:
+            raise RuntimeError(
+                f"HCP Terraform run {run_id} response does not include a status; "
+                "unable to determine run state."
+            )
+
+        return str(status)
     def get_state_version_outputs(self, state_version_id: str) -> dict[str, Any]:
         """Return outputs for a state version keyed by output name."""
 
