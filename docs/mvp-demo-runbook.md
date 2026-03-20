@@ -14,7 +14,7 @@ It applies to showcase, lab, and offline/mock execution paths used by contributo
 - Target selector: `openshift`, `aws`, or `local-lab`
 - Portal selector: `rhdh` or `backstage`
 - Security profile: `baseline` or `strict`
-- EDA toggle: enabled or disabled
+- EDA toggle: `enabled` or `disabled` (MVP: informational/UI-only, does not change the Terraform-to-Ansible handoff or Python runtime models; used to narrate the future EDA path planned for Phase 2)
 
 ## Procedure
 1. Start with control-plane selectors and create environment request.
