@@ -3,18 +3,56 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Any
+import os
+from dataclasses import dataclass, field
+from typing import Any, cast
 from urllib.error import URLError
 from urllib.request import Request, urlopen
+
+TFC_TOKEN_ENV_VAR = "TF_TOKEN_app_terraform_io"
+TFC_HOSTNAME_ENV_VAR = "TERRAABLE_TFC_HOSTNAME"
+
+
+def _as_str_dict(value: Any) -> dict[str, Any]:
+    """Return a dictionary with string keys, or an empty dictionary."""
+
+    if not isinstance(value, dict):
+        return {}
+
+    # JSON object keys are strings by specification.
+    return cast("dict[str, Any]", value)
 
 
 @dataclass(frozen=True, slots=True)
 class HcpTerraformConfig:
     """Configuration for HCP Terraform API requests."""
 
-    token: str
+    token: str = field(repr=False)
     hostname: str = "app.terraform.io"
+
+    @classmethod
+    def from_env(
+        cls,
+        *,
+        token: str | None = None,
+        hostname: str | None = None,
+    ) -> HcpTerraformConfig:
+        """Build configuration from explicit values and environment variables.
+
+        Precedence:
+        1. Explicit keyword arguments.
+        2. Environment variables (`TF_TOKEN_app_terraform_io`, `TERRAABLE_TFC_HOSTNAME`).
+        3. Built-in defaults (hostname only).
+        """
+
+        resolved_token = token or os.getenv(TFC_TOKEN_ENV_VAR)
+        if not resolved_token:
+            raise ValueError(
+                f"Missing HCP Terraform token. Provide token explicitly or set {TFC_TOKEN_ENV_VAR}."
+            )
+
+        resolved_hostname = hostname or os.getenv(TFC_HOSTNAME_ENV_VAR) or "app.terraform.io"
+        return cls(token=resolved_token, hostname=resolved_hostname)
 
 
 class HcpTerraformClient:
@@ -64,18 +102,18 @@ class HcpTerraformClient:
 
         run = self.get_run(run_id)
 
-        data = run.get("data") or {}
-        attributes = data.get("attributes") or {}
+        data = _as_str_dict(run.get("data"))
+        attributes = _as_str_dict(data.get("attributes"))
         status = attributes.get("status")
-        relationships = data.get("relationships") or {}
-        apply_rel = relationships.get("apply") or {}
-        apply_data = apply_rel.get("data") or {}
+        relationships = _as_str_dict(data.get("relationships"))
+        apply_rel = _as_str_dict(relationships.get("apply"))
+        apply_data = _as_str_dict(apply_rel.get("data"))
         state_version_id = apply_data.get("id")
 
-        if not state_version_id:
+        if not isinstance(state_version_id, str) or not state_version_id:
             status_msg = f" (current status: {status})" if status is not None else ""
             raise RuntimeError(
                 f"HCP Terraform run {run_id} does not have an apply state yet; "
                 f"outputs are only available after a successful apply{status_msg}."
             )
-        return self.get_state_version_outputs(str(state_version_id))
+        return self.get_state_version_outputs(state_version_id)

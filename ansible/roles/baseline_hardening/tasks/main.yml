@@ -6,12 +6,16 @@
 - name: Ensure SSH daemon root login is hardened
   lineinfile:
     path: /etc/ssh/sshd_config
-    regexp: '^PermitRootLogin'
+    regexp: '^\s*#?\s*PermitRootLogin\b'
     line: 'PermitRootLogin no'
     create: true
     backup: true
   become: true
-  notify: restart sshd
+  register: sshd_root_login
 
-- name: Apply SSH daemon configuration immediately
-  meta: flush_handlers
+- name: Restart SSH daemon if configuration changed
+  ansible.builtin.service:
+    name: "{{ ssh_service_name | default('sshd') }}"
+    state: restarted
+  become: true
+  when: sshd_root_login is changed

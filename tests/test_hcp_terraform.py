@@ -83,3 +83,62 @@ def test_api_error_raises_runtime_error() -> None:
         pytest.raises(RuntimeError, match="HCP Terraform request failed"),
     ):
         client.get_run("run-3")
+
+
+@pytest.mark.unit
+def test_get_run_outputs_raises_when_apply_state_missing() -> None:
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    with patch(
+        "terraable.hcp_terraform.urlopen",
+        return_value=_FakeResponse(
+            {
+                "data": {
+                    "attributes": {"status": "planned_and_finished"},
+                    "relationships": {"apply": {"data": None}},
+                }
+            }
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="does not have an apply state yet"):
+            client.get_run_outputs("run-4")
+
+
+@pytest.mark.unit
+def test_config_from_env_reads_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "env-token")
+    monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "tfc.example.internal")
+
+    config = HcpTerraformConfig.from_env()
+
+    assert config.token == "env-token"
+    assert config.hostname == "tfc.example.internal"
+
+
+@pytest.mark.unit
+def test_config_from_env_prefers_explicit_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "env-token")
+    monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "env-host")
+
+    config = HcpTerraformConfig.from_env(token="explicit-token", hostname="explicit-host")
+
+    assert config.token == "explicit-token"
+    assert config.hostname == "explicit-host"
+
+
+@pytest.mark.unit
+def test_config_from_env_uses_default_hostname(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "env-token")
+    monkeypatch.delenv("TERRAABLE_TFC_HOSTNAME", raising=False)
+
+    config = HcpTerraformConfig.from_env()
+
+    assert config.hostname == "app.terraform.io"
+
+
+@pytest.mark.unit
+def test_config_from_env_raises_without_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TF_TOKEN_app_terraform_io", raising=False)
+
+    with pytest.raises(ValueError, match="Missing HCP Terraform token"):
+        HcpTerraformConfig.from_env()

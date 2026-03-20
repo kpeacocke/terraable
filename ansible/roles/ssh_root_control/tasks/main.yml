@@ -6,6 +6,10 @@
       command: sshd -T
       register: sshd_effective
       become: true
+      changed_when: false
+      failed_when: >-
+        sshd_effective.rc != 0 and
+        ('command not found' not in (sshd_effective.stderr | default('')))
 
     - name: Set scan facts
       set_fact:
@@ -24,7 +28,7 @@
     - name: Enforce PermitRootLogin setting in sshd_config
       lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^PermitRootLogin'
+        regexp: '^\s*#?\s*PermitRootLogin\b'
         line: 'PermitRootLogin no'
         create: true
         backup: true
