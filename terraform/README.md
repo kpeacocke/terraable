@@ -6,11 +6,11 @@ Terraform content for substrate provisioning and HCP Terraform handoff outputs.
 
 | Module | Target | Notes |
 |--------|--------|-------|
-| `modules/substrate_openshift` | Red Hat OpenShift | MVP target |
-| `modules/substrate_aws` | Amazon Web Services | Phase 2 target |
-| `modules/substrate_azure` | Microsoft Azure | Phase 2 target |
-| `modules/substrate_okd` | OKD (OpenShift community) | Phase 2 target |
-| `modules/substrate_local` | Local lab / workshop | Phase 2 target; `backstage` only |
+| `modules/substrate_local` | Local lab / workshop | MVP live path; `backstage` only |
+| `modules/substrate_openshift` | Red Hat OpenShift | MVP target; connects to existing cluster |
+| `modules/substrate_aws` | Amazon Web Services | Phase 2; provisions VPC + RHEL 9 EC2 instance |
+| `modules/substrate_azure` | Microsoft Azure | Phase 2; provisions RG + VNet + RHEL 9 VM |
+| `modules/substrate_okd` | OKD (OpenShift community) | Phase 2; connects to existing OKD cluster |
 
 ## Contract outputs
 

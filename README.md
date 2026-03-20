@@ -4,7 +4,7 @@ Reference demo showing HCP Terraform provisioning and Ansible Automation Platfor
 
 ## Status
 
-MVP foundation implemented.
+Local-lab now has an executable end-to-end path: UI -> Python API -> Terraform contract apply -> Ansible operational workflows against workspace-local lab files.
 
 ## MVP Scope
 
@@ -31,9 +31,33 @@ MVP foundation implemented.
 - Lab mode: reduced-complexity local target path.
 - Offline/mock mode: deterministic demo replay using simulated outcomes.
 
+## Running The Control Plane
+
+Preconditions:
+- `terraform` available on `PATH`.
+- Python environment has `ansible` installed.
+
+Run:
+
+```bash
+python -m terraable.api_server --host 127.0.0.1 --port 8000
+```
+
+Then open `http://127.0.0.1:8000`.
+
+Credential authentication:
+- Credentials can be provided from `.env` and/or entered in the UI Authentication panel.
+- Action buttons stay disabled until the selected target and portal are authenticated and executable.
+- For the current executable path (`local-lab`), `HCP_TERRAFORM_TOKEN` is required.
+
+Current executable scope:
+- `local-lab + backstage` is wired end-to-end.
+- Other target selectors remain contract scaffolding and return an explicit failure from the API until provider-specific execution paths are implemented.
+
 ## Key Documentation
 
 - [Architecture overview](docs/architecture-overview.md)
+- [Credential matrix](docs/credentials-matrix.md)
 - [Handoff contract](docs/handoff-contract.md)
 - [HCP Terraform integration](docs/hcp-terraform.md)
 - [MVP demo runbook](docs/mvp-demo-runbook.md)

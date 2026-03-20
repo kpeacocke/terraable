@@ -49,3 +49,20 @@ variable "ssh_port" {
   type        = number
   default     = 22
 }
+
+variable "instance_type" {
+  description = "EC2 instance type for the substrate node"
+  type        = string
+  default     = "t3.small"
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key content for the substrate key pair"
+  type        = string
+}
+
+variable "allowed_cidr_blocks" {
+  description = "CIDR blocks permitted to reach SSH, HTTP, and HTTPS on the substrate node. Restrict to operator IP ranges in non-demo environments."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

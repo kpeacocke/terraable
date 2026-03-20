@@ -48,3 +48,26 @@ variable "ssh_port" {
   type        = number
   default     = 22
 }
+
+variable "vnet_cidr" {
+  description = "Address space for the substrate virtual network"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "vm_size" {
+  description = "Azure VM size for the substrate node"
+  type        = string
+  default     = "Standard_B2s"
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key content for admin access to the substrate VM"
+  type        = string
+}
+
+variable "allowed_source_prefix" {
+  description = "Source IP prefix permitted for SSH, HTTP, and HTTPS inbound rules. Restrict to operator IP ranges in non-demo environments."
+  type        = string
+  default     = "*"
+}

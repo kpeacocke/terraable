@@ -4,18 +4,30 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Terraable Control Plane</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;700&family=Red+Hat+Text:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
+    /* Red Hat / PatternFly dark theme */
     :root {
-      --bg: #f3efe6;
-      --ink: #162029;
-      --accent: #ba4a00;
-      --accent-2: #2563eb;
-      --card: #fffaf1;
-      --border: #d7c8b6;
-      --ok: #1e7f3b;
-      --warn: #94570b;
-      --fail: #a11d1d;
-      --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+      --bg: #1b1d21;
+      --bg-2: #0f0f0f;
+      --ink: #e0e0e0;
+      --ink-muted: #8a8d90;
+      --accent: #ee0000;    /* Red Hat red */
+      --accent-dark: #a30000;
+      --accent-2: #004080;  /* Red Hat blue */
+      --accent-2-light: #2b9af3;
+      --card: #212427;
+      --border: #3c3f42;
+      --ok: #3e8635;        /* PatternFly success */
+      --ok-bg: #1e3a1a;
+      --warn: #f0ab00;      /* PatternFly warning */
+      --warn-bg: #3d2f00;
+      --fail: #c9190b;      /* PatternFly danger */
+      --fail-bg: #3d0f0c;
+      --font: "Red Hat Text", "Open Sans", sans-serif;
+      --font-display: "Red Hat Display", "Red Hat Text", sans-serif;
     }
 
     * { box-sizing: border-box; }
@@ -23,11 +35,52 @@
       margin: 0;
       font-family: var(--font);
       color: var(--ink);
-      background: radial-gradient(circle at 20% 10%, #fff5dc 0%, var(--bg) 35%, #e8e2d8 100%);
+      background: var(--bg-2);
+      background-image: radial-gradient(ellipse at 0% 0%, #2b0000 0%, transparent 50%),
+                        radial-gradient(ellipse at 100% 100%, #0d1f35 0%, transparent 50%);
+      min-height: 100vh;
+    }
+    .masthead {
+      background: #151515;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 56px;
+    }
+    .rh-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .rh-hat {
+      width: 30px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .masthead-title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.01em;
+    }
+    .masthead-sub {
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      margin-left: 4px;
     }
     .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    h1 { margin: 0 0 8px; letter-spacing: 0.02em; }
-    .subtitle { margin: 0 0 20px; color: #3d4a56; }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 0 4px;
+      color: #fff;
+    }
+    .subtitle { margin: 0 0 20px; color: var(--ink-muted); font-size: 0.9rem; }
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -42,89 +95,181 @@
     .panel {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 4px;
       padding: 16px;
-      box-shadow: 0 10px 26px rgba(22, 32, 41, 0.08);
-      animation: rise 300ms ease-out;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      animation: rise 250ms ease-out;
     }
-    .panel h2 { margin: 0 0 12px; font-size: 1rem; }
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
     @keyframes rise {
-      from { opacity: 0; transform: translateY(10px); }
+      from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
     .field { margin: 0 0 10px; }
-    .field label { display: block; font-size: 0.9rem; margin-bottom: 4px; }
+    .field label { display: block; font-size: 0.82rem; margin-bottom: 4px; color: var(--ink-muted); }
     .field select {
       width: 100%;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #fff;
-      padding: 8px;
+      border-radius: 3px;
+      background: #2b2e33;
+      color: var(--ink);
+      padding: 7px 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
     }
+    .field input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: #2b2e33;
+      color: var(--ink);
+      padding: 7px 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
+    }
+    .field select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
     .actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(140px, 1fr));
       gap: 8px;
+      margin-top: 4px;
     }
     button {
-      border: 0;
-      border-radius: 9px;
-      padding: 10px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      padding: 9px 12px;
       background: var(--accent);
       color: #fff;
       cursor: pointer;
+      font-family: var(--font);
       font-weight: 700;
-      transition: transform 120ms ease, filter 120ms ease;
+      font-size: 0.82rem;
+      transition: background 100ms ease, border-color 100ms ease;
     }
-    button.secondary { background: var(--accent-2); }
-    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
-    ul { margin: 0; padding-left: 20px; }
-    li { margin: 6px 0; font-size: 0.88rem; }
-    .ok { color: var(--ok); }
+    button:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+    button.secondary {
+      background: transparent;
+      border-color: var(--accent-2-light);
+      color: var(--accent-2-light);
+    }
+    button.secondary:hover { background: rgba(43, 154, 243, 0.12); }
+    ul { margin: 0; padding-left: 18px; }
+    li { margin: 5px 0; font-size: 0.82rem; font-family: "Red Hat Text Mono", "Courier New", monospace; }
+    .ok { color: #5ba352; }
     .warn { color: var(--warn); }
-    .fail { color: var(--fail); }
+    .fail { color: #f56d63; }
     .score-bar-wrap { margin: 8px 0; }
-    .score-label { font-size: 0.85rem; margin-bottom: 4px; }
+    .score-label { font-size: 0.8rem; margin-bottom: 4px; color: var(--ink-muted); }
     .score-bar {
-      height: 12px;
-      border-radius: 6px;
-      background: #e5e0d8;
+      height: 10px;
+      border-radius: 2px;
+      background: #333;
       overflow: hidden;
     }
     .score-bar-fill {
       height: 100%;
-      border-radius: 6px;
+      border-radius: 2px;
       background: var(--ok);
       transition: width 400ms ease;
     }
     .score-bar-fill.warn { background: var(--warn); }
     .score-bar-fill.fail { background: var(--fail); }
-    .score-pct { font-size: 1.4rem; font-weight: 700; margin: 4px 0; }
+    .score-pct {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 4px 0;
+      color: #fff;
+    }
     .eda-badge {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-size: 0.75rem;
+      padding: 1px 7px;
+      border-radius: 2px;
+      font-size: 0.7rem;
       font-weight: 700;
-      background: #e8f5e9;
-      color: var(--ok);
-      border: 1px solid #a5d6a7;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--ok-bg);
+      color: #5ba352;
+      border: 1px solid var(--ok);
+      margin-left: 6px;
+      vertical-align: middle;
     }
-    .eda-badge.inactive { background: #f5f0ea; color: #888; border-color: #d7c8b6; }
-    .trend-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; margin: 4px 0; }
+    .eda-badge.inactive { background: #2b2e33; color: var(--ink-muted); border-color: var(--border); }
+    .demo-badge {
+      margin-left: auto;
+      padding: 2px 10px;
+      border-radius: 2px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: var(--warn-bg);
+      color: var(--warn);
+      border: 1px solid var(--warn);
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .trend-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; margin: 4px 0; }
     .trend-chip {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
+      width: 32px;
+      height: 22px;
+      border-radius: 2px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       flex-shrink: 0;
+      letter-spacing: 0.03em;
     }
-    .trend-chip.pass { background: #e8f5e9; color: var(--ok); }
-    .trend-chip.fail { background: #fdecea; color: var(--fail); }
+    .trend-chip.pass { background: var(--ok-bg); color: #5ba352; border: 1px solid var(--ok); }
+    .trend-chip.fail { background: var(--fail-bg); color: #f56d63; border: 1px solid var(--fail); }
+    .auth-status {
+      margin: 8px 0 12px;
+      font-size: 0.8rem;
+      color: var(--ink-muted);
+      min-height: 20px;
+    }
+    .auth-status.ok { color: #5ba352; }
+    .auth-status.fail { color: #f56d63; }
+    .hint {
+      margin-top: 8px;
+      font-size: 0.76rem;
+      color: var(--ink-muted);
+      line-height: 1.35;
+    }
+    details.cred-group { margin-bottom: 6px; }
+    details.cred-group > summary {
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      padding: 6px 0;
+      user-select: none;
+      list-style: none;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+    details.cred-group > summary::marker,
+    details.cred-group > summary::-webkit-details-marker { display: none; }
+    details.cred-group > summary::before {
+      content: "\25B6  ";
+      font-size: 0.6rem;
+      margin-right: 2px;
+    }
+    details.cred-group[open] > summary::before { content: "\25BC  "; }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       .grid-3 { grid-template-columns: 1fr; }
@@ -133,9 +278,22 @@
   </style>
 </head>
 <body>
+  <header class="masthead">
+    <a class="rh-logo" href="#" aria-label="Red Hat">
+      <!-- Red Hat fedora logo mark (simplified SVG) -->
+      <svg class="rh-hat" viewBox="0 0 30 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M20.5 14c0 0-2.2 3-5.5 3s-5.5-3-5.5-3H3.5C3.5 14 2 17 2 19h26c0-2-1.5-5-1.5-5h-6z" fill="#ee0000"/>
+        <path d="M15 3C9 3 5 8 5 8h20S21 3 15 3z" fill="#fff"/>
+        <path d="M5 8s-1 2.5-1 6h22c0-3.5-1-6-1-6H5z" fill="#cc0000"/>
+      </svg>
+      <span class="masthead-title">Terraable</span>
+    </a>
+    <span class="masthead-sub">Control Plane</span>
+    <span class="demo-badge" id="runtime-badge" title="Waiting for the Terraable API server.">Connecting</span>
+  </header>
   <main class="wrap">
-    <h1>Terraable Control Plane</h1>
-    <p class="subtitle">Action panel, compliance posture, EDA history, and evidence timeline.</p>
+    <h1 class="page-title">Environment Management</h1>
+    <p class="subtitle">Action panel &middot; compliance posture &middot; EDA history &middot; evidence timeline</p>
 
     <section class="grid">
       <article class="panel">
@@ -182,6 +340,61 @@
       </article>
 
       <article class="panel">
+        <h2>Credential Authentication</h2>
+        <details class="cred-group" id="creds-hcp" open>
+          <summary>HCP Terraform &mdash; required for all targets</summary>
+          <div class="field">
+            <label for="hcp-token">HCP Terraform token</label>
+            <input id="hcp-token" type="password" autocomplete="off" placeholder="From UI or .env" />
+          </div>
+        </details>
+        <details class="cred-group" id="creds-aws">
+          <summary>AWS</summary>
+          <div class="field">
+            <label for="aws-key">AWS access key ID</label>
+            <input id="aws-key" type="password" autocomplete="off" placeholder="Required for target=aws" />
+          </div>
+          <div class="field">
+            <label for="aws-secret">AWS secret access key</label>
+            <input id="aws-secret" type="password" autocomplete="off" placeholder="Required for target=aws" />
+          </div>
+        </details>
+        <details class="cred-group" id="creds-azure">
+          <summary>Azure</summary>
+          <div class="field">
+            <label for="arm-client-id">Azure client ID</label>
+            <input id="arm-client-id" type="text" autocomplete="off" placeholder="Required for target=azure" />
+          </div>
+          <div class="field">
+            <label for="arm-client-secret">Azure client secret</label>
+            <input id="arm-client-secret" type="password" autocomplete="off" placeholder="Required for target=azure" />
+          </div>
+          <div class="field">
+            <label for="arm-tenant-id">Azure tenant ID</label>
+            <input id="arm-tenant-id" type="text" autocomplete="off" placeholder="Required for target=azure" />
+          </div>
+          <div class="field">
+            <label for="arm-subscription-id">Azure subscription ID</label>
+            <input id="arm-subscription-id" type="text" autocomplete="off" placeholder="Required for target=azure" />
+          </div>
+        </details>
+        <details class="cred-group" id="creds-openshift">
+          <summary>OpenShift / OKD</summary>
+          <div class="field">
+            <label for="openshift-api">OpenShift API URL</label>
+            <input id="openshift-api" type="text" autocomplete="off" placeholder="Required for target=openshift/okd" />
+          </div>
+          <div class="field">
+            <label for="openshift-token">OpenShift token</label>
+            <input id="openshift-token" type="password" autocomplete="off" placeholder="Required for target=openshift/okd" />
+          </div>
+        </details>
+        <button id="save-auth">Save credentials</button>
+        <p id="auth-status" class="auth-status">Checking readiness...</p>
+        <div class="hint">Credentials can be sourced from .env or entered here. Action buttons stay locked until authentication and execution readiness checks pass.</div>
+      </article>
+
+      <article class="panel">
         <h2>Evidence and Status</h2>
         <ul id="evidence" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
       </article>
@@ -212,7 +425,7 @@
     </section>
   </main>
 
-  <script>
+  <script type="module">
     const evidence = document.getElementById("evidence");
     const edaHistory = document.getElementById("eda-history");
     const controlStatusEl = document.getElementById("control-status");
@@ -220,16 +433,22 @@
     const scorePctEl = document.getElementById("score-pct");
     const scoreBarFill = document.getElementById("score-bar-fill");
     const edaBadge = document.getElementById("eda-badge");
+    const runtimeBadge = document.getElementById("runtime-badge");
+    const authStatusEl = document.getElementById("auth-status");
+    const actionButtons = Array.from(document.querySelectorAll(".actions button"));
 
-    let driftActive = false;
-    let svcDriftActive = false;
-    let scanCount = 0;
-
-    // Track per-control pass/fail state for compliance score
     const controls = {
-      ssh_root_login: true,
-      portal_service_health: true,
+      ssh_root_login: false,
+      portal_service_health: false,
     };
+
+    let authState = {
+      authenticated: false,
+      ready: false,
+      blockers: ["auth status has not been loaded yet"],
+    };
+    let pendingAction = false;
+    let latestState = {};
 
     function updateComplianceScore() {
       const total = Object.keys(controls).length;
@@ -237,7 +456,11 @@
       const pct = Math.round((passing / total) * 100);
       scorePctEl.textContent = `${pct}%`;
       scoreBarFill.style.width = `${pct}%`;
-      scoreBarFill.className = "score-bar-fill" + (pct === 100 ? "" : pct >= 50 ? " warn" : " fail");
+      let scoreTone = "";
+      if (pct < 100) {
+        scoreTone = pct >= 50 ? " warn" : " fail";
+      }
+      scoreBarFill.className = `score-bar-fill${scoreTone}`;
 
       controlStatusEl.innerHTML = "";
       for (const [name, pass] of Object.entries(controls)) {
@@ -248,109 +471,275 @@
       }
     }
 
-    function addTrend(pct, label) {
-      const row = document.createElement("div");
-      row.className = "trend-row";
-      const chip = document.createElement("div");
-      chip.className = `trend-chip ${pct === 100 ? "pass" : "fail"}`;
-      chip.textContent = `${pct}%`;
-      const span = document.createElement("span");
-      span.textContent = label;
-      row.appendChild(chip);
-      row.appendChild(span);
-      trendListEl.prepend(row);
-      // Keep last 8 entries
-      while (trendListEl.children.length > 8) {
-        trendListEl.removeChild(trendListEl.lastChild);
+    function renderTrend(trend) {
+      trendListEl.innerHTML = "";
+      for (const entry of trend || []) {
+        const row = document.createElement("div");
+        row.className = "trend-row";
+        const chip = document.createElement("div");
+        chip.className = `trend-chip ${entry.pct === 100 ? "pass" : "fail"}`;
+        chip.textContent = `${entry.pct}%`;
+        const span = document.createElement("span");
+        span.textContent = entry.label;
+        row.appendChild(chip);
+        row.appendChild(span);
+        trendListEl.appendChild(row);
       }
     }
 
-    function addEvidence(message, tone) {
-      const item = document.createElement("li");
-      item.className = tone;
-      item.textContent = message;
-      evidence.prepend(item);
+    function renderLog(targetEl, entries) {
+      targetEl.innerHTML = "";
+      for (const entry of entries || []) {
+        const item = document.createElement("li");
+        item.className = entry.tone;
+        item.textContent = entry.message;
+        targetEl.appendChild(item);
+      }
     }
 
-    function addEdaEvent(message, tone) {
-      const edaMode = selected("eda");
-      if (edaMode !== "enabled") return;
-      const item = document.createElement("li");
-      item.className = tone;
-      item.textContent = `[EDA] ${message}`;
-      edaHistory.prepend(item);
+    function setRuntimeBadge(label, title, isFailure) {
+      runtimeBadge.textContent = label;
+      runtimeBadge.title = title;
+      runtimeBadge.style.color = isFailure ? "#f56d63" : "var(--warn)";
+      runtimeBadge.style.borderColor = isFailure ? "#c9190b" : "var(--warn)";
+      runtimeBadge.style.background = isFailure ? "#3d0f0c" : "var(--warn-bg)";
     }
 
     function selected(id) {
       return document.getElementById(id).value;
     }
 
-    document.getElementById("eda").addEventListener("change", () => {
-      const enabled = selected("eda") === "enabled";
-      edaBadge.textContent = enabled ? "enabled" : "disabled";
-      edaBadge.className = enabled ? "eda-badge" : "eda-badge inactive";
-    });
+    function syncCredentialGroups(target) {
+      const relevant = {
+        aws: ["creds-aws"],
+        azure: ["creds-azure"],
+        openshift: ["creds-openshift"],
+        okd: ["creds-openshift"],
+      };
+      const open = new Set(relevant[target] || []);
+      ["creds-aws", "creds-azure", "creds-openshift"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.open = open.has(id);
+      });
+    }
 
-    document.getElementById("create").addEventListener("click", () => {
-      const target = selected("target");
-      const portal = selected("portal");
-      if (target === "local-lab" && portal === "rhdh") {
-        addEvidence("create_environment failed: unsupported combination local-lab + rhdh", "fail");
+    function requiredFieldsByTarget(target) {
+      if (target === "aws") {
+        return ["HCP_TERRAFORM_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
+      }
+      if (target === "azure") {
+        return [
+          "HCP_TERRAFORM_TOKEN",
+          "ARM_CLIENT_ID",
+          "ARM_CLIENT_SECRET",
+          "ARM_TENANT_ID",
+          "ARM_SUBSCRIPTION_ID",
+        ];
+      }
+      if (target === "openshift" || target === "okd") {
+        return ["HCP_TERRAFORM_TOKEN", "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"];
+      }
+      return ["HCP_TERRAFORM_TOKEN"];
+    }
+
+    function updateActionButtons() {
+      const hasCurrentEnvironment = Boolean(latestState.current);
+      const baseReady = authState.ready && !pendingAction;
+      actionButtons.forEach((btn) => {
+        if (btn.id === "create") {
+          btn.disabled = !baseReady;
+          return;
+        }
+        btn.disabled = !baseReady || !hasCurrentEnvironment;
+      });
+    }
+
+    function renderAuthStatus() {
+      const selectedTarget = selected("target");
+      const selectedPortal = selected("portal");
+      const required = requiredFieldsByTarget(selectedTarget);
+      const sources = authState.credential_sources || {};
+      const sourceSummary = Object.entries(sources)
+        .map(([key, source]) => `${key}=${source}`)
+        .join(", ");
+
+      if (authState.ready) {
+        authStatusEl.className = "auth-status ok";
+        authStatusEl.textContent = `Authenticated and ready for ${selectedTarget}/${selectedPortal}.${sourceSummary ? ` Sources: ${sourceSummary}` : ""}`;
         return;
       }
 
-      addEvidence(
-        `create_environment succeeded: target=${target}, portal=${portal}, profile=${selected("profile")}, eda=${selected("eda")}`,
-        "ok"
-      );
-    });
+      const blockers = (authState.blockers || []).join("; ");
+      authStatusEl.className = "auth-status fail";
+      authStatusEl.textContent = `Blocked. Required: ${required.join(", ")}. ${blockers}`;
+    }
 
-    document.getElementById("baseline").addEventListener("click", () => {
-      const profile = selected("profile");
-      addEvidence(`apply_baseline succeeded: CIS-aligned baseline role set applied (profile=${profile})`, "ok");
-    });
-
-    document.getElementById("scan").addEventListener("click", () => {
-      scanCount++;
-      controls.ssh_root_login = !driftActive;
-      controls.portal_service_health = !svcDriftActive;
+    function renderState(state) {
+      latestState = state;
+      const stateControls = state.controls || {};
+      controls.ssh_root_login = Boolean(stateControls.ssh_root_login);
+      controls.portal_service_health = Boolean(stateControls.portal_service_health);
       updateComplianceScore();
+      renderTrend(state.trend || []);
+      renderLog(evidence, state.evidence || []);
+      renderLog(edaHistory, state.eda_history || []);
 
-      const total = Object.keys(controls).length;
-      const passing = Object.values(controls).filter(Boolean).length;
-      const pct = Math.round((passing / total) * 100);
-      addTrend(pct, `Scan #${scanCount}`);
+      const edaEnabled = Boolean(state.eda_enabled);
+      edaBadge.textContent = edaEnabled ? "enabled" : "disabled";
+      edaBadge.className = edaEnabled ? "eda-badge" : "eda-badge inactive";
 
-      if (driftActive || svcDriftActive) {
-        const failing = Object.entries(controls).filter(([, v]) => !v).map(([k]) => k).join(", ");
-        addEvidence(`run_compliance_scan failed: drift detected on ${failing}`, "fail");
-        addEdaEvent(`compliance_drift event emitted for ${failing}`, "warn");
-      } else {
-        addEvidence("run_compliance_scan succeeded: all baseline controls compliant", "ok");
+      if (state.current) {
+        document.getElementById("target").value = state.current.target;
+        document.getElementById("portal").value = state.current.portal;
+        document.getElementById("profile").value = state.current.profile;
+        document.getElementById("eda").value = state.current.eda;
+      }
+
+      if (state.auth) {
+        authState = state.auth;
+      }
+      renderAuthStatus();
+      updateActionButtons();
+    }
+
+    async function api(path, payload) {
+      const response = await fetch(path, {
+        method: payload ? "POST" : "GET",
+        headers: { "Content-Type": "application/json" },
+        body: payload ? JSON.stringify(payload) : undefined,
+      });
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+      return response.json();
+    }
+
+    async function refreshState() {
+      try {
+        const data = await api("/api/state");
+        renderState(data.state);
+        setRuntimeBadge("Live local-lab", "Browser is connected to the Terraable API server.", false);
+      } catch (error) {
+        setRuntimeBadge("API offline", String(error), true);
+      }
+    }
+
+    async function refreshAuthStatus() {
+      const query = new URLSearchParams({
+        target: selected("target"),
+        portal: selected("portal"),
+      });
+      const data = await api(`/api/auth/status?${query.toString()}`);
+      authState = data.auth;
+      renderAuthStatus();
+      updateActionButtons();
+    }
+
+    async function saveCredentials() {
+      const payload = {
+        credentials: {
+          HCP_TERRAFORM_TOKEN: document.getElementById("hcp-token").value,
+          AWS_ACCESS_KEY_ID: document.getElementById("aws-key").value,
+          AWS_SECRET_ACCESS_KEY: document.getElementById("aws-secret").value,
+          ARM_CLIENT_ID: document.getElementById("arm-client-id").value,
+          ARM_CLIENT_SECRET: document.getElementById("arm-client-secret").value,
+          ARM_TENANT_ID: document.getElementById("arm-tenant-id").value,
+          ARM_SUBSCRIPTION_ID: document.getElementById("arm-subscription-id").value,
+          OPENSHIFT_API_URL: document.getElementById("openshift-api").value,
+          OPENSHIFT_TOKEN: document.getElementById("openshift-token").value,
+        },
+      };
+      const data = await api("/api/auth/configure", payload);
+      authState = data.auth;
+      renderAuthStatus();
+      updateActionButtons();
+    }
+
+    async function withPending(btn, pendingLabel, fn) {
+      const origLabel = btn.textContent;
+      pendingAction = true;
+      updateActionButtons();
+      btn.textContent = pendingLabel;
+      try {
+        await fn();
+      } finally {
+        btn.textContent = origLabel;
+        pendingAction = false;
+        await refreshAuthStatus();
+      }
+    }
+
+    async function runAction(btn, pendingLabel, action, payload) {
+      await withPending(btn, pendingLabel, async () => {
+        try {
+          const response = await api(`/api/actions/${action}`, payload);
+          renderState(response.state);
+        } catch (error) {
+          setRuntimeBadge("API offline", String(error), true);
+        }
+      });
+    }
+
+    document.getElementById("create").addEventListener("click", function() {
+      runAction(this, "Provisioning...", "create_environment", {
+        target: selected("target"),
+        portal: selected("portal"),
+        profile: selected("profile"),
+        eda: selected("eda"),
+      });
+    });
+
+    document.getElementById("baseline").addEventListener("click", function() {
+      runAction(this, "Applying...", "apply_baseline", {});
+    });
+
+    document.getElementById("scan").addEventListener("click", function() {
+      runAction(this, "Scanning...", "run_compliance_scan", {});
+    });
+
+    document.getElementById("drift").addEventListener("click", function() {
+      runAction(this, "Injecting...", "inject_ssh_drift", {});
+    });
+
+    document.getElementById("drift-svc").addEventListener("click", function() {
+      runAction(this, "Injecting...", "inject_service_drift", {});
+    });
+
+    document.getElementById("remediate").addEventListener("click", function() {
+      runAction(this, "Remediating...", "run_remediation", {});
+    });
+
+    document.getElementById("save-auth").addEventListener("click", async function() {
+      const original = this.textContent;
+      this.disabled = true;
+      this.textContent = "Saving...";
+      try {
+        await saveCredentials();
+      } catch (error) {
+        authState = {
+          authenticated: false,
+          ready: false,
+          blockers: [String(error)],
+        };
+        renderAuthStatus();
+        updateActionButtons();
+      } finally {
+        this.textContent = original;
+        this.disabled = false;
       }
     });
 
-    document.getElementById("drift").addEventListener("click", () => {
-      driftActive = true;
-      addEvidence("inject_ssh_drift succeeded: set PermitRootLogin yes", "warn");
-      addEdaEvent("EDA: ssh_root_login drift injected — rulebook triggered", "warn");
+    document.getElementById("target").addEventListener("change", async () => {
+      syncCredentialGroups(selected("target"));
+      await refreshAuthStatus();
+    });
+    document.getElementById("portal").addEventListener("change", async () => {
+      await refreshAuthStatus();
     });
 
-    document.getElementById("drift-svc").addEventListener("click", () => {
-      svcDriftActive = true;
-      addEvidence("inject_service_drift succeeded: portal service stopped", "warn");
-      addEdaEvent("EDA: portal_service_health drift injected — rulebook triggered", "warn");
-    });
-
-    document.getElementById("remediate").addEventListener("click", () => {
-      driftActive = false;
-      svcDriftActive = false;
-      addEvidence("run_remediation succeeded: restored PermitRootLogin no and portal service running", "ok");
-      addEdaEvent("EDA: remediation complete — all drift cleared", "ok");
-    });
-
-    // Initialise score display
-    updateComplianceScore();
+    syncCredentialGroups(selected("target"));
+    await refreshState();
+    await refreshAuthStatus();
   </script>
 </body>
 </html>

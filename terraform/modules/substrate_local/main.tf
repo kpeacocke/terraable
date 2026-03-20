@@ -3,9 +3,18 @@ locals {
   api_endpoint     = "http://${var.local_host}:8080"
 }
 
+resource "terraform_data" "environment_contract" {
+  input = {
+    environment_name = local.environment_name
+    portal_impl      = var.portal_impl
+    security_profile = var.security_profile
+    local_host       = var.local_host
+  }
+}
+
 output "environment_name" {
   description = "Environment identifier passed to Ansible workflows"
-  value       = local.environment_name
+  value       = terraform_data.environment_contract.output.environment_name
 }
 
 output "target_platform" {
@@ -15,12 +24,12 @@ output "target_platform" {
 
 output "portal_impl" {
   description = "Selected portal implementation"
-  value       = var.portal_impl
+  value       = terraform_data.environment_contract.output.portal_impl
 }
 
 output "security_profile" {
   description = "Selected security profile"
-  value       = var.security_profile
+  value       = terraform_data.environment_contract.output.security_profile
 }
 
 output "connection" {

@@ -7,22 +7,22 @@
 
 - name: Ensure SSH daemon root login is hardened
   lineinfile:
-    path: /etc/ssh/sshd_config
+    path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
     regexp: '^\s*#?\s*PermitRootLogin\b'
     line: 'PermitRootLogin no'
     create: true
     backup: true
-  become: true
+  become: "{{ not (lab_mode | default(false) | bool) }}"
   register: sshd_root_login
 
 - name: Disable SSH password authentication (baseline)
   lineinfile:
-    path: /etc/ssh/sshd_config
+    path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
     regexp: '^\s*#?\s*PasswordAuthentication\b'
     line: 'PasswordAuthentication no'
     create: true
     backup: true
-  become: true
+  become: "{{ not (lab_mode | default(false) | bool) }}"
   register: sshd_password_auth
 
 - name: Restart SSH daemon if configuration changed
@@ -30,7 +30,9 @@
     name: "{{ ssh_service_name | default('sshd') }}"
     state: restarted
   become: true
-  when: sshd_root_login is changed or sshd_password_auth is changed
+  when:
+    - not (lab_mode | default(false) | bool)
+    - sshd_root_login is changed or sshd_password_auth is changed
 
 # ── Strict-only controls ───────────────────────────────────────────────────────
 
@@ -39,32 +41,32 @@
   block:
     - name: Set SSH login grace time to 30 seconds (strict)
       lineinfile:
-        path: /etc/ssh/sshd_config
+        path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
         regexp: '^\s*#?\s*LoginGraceTime\b'
         line: 'LoginGraceTime 30'
         create: true
         backup: true
-      become: true
+      become: "{{ not (lab_mode | default(false) | bool) }}"
       register: sshd_login_grace
 
     - name: Set SSH max authentication attempts to 3 (strict)
       lineinfile:
-        path: /etc/ssh/sshd_config
+        path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
         regexp: '^\s*#?\s*MaxAuthTries\b'
         line: 'MaxAuthTries 3'
         create: true
         backup: true
-      become: true
+      become: "{{ not (lab_mode | default(false) | bool) }}"
       register: sshd_max_auth_tries
 
     - name: Disable X11 forwarding (strict)
       lineinfile:
-        path: /etc/ssh/sshd_config
+        path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
         regexp: '^\s*#?\s*X11Forwarding\b'
         line: 'X11Forwarding no'
         create: true
         backup: true
-      become: true
+      become: "{{ not (lab_mode | default(false) | bool) }}"
       register: sshd_x11
 
     - name: Restart SSH daemon after strict profile changes
@@ -72,7 +74,9 @@
         name: "{{ ssh_service_name | default('sshd') }}"
         state: restarted
       become: true
-      when: >-
-        sshd_login_grace is changed or
-        sshd_max_auth_tries is changed or
-        sshd_x11 is changed
+      when:
+        - not (lab_mode | default(false) | bool)
+        - >-
+          sshd_login_grace is changed or
+          sshd_max_auth_tries is changed or
+          sshd_x11 is changed

@@ -1,0 +1,10 @@
+---
+- name: SSH root login drift scenario
+  hosts: "{{ connection.ansible_inventory_group | default(target_group | default('all')) }}"
+  gather_facts: false
+  tasks:
+    - name: Inject SSH root login drift
+      include_role:
+        name: ssh_root_control
+      vars:
+        ssh_control_mode: inject

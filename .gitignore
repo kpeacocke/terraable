@@ -90,3 +90,4 @@ tmp/
 junit*.xml
 test-results/
 .scannerwork/
+.terraable/

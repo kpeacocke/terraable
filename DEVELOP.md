@@ -120,6 +120,11 @@ terraform validate
 poetry run pytest tests -m integration -v
 ```
 
+## Credential Planning
+
+Use the [credential matrix](docs/credentials-matrix.md) to assign owners, minimum scopes,
+and rotation targets for Dev, Test, Demo, and Prod before enabling live mode.
+
 ## Development workflow
 
 1. **Pick an issue** from the MVP, Phase 2, or Phase 3 milestone.

@@ -10,6 +10,40 @@ It applies to showcase, lab, and offline/mock execution paths used by contributo
 - Repository checks pass locally.
 - Target credentials are configured through environment variables.
 
+## Credential Readiness Checklist
+Use this checklist before any live demo run. For full credential definitions, owners, and minimum scope guidance, see [Credential Matrix](credentials-matrix.md).
+
+### Sign-off Rules
+- A run environment is `Ready` only when all required credential domains below are provisioned, validated, and not expired.
+- Use dedicated service accounts, not personal accounts.
+- Record sign-off evidence in your team run log or ticket system.
+
+### Environment Sign-off
+| Environment | Status | Signed By | Date | Notes |
+|---|---|---|---|---|
+| Dev | TODO |  |  |  |
+| Test | TODO |  |  |  |
+| Demo | TODO |  |  |  |
+| Prod | TODO |  |  |  |
+
+### Required Credential Domains
+Mark each row as `Ready` or `N/A` for the selected target path.
+
+| Credential Domain | Dev | Test | Demo | Prod | Validation Check |
+|---|---|---|---|---|---|
+| HCP Terraform API token and workspace access | TODO | TODO | TODO | TODO | `HcpTerraformClient.get_run_status()` returns successfully for a known run |
+| Target platform identity (AWS/Azure/OpenShift/OKD/local) | TODO | TODO | TODO | TODO | Target API auth succeeds and Terraform plan can read provider data |
+| AAP/AWX controller credentials | TODO | TODO | TODO | TODO | Controller API auth succeeds and a test job template can be launched |
+| SSH/host credentials for operational targets | TODO | TODO | TODO | TODO | Ansible ad-hoc ping or equivalent host reachability check passes |
+| Registry/SCM credentials for portal path | TODO | TODO | TODO | TODO | Portal artefacts/templates can be fetched without interactive auth |
+| EDA webhook and source authentication (if enabled) | TODO | TODO | TODO | TODO | Test event accepted and routed to the expected rulebook path |
+| DNS/TLS credentials (if applicable) | TODO | TODO | TODO | TODO | DNS write and certificate issuance/renewal smoke checks pass |
+| Secrets backend access (if used) | TODO | TODO | TODO | TODO | Required secret paths are readable by runtime identities only |
+
+### Go/No-Go Gate
+- Go: all required rows are `Ready` for the chosen environment and target selectors.
+- No-Go: any required row remains `TODO` or failed validation.
+
 ## Procedure Inputs
 - Target selector: `openshift`, `aws`, or `local-lab`
 - Portal selector: `rhdh` or `backstage`
