@@ -9,7 +9,9 @@
       changed_when: false
       failed_when: >-
         sshd_effective.rc != 0 and
-        ('command not found' not in (sshd_effective.stderr | default('')))
+        ('command not found' not in (sshd_effective.stderr | default('') | lower)) and
+        ('no such file or directory' not in (sshd_effective.stderr | default('') | lower)) and
+        ('[errno 2]' not in (sshd_effective.stderr | default('') | lower))
 
     - name: Set scan facts
       set_fact:
