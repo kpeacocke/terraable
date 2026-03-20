@@ -11,3 +11,7 @@
     create: true
     backup: true
   become: true
+  notify: restart sshd
+
+- name: Apply SSH daemon configuration immediately
+  meta: flush_handlers
