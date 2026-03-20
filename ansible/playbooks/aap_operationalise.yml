@@ -1,6 +1,6 @@
 ---
 - name: Post-provision operationalisation workflow
-  hosts: "{{ target_group | default('all') }}"
+  hosts: "{{ connection.ansible_inventory_group | default(target_group | default('all')) }}"
   gather_facts: false
   vars:
     portal_impl_in: "{{ portal_impl | default('backstage') }}"
