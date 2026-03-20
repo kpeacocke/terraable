@@ -16,7 +16,7 @@ class _FakeResponse:
     def __init__(self, payload: dict[str, Any]) -> None:
         self._payload = payload
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> _FakeResponse:
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
@@ -78,6 +78,8 @@ def test_get_run_outputs() -> None:
 def test_api_error_raises_runtime_error() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
-    with patch("terraable.hcp_terraform.urlopen", side_effect=URLError("network down")):
-        with pytest.raises(RuntimeError, match="HCP Terraform request failed"):
-            client.get_run("run-3")
+    with (
+        patch("terraable.hcp_terraform.urlopen", side_effect=URLError("network down")),
+        pytest.raises(RuntimeError, match="HCP Terraform request failed"),
+    ):
+        client.get_run("run-3")

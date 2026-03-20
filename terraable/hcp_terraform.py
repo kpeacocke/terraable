@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any
-from urllib.error import HTTPError, URLError
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
@@ -35,7 +35,7 @@ class HcpTerraformClient:
         try:
             with urlopen(request, timeout=30) as response:
                 return json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError) as exc:
+        except URLError as exc:
             raise RuntimeError(f"HCP Terraform request failed for {path}") from exc
 
     def get_run(self, run_id: str) -> dict[str, Any]:
