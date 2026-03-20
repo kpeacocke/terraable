@@ -1,6 +1,6 @@
 ---
 - name: Compliance scan workflow
-  hosts: "{{ target_group | default('all') }}"
+  hosts: "{{ connection.ansible_inventory_group | default(target_group | default('all')) }}"
   gather_facts: false
   tasks:
     - name: Validate SSH root login control
