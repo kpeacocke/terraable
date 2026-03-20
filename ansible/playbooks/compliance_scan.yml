@@ -18,4 +18,4 @@
             'status': ssh_root_login_status | default('unknown'),
             'evidence': ssh_root_login_evidence | default('not-collected')
           } | to_json }}
-        mode: "0644"
+        mode: "{{ scan_output_mode | default('0600') }}"
