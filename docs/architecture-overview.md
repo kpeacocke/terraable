@@ -22,7 +22,7 @@ Terraform provisions infrastructure. Ansible operationalises and enforces contro
 - `target_platform`: `openshift`, `aws`, `local-lab`
 - `portal_impl`: `rhdh`, `backstage`
 - `security_profile`: `baseline`, `strict`
-- `eda_enabled`: Boolean feature toggle for event-driven path
+- `eda`: UI-only selector for future event-driven path (`enabled` / `disabled`, Phase 2, not present in MVP handoff contract)
 
 ## Component Boundaries
 - Terraform content: substrate provisioning and outputs.
