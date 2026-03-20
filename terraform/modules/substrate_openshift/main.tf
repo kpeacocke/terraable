@@ -1,7 +1,3 @@
-terraform {
-  required_version = ">= 1.5.0"
-}
-
 locals {
   environment_name = var.environment_name
   api_endpoint     = "https://api.${var.cluster_name}.${var.base_domain}:6443"
