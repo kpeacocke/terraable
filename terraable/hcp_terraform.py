@@ -9,8 +9,17 @@ from typing import Any, cast
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-TFC_TOKEN_ENV_VAR = "TF_TOKEN_app_terraform_io"
 TFC_HOSTNAME_ENV_VAR = "TERRAABLE_TFC_HOSTNAME"
+
+
+def _hostname_to_token_env_var(hostname: str) -> str:
+    """Convert hostname to TF_TOKEN_* environment variable name.
+
+    Matches Terraform CLI convention: dots replaced with underscores.
+    E.g. "app.terraform.io" → "TF_TOKEN_app_terraform_io"
+    """
+    normalized = hostname.replace(".", "_")
+    return f"TF_TOKEN_{normalized}"
 
 
 def _as_str_dict(value: Any) -> dict[str, Any]:
@@ -41,17 +50,21 @@ class HcpTerraformConfig:
 
         Precedence:
         1. Explicit keyword arguments.
-        2. Environment variables (`TF_TOKEN_app_terraform_io`, `TERRAABLE_TFC_HOSTNAME`).
+        2. Environment variables. Token env var is derived from hostname:
+           - app.terraform.io → TF_TOKEN_app_terraform_io
+           - tfe.example.com → TF_TOKEN_tfe_example_com
         3. Built-in defaults (hostname only).
         """
 
-        resolved_token = token or os.getenv(TFC_TOKEN_ENV_VAR)
+        resolved_hostname = hostname or os.getenv(TFC_HOSTNAME_ENV_VAR) or "app.terraform.io"
+        token_env_var = _hostname_to_token_env_var(resolved_hostname)
+        resolved_token = token or os.getenv(token_env_var)
+
         if not resolved_token:
             raise ValueError(
-                f"Missing HCP Terraform token. Provide token explicitly or set {TFC_TOKEN_ENV_VAR}."
+                f"Missing HCP Terraform token. Provide token explicitly or set {token_env_var}."
             )
 
-        resolved_hostname = hostname or os.getenv(TFC_HOSTNAME_ENV_VAR) or "app.terraform.io"
         return cls(token=resolved_token, hostname=resolved_hostname)
 
 
@@ -66,7 +79,7 @@ class HcpTerraformClient:
             url=f"https://{self._config.hostname}{path}",
             headers={
                 "Authorization": f"Bearer {self._config.token}",
-                "Content-Type": "application/vnd.api+json",
+                "Accept": "application/vnd.api+json",
             },
         )
 

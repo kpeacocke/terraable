@@ -106,7 +106,7 @@ def test_get_run_outputs_raises_when_apply_state_missing() -> None:
 
 @pytest.mark.unit
 def test_config_from_env_reads_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "env-token")
+    monkeypatch.setenv("TF_TOKEN_tfc_example_internal", "env-token")
     monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "tfc.example.internal")
 
     config = HcpTerraformConfig.from_env()
@@ -117,7 +117,7 @@ def test_config_from_env_reads_env_vars(monkeypatch: pytest.MonkeyPatch) -> None
 
 @pytest.mark.unit
 def test_config_from_env_prefers_explicit_values(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "env-token")
+    monkeypatch.setenv("TF_TOKEN_env_host", "env-token")
     monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "env-host")
 
     config = HcpTerraformConfig.from_env(token="explicit-token", hostname="explicit-host")
@@ -141,4 +141,26 @@ def test_config_from_env_raises_without_token(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.delenv("TF_TOKEN_app_terraform_io", raising=False)
 
     with pytest.raises(ValueError, match="Missing HCP Terraform token"):
+        HcpTerraformConfig.from_env()
+
+
+@pytest.mark.unit
+def test_config_from_env_derives_token_env_var_from_hostname(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TF_TOKEN_tfe_example_com", "custom-token")
+
+    config = HcpTerraformConfig.from_env(hostname="tfe.example.com")
+
+    assert config.token == "custom-token"
+    assert config.hostname == "tfe.example.com"
+
+
+@pytest.mark.unit
+def test_config_from_env_error_shows_derived_env_var_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TF_TOKEN_app_terraform_io", raising=False)
+
+    with pytest.raises(ValueError, match="TF_TOKEN_app_terraform_io"):
         HcpTerraformConfig.from_env()
