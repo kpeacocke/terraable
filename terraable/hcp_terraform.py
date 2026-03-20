@@ -41,13 +41,16 @@ def _extract_relationship_data_id(relationship: dict[str, Any]) -> str | None:
 
     rel_data = relationship.get("data")
     if isinstance(rel_data, dict):
-        rel_id = rel_data.get("id")
+        rel_data_dict = cast(dict[str, Any], rel_data)
+        rel_id = rel_data_dict.get("id")
         return rel_id if isinstance(rel_id, str) and rel_id else None
 
     if isinstance(rel_data, list) and rel_data:
-        first = rel_data[0]
+        rel_data_list = cast(list[Any], rel_data)
+        first = rel_data_list[0]
         if isinstance(first, dict):
-            rel_id = first.get("id")
+            first_dict = cast(dict[str, Any], first)
+            rel_id = first_dict.get("id")
             return rel_id if isinstance(rel_id, str) and rel_id else None
 
     return None

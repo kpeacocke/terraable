@@ -209,9 +209,11 @@ def test_get_run_outputs_raises_when_apply_state_missing() -> None:
         ),
     ]
 
-    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
-        with pytest.raises(RuntimeError, match="does not have an apply state yet"):
-            client.get_run_outputs("run-4")
+    with (
+        patch("terraable.hcp_terraform.urlopen", side_effect=responses),
+        pytest.raises(RuntimeError, match="does not have an apply state yet"),
+    ):
+        client.get_run_outputs("run-4")
 
 
 @pytest.mark.unit
@@ -322,9 +324,11 @@ def test_get_run_outputs_raises_when_state_version_id_missing() -> None:
         ),
     ]
 
-    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
-        with pytest.raises(RuntimeError, match="does not have an apply state yet"):
-            client.get_run_outputs("run-5")
+    with (
+        patch("terraable.hcp_terraform.urlopen", side_effect=responses),
+        pytest.raises(RuntimeError, match="does not have an apply state yet"),
+    ):
+        client.get_run_outputs("run-5")
 
 
 @pytest.mark.unit
@@ -343,6 +347,8 @@ def test_get_run_outputs_raises_when_apply_is_missing() -> None:
         ),
     ]
 
-    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
-        with pytest.raises(RuntimeError, match="does not have an apply state yet"):
-            client.get_run_outputs("run-6")
+    with (
+        patch("terraable.hcp_terraform.urlopen", side_effect=responses),
+        pytest.raises(RuntimeError, match="does not have an apply state yet"),
+    ):
+        client.get_run_outputs("run-6")
