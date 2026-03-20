@@ -277,6 +277,29 @@ def test_config_from_env_error_shows_derived_env_var_name(
 
 
 @pytest.mark.unit
+def test_config_from_env_normalizes_hostname_with_hyphens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TF_TOKEN_tfc_my_company_internal", "hyphen-token")
+
+    config = HcpTerraformConfig.from_env(hostname="tfc.my-company.internal")
+
+    assert config.token == "hyphen-token"
+    assert config.hostname == "tfc.my-company.internal"
+
+
+@pytest.mark.unit
+def test_config_from_env_lowercases_hostname_in_env_var_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TF_TOKEN_tfc_example_com", "uppercase-token")
+
+    config = HcpTerraformConfig.from_env(hostname="TFC.EXAMPLE.COM")
+
+    assert config.token == "uppercase-token"
+
+
+@pytest.mark.unit
 def test_get_run_outputs_raises_when_state_version_id_missing() -> None:
     """Test error when apply has state_version but with no ID."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))

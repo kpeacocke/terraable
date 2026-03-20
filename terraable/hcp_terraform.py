@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, cast
 from urllib.error import URLError
@@ -15,10 +16,13 @@ TFC_HOSTNAME_ENV_VAR = "TERRAABLE_TFC_HOSTNAME"
 def _hostname_to_token_env_var(hostname: str) -> str:
     """Convert hostname to TF_TOKEN_* environment variable name.
 
-    Matches Terraform CLI convention: dots replaced with underscores.
-    E.g. "app.terraform.io" → "TF_TOKEN_app_terraform_io"
+    Matches Terraform CLI convention: lowercase and replace any non-alphanumeric
+    characters with underscores.
+    E.g.
+    - "app.terraform.io" → "TF_TOKEN_app_terraform_io"
+    - "tfc.my-company.internal" → "TF_TOKEN_tfc_my_company_internal"
     """
-    normalized = hostname.replace(".", "_")
+    normalized = re.sub(r"[^a-z0-9]", "_", hostname.lower())
     return f"TF_TOKEN_{normalized}"
 
 
