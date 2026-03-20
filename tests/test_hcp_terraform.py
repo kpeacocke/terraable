@@ -36,7 +36,7 @@ def test_get_run_status() -> None:
             {
                 "data": {
                     "attributes": {"status": "applied"},
-                    "relationships": {"apply": {"data": {"id": "sv-1"}}},
+                    "relationships": {"apply": {"data": {"id": "apply-1"}}},
                 }
             }
         ),
@@ -46,6 +46,7 @@ def test_get_run_status() -> None:
 
 @pytest.mark.unit
 def test_get_run_outputs() -> None:
+    """Test correct resolution chain: run -> apply -> state-version -> outputs."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
     responses = [
@@ -53,7 +54,14 @@ def test_get_run_outputs() -> None:
             {
                 "data": {
                     "attributes": {"status": "applied"},
-                    "relationships": {"apply": {"data": {"id": "sv-1"}}},
+                    "relationships": {"apply": {"data": {"id": "apply-1"}}},
+                }
+            }
+        ),
+        _FakeResponse(
+            {
+                "data": {
+                    "relationships": {"state_version": {"data": {"id": "sv-1"}}},
                 }
             }
         ),
@@ -75,6 +83,99 @@ def test_get_run_outputs() -> None:
 
 
 @pytest.mark.unit
+def test_get_run_outputs_uses_run_level_state_version_when_present() -> None:
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    responses = [
+        _FakeResponse(
+            {
+                "data": {
+                    "attributes": {"status": "applied"},
+                    "relationships": {"state-version": {"data": {"id": "sv-2"}}},
+                }
+            }
+        ),
+        _FakeResponse(
+            {
+                "data": [
+                    {"attributes": {"name": "environment_name", "value": "demo-direct"}},
+                ]
+            }
+        ),
+    ]
+
+    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
+        outputs = client.get_run_outputs("run-direct")
+
+    assert outputs["environment_name"] == "demo-direct"
+
+
+@pytest.mark.unit
+def test_get_run_outputs_resolves_hyphenated_state_version_from_apply() -> None:
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    responses = [
+        _FakeResponse(
+            {
+                "data": {
+                    "attributes": {"status": "applied"},
+                    "relationships": {"apply": {"data": {"id": "apply-7"}}},
+                }
+            }
+        ),
+        _FakeResponse(
+            {
+                "data": {
+                    "relationships": {"state-version": {"data": {"id": "sv-7"}}},
+                }
+            }
+        ),
+        _FakeResponse(
+            {
+                "data": [
+                    {"attributes": {"name": "api_endpoint", "value": "https://api.hyphen"}},
+                ]
+            }
+        ),
+    ]
+
+    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
+        outputs = client.get_run_outputs("run-7")
+
+    assert outputs["api_endpoint"] == "https://api.hyphen"
+
+
+@pytest.mark.unit
+def test_get_run_outputs_resolves_state_version_from_list_relationship() -> None:
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    responses = [
+        _FakeResponse(
+            {
+                "data": {
+                    "attributes": {"status": "applied"},
+                    "relationships": {
+                        "state-versions": {"data": [{"id": "sv-list-1"}]},
+                    },
+                }
+            }
+        ),
+        _FakeResponse(
+            {
+                "data": [
+                    {"attributes": {"name": "environment_name", "value": "demo-list"}},
+                ]
+            }
+        ),
+    ]
+
+    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
+        outputs = client.get_run_outputs("run-list")
+
+    assert outputs["environment_name"] == "demo-list"
+
+
+@pytest.mark.unit
 def test_api_error_raises_runtime_error() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -87,19 +188,28 @@ def test_api_error_raises_runtime_error() -> None:
 
 @pytest.mark.unit
 def test_get_run_outputs_raises_when_apply_state_missing() -> None:
+    """Test error when apply lacks state_version relationship."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
-    with patch(
-        "terraable.hcp_terraform.urlopen",
-        return_value=_FakeResponse(
+    responses = [
+        _FakeResponse(
             {
                 "data": {
                     "attributes": {"status": "planned_and_finished"},
-                    "relationships": {"apply": {"data": None}},
+                    "relationships": {"apply": {"data": {"id": "apply-2"}}},
                 }
             }
         ),
-    ):
+        _FakeResponse(
+            {
+                "data": {
+                    "relationships": {"state_version": {"data": None}},
+                }
+            }
+        ),
+    ]
+
+    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
         with pytest.raises(RuntimeError, match="does not have an apply state yet"):
             client.get_run_outputs("run-4")
 
@@ -164,3 +274,52 @@ def test_config_from_env_error_shows_derived_env_var_name(
 
     with pytest.raises(ValueError, match="TF_TOKEN_app_terraform_io"):
         HcpTerraformConfig.from_env()
+
+
+@pytest.mark.unit
+def test_get_run_outputs_raises_when_state_version_id_missing() -> None:
+    """Test error when apply has state_version but with no ID."""
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    responses = [
+        _FakeResponse(
+            {
+                "data": {
+                    "attributes": {"status": "applied"},
+                    "relationships": {"apply": {"data": {"id": "apply-3"}}},
+                }
+            }
+        ),
+        _FakeResponse(
+            {
+                "data": {
+                    "relationships": {"state_version": {"data": {}}},
+                }
+            }
+        ),
+    ]
+
+    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
+        with pytest.raises(RuntimeError, match="does not have an apply state yet"):
+            client.get_run_outputs("run-5")
+
+
+@pytest.mark.unit
+def test_get_run_outputs_raises_when_apply_is_missing() -> None:
+    """Test error when run has no apply relationship."""
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    responses = [
+        _FakeResponse(
+            {
+                "data": {
+                    "attributes": {"status": "planned"},
+                    "relationships": {"apply": {"data": None}},
+                }
+            }
+        ),
+    ]
+
+    with patch("terraable.hcp_terraform.urlopen", side_effect=responses):
+        with pytest.raises(RuntimeError, match="does not have an apply state yet"):
+            client.get_run_outputs("run-6")

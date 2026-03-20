@@ -32,6 +32,34 @@ def _as_str_dict(value: Any) -> dict[str, Any]:
     return cast("dict[str, Any]", value)
 
 
+def _extract_relationship_data_id(relationship: dict[str, Any]) -> str | None:
+    """Return relationship data ID for either object or list relationship payloads."""
+
+    rel_data = relationship.get("data")
+    if isinstance(rel_data, dict):
+        rel_id = rel_data.get("id")
+        return rel_id if isinstance(rel_id, str) and rel_id else None
+
+    if isinstance(rel_data, list) and rel_data:
+        first = rel_data[0]
+        if isinstance(first, dict):
+            rel_id = first.get("id")
+            return rel_id if isinstance(rel_id, str) and rel_id else None
+
+    return None
+
+
+def _get_state_version_id(relationships: dict[str, Any]) -> str | None:
+    """Return a state version ID from common JSON:API relationship key variants."""
+
+    for key in ("state_version", "state-version", "state_versions", "state-versions"):
+        state_version_rel = _as_str_dict(relationships.get(key))
+        state_version_id = _extract_relationship_data_id(state_version_rel)
+        if state_version_id:
+            return state_version_id
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class HcpTerraformConfig:
     """Configuration for HCP Terraform API requests."""
@@ -98,17 +126,14 @@ class HcpTerraformClient:
         """Return the current run status string."""
 
         run = self.get_run(run_id)
-        data = _as_str_dict(run.get("data"))
-        attributes = _as_str_dict(data.get("attributes"))
-        status = attributes.get("status")
+        return str(run["data"]["attributes"]["status"])
 
-        if status is None:
-            raise RuntimeError(
-                f"HCP Terraform run {run_id} response does not include a status; "
-                "unable to determine run state."
-            )
 
-        return str(status)
+    def get_apply(self, apply_id: str) -> dict[str, Any]:
+        """Return the apply payload from HCP Terraform."""
+
+        return self._request(f"/api/v2/applies/{apply_id}")
+
     def get_state_version_outputs(self, state_version_id: str) -> dict[str, Any]:
         """Return outputs for a state version keyed by output name."""
 
@@ -120,7 +145,10 @@ class HcpTerraformClient:
         return outputs
 
     def get_run_outputs(self, run_id: str) -> dict[str, Any]:
-        """Resolve a run to its state version outputs."""
+        """Resolve a run to its state version outputs.
+
+        Follows API resolution chain: run -> apply -> state-version -> outputs.
+        """
 
         run = self.get_run(run_id)
 
@@ -128,9 +156,26 @@ class HcpTerraformClient:
         attributes = _as_str_dict(data.get("attributes"))
         status = attributes.get("status")
         relationships = _as_str_dict(data.get("relationships"))
+
+        # Some API shapes expose a run-level state-version relationship directly.
+        run_state_version_id = _get_state_version_id(relationships)
+        if run_state_version_id:
+            return self.get_state_version_outputs(run_state_version_id)
+
         apply_rel = _as_str_dict(relationships.get("apply"))
-        apply_data = _as_str_dict(apply_rel.get("data"))
-        state_version_id = apply_data.get("id")
+        apply_id = _extract_relationship_data_id(apply_rel)
+
+        if not isinstance(apply_id, str) or not apply_id:
+            status_msg = f" (current status: {status})" if status is not None else ""
+            raise RuntimeError(
+                f"HCP Terraform run {run_id} does not have an apply state yet; "
+                f"outputs are only available after a successful apply{status_msg}."
+            )
+
+        apply = self.get_apply(apply_id)
+        apply_data_obj = _as_str_dict(apply.get("data"))
+        apply_relationships = _as_str_dict(apply_data_obj.get("relationships"))
+        state_version_id = _get_state_version_id(apply_relationships)
 
         if not isinstance(state_version_id, str) or not state_version_id:
             status_msg = f" (current status: {status})" if status is not None else ""
