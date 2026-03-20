@@ -8,10 +8,12 @@ from typing import Any
 
 
 class TargetPlatform(StrEnum):
-    """Supported MVP target platforms."""
+    """Supported target platforms."""
 
     OPENSHIFT = "openshift"
     AWS = "aws"
+    AZURE = "azure"
+    OKD = "okd"
     LOCAL_LAB = "local-lab"
 
 

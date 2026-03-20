@@ -1,3 +1,45 @@
-# Offline Mock Mode
+# Offline / Mock Mode
 
-Offline mode supports deterministic rehearsal runs using simulated outcomes and pre-seeded evidence.
+Offline mode supports deterministic rehearsal runs using simulated outcomes and pre-seeded evidence. No live HCP Terraform, AAP, or cloud credentials are needed.
+
+## When to use
+
+- Screenshot and screen-recording sessions where live infra is unavailable
+- Presenter rehearsal before a live demo
+- CI validation of UI and orchestrator logic without external dependencies
+
+## How it works
+
+Set `TERRAABLE_MOCK_MODE=true` in your environment (or in `.env`). When mock mode is active the `DemoOrchestrator` uses pre-seeded state and the UI actions emit deterministic evidence messages without making external API calls.
+
+## Quick start
+
+```bash
+cp .env.example .env
+# Ensure TERRAABLE_MOCK_MODE=true is set in .env
+
+source .venv/bin/activate
+open ui/index.html   # or: xdg-open ui/index.html
+```
+
+All UI actions (create, baseline, scan, drift, remediate) work immediately with no credentials.
+
+## Pre-seeded mock scenarios
+
+| Scenario | How to trigger |
+|----------|---------------|
+| Clean environment | Open UI, click **Create environment** |
+| SSH drift detected | Click **Inject SSH drift**, then **Run compliance scan** |
+| Service health drift | Click **Inject service drift**, then **Run compliance scan** |
+| EDA auto-remediation | Enable EDA in the selector before injecting drift |
+| Full remediation | After drift, click **Run remediation** to restore all controls |
+
+## Mock data location
+
+Pre-seeded scan outputs for offline demos are in [mock-data/](./mock-data/):
+
+- `scan-clean.json` — scan result with all controls passing
+- `scan-ssh-drift.json` — scan result with SSH drift present
+- `scan-service-drift.json` — scan result with service health drift
+
+These files can be used as fixture inputs for integration tests or screenshot scripts.

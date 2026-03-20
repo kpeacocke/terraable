@@ -24,7 +24,7 @@ __all__ = [
     "PortalImplementation",
     "SecurityProfile",
     "TargetPlatform",
+    "__version__",
     "build_handoff_payload",
     "validate_target_combination",
-    "__version__",
 ]

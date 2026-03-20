@@ -1,0 +1,114 @@
+---
+# AWX lab-mode bootstrap playbook
+# Idempotently creates or updates the Terraable project, credential type,
+# job templates, and inventory on a target AWX instance.
+#
+# Prerequisites:
+#   - AWX_HOST, AWX_USERNAME, AWX_PASSWORD environment variables set
+#   - awx.awx collection installed (ansible-galaxy collection install awx.awx)
+#
+# Usage:
+#   ansible-playbook ansible/awx/bootstrap_awx.yml
+#
+- name: Bootstrap Terraable on AWX
+  hosts: localhost
+  gather_facts: false
+  vars:
+    awx_host: "{{ lookup('env', 'AWX_HOST') }}"
+    awx_username: "{{ lookup('env', 'AWX_USERNAME') }}"
+    awx_password: "{{ lookup('env', 'AWX_PASSWORD') }}"
+    terraable_scm_url: "{{ lookup('env', 'TERRAABLE_SCM_URL') }}"
+  tasks:
+    - name: Validate required environment variables are set
+      ansible.builtin.assert:
+        that:
+          - awx_host | length > 0
+          - awx_username | length > 0
+          - awx_password | length > 0
+          - terraable_scm_url | length > 0
+        fail_msg: >-
+          AWX_HOST, AWX_USERNAME, AWX_PASSWORD, and TERRAABLE_SCM_URL
+          must be set in the environment.
+
+    - name: Create or update Terraable project
+      awx.awx.project:
+        name: terraable-lab
+        description: Terraable demo workflows running on AWX lab-mode controller
+        scm_type: git
+        scm_url: "{{ terraable_scm_url }}"
+        scm_branch: main
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present
+
+    - name: Create or update lab inventory
+      awx.awx.inventory:
+        name: terraable-lab-inventory
+        description: Lab inventory for local and workshop targets
+        organization: Default
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present
+
+    - name: Create or update operationalisation job template
+      awx.awx.job_template:
+        name: terraable-operationalise
+        description: Post-provision operationalisation workflow
+        project: terraable-lab
+        playbook: ansible/playbooks/aap_operationalise.yml
+        inventory: terraable-lab-inventory
+        ask_variables_on_launch: true
+        extra_vars:
+          portal_impl: backstage
+          security_profile: baseline
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present
+
+    - name: Create or update compliance scan job template
+      awx.awx.job_template:
+        name: terraable-compliance-scan
+        description: Compliance scan and evidence capture
+        project: terraable-lab
+        playbook: ansible/playbooks/compliance_scan.yml
+        inventory: terraable-lab-inventory
+        ask_variables_on_launch: true
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present
+
+    - name: Create or update SSH remediation job template
+      awx.awx.job_template:
+        name: terraable-remediate-ssh
+        description: Remediate SSH root login drift
+        project: terraable-lab
+        playbook: ansible/playbooks/remediate_ssh_root.yml
+        inventory: terraable-lab-inventory
+        ask_variables_on_launch: true
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present
+
+    - name: Create or update service health drift job template
+      awx.awx.job_template:
+        name: terraable-drift-second-scenario
+        description: Inject or remediate secondary drift scenario (service health)
+        project: terraable-lab
+        playbook: ansible/playbooks/drift_service_health.yml
+        inventory: terraable-lab-inventory
+        ask_variables_on_launch: true
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present

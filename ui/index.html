@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Terraable MVP Control Plane</title>
+  <title>Terraable Control Plane</title>
   <style>
     :root {
       --bg: #f3efe6;
@@ -25,13 +25,19 @@
       color: var(--ink);
       background: radial-gradient(circle at 20% 10%, #fff5dc 0%, var(--bg) 35%, #e8e2d8 100%);
     }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
     h1 { margin: 0 0 8px; letter-spacing: 0.02em; }
     .subtitle { margin: 0 0 20px; color: #3d4a56; }
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(280px, 1fr));
       gap: 16px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
     }
     .panel {
       background: var(--card);
@@ -41,6 +47,7 @@
       box-shadow: 0 10px 26px rgba(22, 32, 41, 0.08);
       animation: rise 300ms ease-out;
     }
+    .panel h2 { margin: 0 0 12px; font-size: 1rem; }
     @keyframes rise {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -72,12 +79,55 @@
     button.secondary { background: var(--accent-2); }
     button:hover { transform: translateY(-1px); filter: brightness(1.05); }
     ul { margin: 0; padding-left: 20px; }
-    li { margin: 6px 0; }
+    li { margin: 6px 0; font-size: 0.88rem; }
     .ok { color: var(--ok); }
     .warn { color: var(--warn); }
     .fail { color: var(--fail); }
-    @media (max-width: 780px) {
+    .score-bar-wrap { margin: 8px 0; }
+    .score-label { font-size: 0.85rem; margin-bottom: 4px; }
+    .score-bar {
+      height: 12px;
+      border-radius: 6px;
+      background: #e5e0d8;
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      background: var(--ok);
+      transition: width 400ms ease;
+    }
+    .score-bar-fill.warn { background: var(--warn); }
+    .score-bar-fill.fail { background: var(--fail); }
+    .score-pct { font-size: 1.4rem; font-weight: 700; margin: 4px 0; }
+    .eda-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #e8f5e9;
+      color: var(--ok);
+      border: 1px solid #a5d6a7;
+    }
+    .eda-badge.inactive { background: #f5f0ea; color: #888; border-color: #d7c8b6; }
+    .trend-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; margin: 4px 0; }
+    .trend-chip {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+    .trend-chip.pass { background: #e8f5e9; color: var(--ok); }
+    .trend-chip.fail { background: #fdecea; color: var(--fail); }
+    @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
       .actions { grid-template-columns: 1fr; }
     }
   </style>
@@ -85,7 +135,7 @@
 <body>
   <main class="wrap">
     <h1>Terraable Control Plane</h1>
-    <p class="subtitle">MVP action panel and evidence timeline for baseline, scan, drift, and remediation.</p>
+    <p class="subtitle">Action panel, compliance posture, EDA history, and evidence timeline.</p>
 
     <section class="grid">
       <article class="panel">
@@ -95,6 +145,8 @@
           <select id="target">
             <option value="openshift">openshift</option>
             <option value="aws">aws</option>
+            <option value="azure">azure</option>
+            <option value="okd">okd</option>
             <option value="local-lab">local-lab</option>
           </select>
         </div>
@@ -124,6 +176,7 @@
           <button class="secondary" id="baseline">Apply baseline</button>
           <button class="secondary" id="scan">Run compliance scan</button>
           <button class="secondary" id="drift">Inject SSH drift</button>
+          <button class="secondary" id="drift-svc">Inject service drift</button>
           <button class="secondary" id="remediate">Run remediation</button>
         </div>
       </article>
@@ -133,11 +186,84 @@
         <ul id="evidence" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
       </article>
     </section>
+
+    <section class="grid-3">
+      <article class="panel">
+        <h2>Compliance Score</h2>
+        <p class="score-pct" id="score-pct">100%</p>
+        <div class="score-bar-wrap">
+          <div class="score-label">Controls passing</div>
+          <div class="score-bar"><div class="score-bar-fill" id="score-bar-fill" style="width:100%"></div></div>
+        </div>
+        <ul id="control-status" style="margin-top:10px; padding-left:16px; font-size:0.82rem;"></ul>
+      </article>
+
+      <article class="panel">
+        <h2>Compliance Trend</h2>
+        <div id="trend-list"></div>
+      </article>
+
+      <article class="panel">
+        <h2>EDA Event History
+          <span class="eda-badge inactive" id="eda-badge">disabled</span>
+        </h2>
+        <ul id="eda-history" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
+      </article>
+    </section>
   </main>
 
   <script>
     const evidence = document.getElementById("evidence");
+    const edaHistory = document.getElementById("eda-history");
+    const controlStatusEl = document.getElementById("control-status");
+    const trendListEl = document.getElementById("trend-list");
+    const scorePctEl = document.getElementById("score-pct");
+    const scoreBarFill = document.getElementById("score-bar-fill");
+    const edaBadge = document.getElementById("eda-badge");
+
     let driftActive = false;
+    let svcDriftActive = false;
+    let scanCount = 0;
+
+    // Track per-control pass/fail state for compliance score
+    const controls = {
+      ssh_root_login: true,
+      portal_service_health: true,
+    };
+
+    function updateComplianceScore() {
+      const total = Object.keys(controls).length;
+      const passing = Object.values(controls).filter(Boolean).length;
+      const pct = Math.round((passing / total) * 100);
+      scorePctEl.textContent = `${pct}%`;
+      scoreBarFill.style.width = `${pct}%`;
+      scoreBarFill.className = "score-bar-fill" + (pct === 100 ? "" : pct >= 50 ? " warn" : " fail");
+
+      controlStatusEl.innerHTML = "";
+      for (const [name, pass] of Object.entries(controls)) {
+        const li = document.createElement("li");
+        li.className = pass ? "ok" : "fail";
+        li.textContent = `${name}: ${pass ? "pass" : "FAIL"}`;
+        controlStatusEl.appendChild(li);
+      }
+    }
+
+    function addTrend(pct, label) {
+      const row = document.createElement("div");
+      row.className = "trend-row";
+      const chip = document.createElement("div");
+      chip.className = `trend-chip ${pct === 100 ? "pass" : "fail"}`;
+      chip.textContent = `${pct}%`;
+      const span = document.createElement("span");
+      span.textContent = label;
+      row.appendChild(chip);
+      row.appendChild(span);
+      trendListEl.prepend(row);
+      // Keep last 8 entries
+      while (trendListEl.children.length > 8) {
+        trendListEl.removeChild(trendListEl.lastChild);
+      }
+    }
 
     function addEvidence(message, tone) {
       const item = document.createElement("li");
@@ -146,9 +272,24 @@
       evidence.prepend(item);
     }
 
+    function addEdaEvent(message, tone) {
+      const edaMode = selected("eda");
+      if (edaMode !== "enabled") return;
+      const item = document.createElement("li");
+      item.className = tone;
+      item.textContent = `[EDA] ${message}`;
+      edaHistory.prepend(item);
+    }
+
     function selected(id) {
       return document.getElementById(id).value;
     }
+
+    document.getElementById("eda").addEventListener("change", () => {
+      const enabled = selected("eda") === "enabled";
+      edaBadge.textContent = enabled ? "enabled" : "disabled";
+      edaBadge.className = enabled ? "eda-badge" : "eda-badge inactive";
+    });
 
     document.getElementById("create").addEventListener("click", () => {
       const target = selected("target");
@@ -165,26 +306,51 @@
     });
 
     document.getElementById("baseline").addEventListener("click", () => {
-      addEvidence("apply_baseline succeeded: CIS-aligned baseline role set applied", "ok");
+      const profile = selected("profile");
+      addEvidence(`apply_baseline succeeded: CIS-aligned baseline role set applied (profile=${profile})`, "ok");
     });
 
     document.getElementById("scan").addEventListener("click", () => {
-      if (driftActive) {
-        addEvidence("run_compliance_scan failed: detected PermitRootLogin yes drift", "fail");
+      scanCount++;
+      controls.ssh_root_login = !driftActive;
+      controls.portal_service_health = !svcDriftActive;
+      updateComplianceScore();
+
+      const total = Object.keys(controls).length;
+      const passing = Object.values(controls).filter(Boolean).length;
+      const pct = Math.round((passing / total) * 100);
+      addTrend(pct, `Scan #${scanCount}`);
+
+      if (driftActive || svcDriftActive) {
+        const failing = Object.entries(controls).filter(([, v]) => !v).map(([k]) => k).join(", ");
+        addEvidence(`run_compliance_scan failed: drift detected on ${failing}`, "fail");
+        addEdaEvent(`compliance_drift event emitted for ${failing}`, "warn");
       } else {
-        addEvidence("run_compliance_scan succeeded: baseline controls compliant", "ok");
+        addEvidence("run_compliance_scan succeeded: all baseline controls compliant", "ok");
       }
     });
 
     document.getElementById("drift").addEventListener("click", () => {
       driftActive = true;
       addEvidence("inject_ssh_drift succeeded: set PermitRootLogin yes", "warn");
+      addEdaEvent("EDA: ssh_root_login drift injected — rulebook triggered", "warn");
+    });
+
+    document.getElementById("drift-svc").addEventListener("click", () => {
+      svcDriftActive = true;
+      addEvidence("inject_service_drift succeeded: portal service stopped", "warn");
+      addEdaEvent("EDA: portal_service_health drift injected — rulebook triggered", "warn");
     });
 
     document.getElementById("remediate").addEventListener("click", () => {
       driftActive = false;
-      addEvidence("run_remediation succeeded: restored PermitRootLogin no", "ok");
+      svcDriftActive = false;
+      addEvidence("run_remediation succeeded: restored PermitRootLogin no and portal service running", "ok");
+      addEdaEvent("EDA: remediation complete — all drift cleared", "ok");
     });
+
+    // Initialise score display
+    updateComplianceScore();
   </script>
 </body>
 </html>

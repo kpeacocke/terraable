@@ -7,7 +7,7 @@
 git clone https://github.com/<your-org-or-username>/terraable.git
 cd terraable
 
-# Option A: Use VS Code dev container
+# Option A: Use VS Code dev container (recommended — all tooling pre-installed)
 # Open in VS Code and select "Reopen in Container"
 
 # Option B: Local setup (macOS/Linux/Windows with WSL)
@@ -15,6 +15,194 @@ python3 -m venv .venv
 source .venv/bin/activate  # or .\.venv\Scripts\activate on Windows
 pip install --upgrade pip
 ```
+
+## Prerequisites
+
+### VS Code dev container (recommended)
+
+- VS Code with Dev Containers extension.
+- Docker or Podman.
+- ~2GB free disk space.
+
+The dev container installs all required tooling automatically on first launch via `.devcontainer/post-create.sh`. No manual tool installation is needed.
+
+#### SSH access inside the container
+
+The dev container forwards your host SSH agent socket (`SSH_AUTH_SOCK`) rather than
+bind-mounting `~/.ssh`. This keeps private key material off the container filesystem
+and works correctly on Linux, macOS, and WSL without path-concatenation issues.
+
+Ensure your SSH agent is running on the host before opening the container:
+
+```bash
+# Linux / macOS / WSL
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519  # or your preferred key
+```
+
+### Local setup — tool versions
+
+| Tool | Minimum version | Install |
+|------|----------------|---------|
+| Python | 3.11 | <https://python.org> |
+| Poetry | 1.8 | `curl -sSL https://install.python-poetry.org \| python3 -` |
+| Terraform CLI | 1.5 | <https://developer.hashicorp.com/terraform/install> |
+| Ansible | 2.15 (ansible-core) | `pip install ansible` |
+| ansible-rulebook | 1.0 | `pip install ansible-rulebook` |
+| shellcheck | 0.9 | `apt install shellcheck` or `brew install shellcheck` |
+| markdownlint-cli2 | 0.13 | `npm install -g markdownlint-cli2` |
+| yamllint | 1.35 | `pip install yamllint` |
+| Git | 2.40 | System package manager |
+
+To verify all tools are available after local setup, run:
+
+```bash
+bash scripts/check-tools.sh
+```
+
+## Installation
+
+```bash
+# Install Python dependencies via Poetry
+poetry install
+
+# Verify installed tool versions
+poetry run python -c "import terraable; print('terraable OK')"
+terraform version
+ansible --version
+```
+
+## Running checks locally
+
+The following commands mirror the checks run in CI. Run all of them before opening a PR.
+
+### Unit tests with coverage
+
+```bash
+poetry run pytest tests -v --cov=terraable --cov-fail-under=100
+```
+
+### Type checking
+
+```bash
+poetry run mypy terraable
+```
+
+### Linting and formatting
+
+```bash
+# Ruff: code style and import order
+poetry run ruff check terraable tests
+
+# Auto-format code
+poetry run ruff format terraable tests
+
+# YAML lint
+yamllint .
+
+# Markdown lint
+markdownlint-cli2 "**/*.md"
+
+# Shell lint
+shellcheck scripts/*.sh
+```
+
+### Terraform validation
+
+```bash
+terraform fmt -check -recursive terraform/
+terraform validate
+```
+
+### Integration tests
+
+```bash
+poetry run pytest tests -m integration -v
+```
+
+## Development workflow
+
+1. **Pick an issue** from the MVP, Phase 2, or Phase 3 milestone.
+2. **Create a feature branch**: `git checkout -b feat/issue-123-short-title`
+3. **Implement** using the appropriate agent:
+   - Architecture/design → `mvp-architect` agent
+   - Implementation → `platform-builder` agent
+   - Security/compliance → `security-compliance` agent
+   - Demo/runbook → `demo-readiness` agent
+4. **Test**: Run `pytest tests -v --cov`, `ruff check`, `mypy`, `yamllint`, and `terraform validate`.
+5. **Docs**: Update relevant `.md` files in Australian English.
+6. **Push and open a PR**: Include test evidence and security implications in the PR summary.
+
+## Repository structure
+
+```text
+.
+├── .devcontainer/              # VS Code dev container setup
+├── .github/                    # Copilot, agents, workflows, and PR metadata
+├── ansible/
+│   ├── awx/                    # AWX lab-mode bootstrap playbook and config
+│   ├── eda/                    # EDA rulebooks, sources, and vars
+│   ├── inventory.yml           # Inventory stub (copy to inventory.local.yml for real use)
+│   ├── playbooks/              # Operational workflow playbooks
+│   └── roles/                  # Ansible roles (baseline_hardening, portal_deploy, ssh_root_control)
+├── docs/                       # Architecture, handoff contract, runbook, lab guide
+├── modes/
+│   ├── lab/                    # AWX-backed lab mode
+│   ├── offline/                # Offline/mock mode with pre-seeded data
+│   └── showcase/               # Live demo mode with HCP Terraform and AAP
+├── scripts/                    # Contributor helper scripts
+├── terraform/
+│   └── modules/
+│       ├── substrate_aws/      # AWS substrate module
+│       ├── substrate_azure/    # Azure substrate module
+│       ├── substrate_local/    # Local lab substrate module
+│       ├── substrate_okd/      # OKD substrate module
+│       └── substrate_openshift/ # OpenShift substrate module
+├── terraable/                  # Python package: contract, orchestrator, HCP Terraform client
+├── tests/                      # Python tests (100% coverage gate)
+├── ui/
+│   └── index.html              # Control-plane UI
+├── .env.example                # Sample environment variable reference
+├── CODEOWNERS
+├── CONTRIBUTING.md
+├── DEVELOP.md                  # This file
+├── README.md
+└── SECURITY.md
+```
+
+## Troubleshooting
+
+**pytest not found:**
+
+```bash
+poetry install
+```
+
+**Poetry not found:**
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+**Terraform errors:**
+
+```bash
+terraform init
+terraform validate
+```
+
+**Ansible connectivity issues:**
+
+Check [`ansible/inventory.yml`](ansible/inventory.yml) and ensure target systems are reachable.
+Copy it to `ansible/inventory.local.yml` (git-ignored) and populate with your actual hosts.
+Do not commit real hostnames or credentials.
+
+**AWX bootstrap fails:**
+
+Verify `AWX_HOST`, `AWX_USERNAME`, and `AWX_PASSWORD` are set in `.env` and that the AWX instance
+is reachable. Check TLS certificate validity with `curl -v $AWX_HOST`.
+
 
 ## Prerequisites
 

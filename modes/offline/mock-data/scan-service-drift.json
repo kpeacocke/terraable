@@ -1,0 +1,22 @@
+{
+  "scan_id": "mock-scan-003",
+  "timestamp": "2026-03-20T00:02:00Z",
+  "environment": "demo-offline",
+  "controls": [
+    {
+      "control": "ssh_root_login",
+      "status": "pass",
+      "evidence": "PermitRootLogin no confirmed in effective sshd configuration"
+    },
+    {
+      "control": "portal_service_health",
+      "status": "fail",
+      "evidence": "Service backstage inactive — service health drift injected"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passing": 1,
+    "score_pct": 50
+  }
+}

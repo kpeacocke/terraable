@@ -1,0 +1,48 @@
+---
+# AWX Project configuration for Terraable lab mode
+# Use this file as input for the AWX Project and Job Template bootstrap.
+# Provides the same operational workflows as the AAP path but targets AWX.
+
+project:
+  name: terraable-lab
+  description: Terraable demo workflows running on AWX lab-mode controller
+  scm_type: git
+  # Populate SCM_URL from your fork — do not hard-code credentials.
+  scm_url: "{{ lookup('env', 'TERRAABLE_SCM_URL') }}"
+  scm_branch: main
+
+credential_types:
+  - name: Terraable SSH
+    description: SSH key for target host access
+    kind: ssh
+
+job_templates:
+  - name: terraable-operationalise
+    description: Post-provision operationalisation workflow
+    playbook: ansible/playbooks/aap_operationalise.yml
+    ask_variables_on_launch: true
+    extra_vars:
+      portal_impl: backstage
+      security_profile: baseline
+
+  - name: terraable-compliance-scan
+    description: Compliance scan and evidence capture
+    playbook: ansible/playbooks/compliance_scan.yml
+    ask_variables_on_launch: true
+
+  - name: terraable-remediate-ssh
+    description: Remediate SSH root login drift
+    playbook: ansible/playbooks/remediate_ssh_root.yml
+    ask_variables_on_launch: true
+
+  - name: terraable-drift-second-scenario
+    description: Inject or remediate secondary drift scenario (service health)
+    playbook: ansible/playbooks/drift_service_health.yml
+    ask_variables_on_launch: true
+
+inventory:
+  name: terraable-lab-inventory
+  description: Lab inventory for local and workshop targets
+  # Inventory file populated from ansible/inventory.yml or dynamic source.
+  source: file
+  source_path: ansible/inventory.yml
