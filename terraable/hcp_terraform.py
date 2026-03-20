@@ -63,5 +63,19 @@ class HcpTerraformClient:
         """Resolve a run to its state version outputs."""
 
         run = self.get_run(run_id)
-        state_version_id = run["data"]["relationships"]["apply"]["data"]["id"]
+
+        data = run.get("data") or {}
+        attributes = data.get("attributes") or {}
+        status = attributes.get("status")
+        relationships = data.get("relationships") or {}
+        apply_rel = relationships.get("apply") or {}
+        apply_data = apply_rel.get("data") or {}
+        state_version_id = apply_data.get("id")
+
+        if not state_version_id:
+            status_msg = f" (current status: {status})" if status is not None else ""
+            raise RuntimeError(
+                f"HCP Terraform run {run_id} does not have an apply state yet; "
+                f"outputs are only available after a successful apply{status_msg}."
+            )
         return self.get_state_version_outputs(str(state_version_id))
