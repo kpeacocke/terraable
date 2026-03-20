@@ -32,9 +32,9 @@ It applies to showcase, lab, and offline/mock execution paths used by contributo
 
 ## Troubleshooting and Recovery
 
-- Auth or token errors when triggering actions:
-  - Confirm you are logged into the control-plane UI and any required token environment variables (for example, `DEMO_CONTROL_PLANE_TOKEN`) are set and not expired.
-  - Re-run a simple read-only action (such as listing runs) to confirm the session is valid before starting the full demo path.
+- Control-plane backend connectivity (showcase mode only):
+  - If you are running with a future or lab “showcase mode” backend (beyond the MVP static UI), follow that integration’s authentication and token configuration documentation, including any required environment variables for API access.
+  - For the MVP static control-plane UI (`ui/index.html`), there is no authentication or token layer; if you see auth-related errors, confirm you are simply serving the static UI correctly and fall back to offline/mock narration for any unsupported interactions.
 
 - Inventory connectivity issues during scan or remediation:
   - Check that the inventory synchronisation has completed successfully in AAP/AWX or the chosen automation controller.
