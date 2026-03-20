@@ -19,10 +19,19 @@
 
 - name: Remediate SSH root login to approved state
   when: ssh_control_mode == 'remediate'
-  lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^PermitRootLogin'
-    line: 'PermitRootLogin no'
-    create: true
-    backup: true
   become: true
+  block:
+    - name: Enforce PermitRootLogin setting in sshd_config
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        create: true
+        backup: true
+      register: ssh_root_login_remediation
+
+    - name: Restart SSH daemon to apply root login configuration
+      ansible.builtin.service:
+        name: "{{ ssh_service_name | default('sshd') }}"
+        state: restarted
+      when: ssh_root_login_remediation is changed
