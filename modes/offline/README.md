@@ -10,7 +10,7 @@ Offline mode supports deterministic rehearsal runs using simulated outcomes and 
 
 ## How it works
 
-Set `TERRAABLE_MOCK_MODE=true` in your environment (or in `.env`). When mock mode is active the `DemoOrchestrator` uses pre-seeded state and the UI actions emit deterministic evidence messages without making external API calls.
+Set `TERRAABLE_MOCK_MODE=true` before starting the API server. When mock mode is active, `LocalLabBackend` bypasses all credential requirements and returns deterministic pre-seeded responses for every action — no live HCP Terraform, AAP, or cloud credentials are needed.
 
 ## Quick start
 
@@ -19,10 +19,10 @@ cp .env.example .env
 # Ensure TERRAABLE_MOCK_MODE=true is set in .env
 
 source .venv/bin/activate
-open ui/index.html   # or: xdg-open ui/index.html
+TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
 ```
 
-All UI actions (create, baseline, scan, drift, remediate) work immediately with no credentials.
+Open `http://127.0.0.1:8000` in a browser. All UI actions (create, baseline, scan, drift, remediate) work immediately with no credentials.
 
 ## Pre-seeded mock scenarios
 

@@ -79,7 +79,14 @@ class _FakeBackend:
             "blockers": [],
         }
 
-    def configure_credentials(self, credentials: dict[str, str]) -> dict[str, object]:
+    def configure_credentials(
+        self,
+        credentials: dict[str, str],
+        *,
+        target: str = "local-lab",
+        portal: str = "backstage",
+    ) -> dict[str, object]:
+        del target, portal
         self.auth_configured = credentials
         return {
             "authenticated": bool(credentials.get("HCP_TERRAFORM_TOKEN")),
@@ -271,6 +278,100 @@ def test_handler_serves_auth_endpoints(
         )
         bad_payload = json.loads(urlopen(bad_request).read().decode("utf-8"))
         assert bad_payload["auth"]["authenticated"] is False
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_handler_returns_400_for_malformed_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        # Malformed JSON to /api/auth/configure should return 400.
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(
+                Request(
+                    f"{base}/api/auth/configure",
+                    data=b"not-json{{",
+                    headers={"Content-Type": "application/json", "Content-Length": "10"},
+                    method="POST",
+                )
+            )
+        assert excinfo.value.code == 400
+
+        # Malformed JSON to an action should return a JSON failure payload (not crash).
+        action_request = Request(
+            f"{base}/api/actions/run_compliance_scan",
+            data=b"not-json{{",
+            headers={"Content-Type": "application/json", "Content-Length": "10"},
+            method="POST",
+        )
+        error_payload = json.loads(urlopen(action_request).read().decode("utf-8"))
+        assert error_payload["status"] == "failed"
+        assert "Invalid JSON" in error_payload["detail"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_handler_configure_passes_target_and_portal(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, str] = {}
+
+    class _CapturingBackend(_FakeBackend):
+        def configure_credentials(
+            self,
+            credentials: dict[str, str],
+            *,
+            target: str = "local-lab",
+            portal: str = "backstage",
+        ) -> dict[str, object]:
+            captured["target"] = target
+            captured["portal"] = portal
+            return super().configure_credentials(credentials, target=target, portal=portal)
+
+    monkeypatch.setattr(api_server, "LocalLabBackend", _CapturingBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        request = Request(
+            f"{base}/api/auth/configure",
+            data=json.dumps(
+                {
+                    "credentials": {"HCP_TERRAFORM_TOKEN": "tok"},
+                    "target": "aws",
+                    "portal": "rhdh",
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urlopen(request)
+        assert captured == {"target": "aws", "portal": "rhdh"}
     finally:
         server.shutdown()
         server.server_close()

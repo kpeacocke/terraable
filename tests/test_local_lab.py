@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ import pytest
 
 from terraable.local_lab import (
     DRIFT_SERVICE_PLAYBOOK,
+    MOCK_MODE_ENV_VAR,
     CommandResult,
     LocalLabBackend,
     default_runner,
@@ -248,7 +250,7 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
 
 @pytest.mark.unit
 def test_default_runner_executes_subprocess() -> None:
-    result = default_runner(["python3", "-c", "print('ok')"], None, None)
+    result = default_runner([sys.executable, "-c", "print('ok')"], None, None)
 
     assert result.stdout.strip() == "ok"
     assert result.stderr == ""
@@ -373,7 +375,7 @@ def test_run_playbook_uses_local_inventory_and_ansible_config(tmp_path: Path) ->
     )
 
     argv, cwd, env = calls[0]
-    assert argv[0].endswith("python")
+    assert argv[0].endswith(("python", "python3"))
     assert argv[1:5] == ["-m", "ansible.cli.playbook", "-i", str(env_dir / "inventory.yml")]
     assert cwd == tmp_path / "ansible"
     assert env is not None
@@ -464,6 +466,21 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
 
 
 @pytest.mark.unit
+def test_configure_credentials_returns_auth_for_requested_target(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    auth = backend.configure_credentials(
+        {"HCP_TERRAFORM_TOKEN": "token"},
+        target="aws",
+        portal="backstage",
+    )
+
+    # AWS requires additional credentials; token alone is insufficient.
+    assert auth["ready"] is False
+    assert "AWS_ACCESS_KEY_ID" in auth["missing_credentials"]
+
+
+@pytest.mark.unit
 def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
@@ -510,3 +527,95 @@ def test_read_dotenv_skips_comments_and_invalid_lines(tmp_path: Path) -> None:
     loaded = backend._read_dotenv(dotenv_path)
 
     assert loaded == {"HCP_TERRAFORM_TOKEN": "from-dotenv"}
+
+
+@pytest.mark.unit
+def test_mock_mode_auth_is_always_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
+    backend = LocalLabBackend(tmp_path)
+
+    auth = backend.get_auth_status(target="any-target", portal="any-portal")
+
+    assert auth["ready"] is True
+    assert auth["missing_credentials"] == []
+    assert auth["blockers"] == []
+
+
+@pytest.mark.unit
+def test_mock_mode_state_reports_offline_mock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
+    backend = LocalLabBackend(tmp_path)
+
+    state = backend.get_state()
+
+    assert state["mode"] == "offline-mock"
+    assert state["auth"]["ready"] is True
+
+
+@pytest.mark.unit
+def test_mock_mode_full_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
+    backend = LocalLabBackend(tmp_path, clock=lambda: 1_700_000_000.0)
+
+    result = backend.create_environment(
+        target="local-lab", portal="backstage", profile="cis", eda="disabled"
+    )
+    assert result["status"] == "succeeded"
+    assert "mock" in result["detail"]
+    assert backend.get_state()["current"] is not None
+
+    result = backend.apply_baseline()
+    assert result["status"] == "succeeded"
+    assert result["state"]["controls"]["ssh_root_login"] is True
+
+    result = backend.run_compliance_scan()
+    assert result["status"] == "succeeded"
+
+    result = backend.inject_ssh_drift()
+    assert result["status"] == "succeeded"
+    assert result["state"]["controls"]["ssh_root_login"] is False
+
+    result = backend.run_compliance_scan()
+    assert result["status"] == "failed"
+    assert "ssh_root_login" in result["detail"]
+
+    result = backend.inject_service_drift()
+    assert result["status"] == "succeeded"
+    assert result["state"]["controls"]["portal_service_health"] is False
+
+    result = backend.run_remediation()
+    assert result["status"] == "succeeded"
+    state = backend.get_state()
+    assert state["controls"]["ssh_root_login"] is True
+    assert state["controls"]["portal_service_health"] is True
+
+
+@pytest.mark.unit
+def test_mock_mode_eda_events_on_drift_and_remediation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
+    backend = LocalLabBackend(tmp_path, clock=lambda: 1_700_000_000.0)
+
+    backend.create_environment(target="local-lab", portal="backstage", profile="cis", eda="enabled")
+
+    result = backend.inject_ssh_drift()
+    assert "state" in result
+    state = backend.get_state()
+    assert any("ssh_root_login" in e["message"] for e in state["eda_history"])
+
+    result = backend.inject_service_drift()
+    assert "state" in result
+    state = backend.get_state()
+    assert any("portal_service_health" in e["message"] for e in state["eda_history"])
+
+    backend.inject_ssh_drift()  # set ssh drift again for scan
+    result = backend.run_compliance_scan()
+    assert "state" in result
+
+    result = backend.run_remediation()
+    assert "state" in result
+    state = backend.get_state()
+    assert any("remediation complete" in e["message"] for e in state["eda_history"])

@@ -62,7 +62,6 @@ variable "ssh_public_key" {
 }
 
 variable "allowed_cidr_blocks" {
-  description = "CIDR blocks permitted to reach SSH, HTTP, and HTTPS on the substrate node. Restrict to operator IP ranges in non-demo environments."
+  description = "CIDR blocks permitted to reach SSH, HTTP, and HTTPS on the substrate node. Must be set explicitly — restrict to operator IP ranges to avoid world-open access."
   type        = list(string)
-  default     = ["0.0.0.0/0"]
 }

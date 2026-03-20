@@ -16,6 +16,7 @@ from .contract import build_handoff_payload
 from .orchestrator import ActionName, ActionStatus
 
 DRIFT_SERVICE_PLAYBOOK = "playbooks/drift_service_health.yml"
+MOCK_MODE_ENV_VAR = "TERRAABLE_MOCK_MODE"
 PORTAL_SERVICE_STATE_FILE = "portal_service.state"
 SUPPORTED_EXECUTION_TARGET = "local-lab"
 CREDENTIAL_KEYS = (
@@ -98,13 +99,14 @@ class LocalLabBackend:
         self.terraform_root = workspace_root / "integration" / "local_lab" / "terraform"
         self._runner = runner or default_runner
         self._clock = clock or time.time
+        self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
         self._credentials = self._bootstrap_credentials()
 
     def get_state(self) -> dict[str, Any]:
         """Return persisted UI state."""
 
         state = self._load_state()
-        state["mode"] = "live-local-lab"
+        state["mode"] = "offline-mock" if self._mock_mode else "live-local-lab"
         current = state.get("current")
         target = (
             str(current.get("target", SUPPORTED_EXECUTION_TARGET))
@@ -117,8 +119,14 @@ class LocalLabBackend:
         state["auth"] = self.get_auth_status(target=target, portal=portal)
         return state
 
-    def configure_credentials(self, credentials: dict[str, str]) -> dict[str, Any]:
-        """Merge credentials from the UI and report current auth status."""
+    def configure_credentials(
+        self,
+        credentials: dict[str, str],
+        *,
+        target: str = SUPPORTED_EXECUTION_TARGET,
+        portal: str = "backstage",
+    ) -> dict[str, Any]:
+        """Merge credentials from the UI and report current auth status for target/portal."""
 
         for key, value in credentials.items():
             if key not in CREDENTIAL_KEYS:
@@ -130,10 +138,20 @@ class LocalLabBackend:
                 # Clearing a UI field should remove only user-entered values.
                 self._credentials.pop(key)
 
-        return self.get_auth_status(target=SUPPORTED_EXECUTION_TARGET, portal="backstage")
+        return self.get_auth_status(target=target, portal=portal)
 
     def get_auth_status(self, *, target: str, portal: str) -> dict[str, Any]:
         """Return authentication and readiness checks for a selected environment request."""
+
+        if self._mock_mode:
+            return {
+                "authenticated": True,
+                "ready": True,
+                "required_credentials": [],
+                "missing_credentials": [],
+                "credential_sources": {"mode": "mock"},
+                "blockers": [],
+            }
 
         requirements = TARGET_CREDENTIAL_REQUIREMENTS.get(target, ("HCP_TERRAFORM_TOKEN",))
         missing = [key for key in requirements if not self._credential_value(key)]
@@ -172,6 +190,26 @@ class LocalLabBackend:
         eda: str,
     ) -> dict[str, Any]:
         """Create a lab environment and its Terraform-to-Ansible handoff contract."""
+
+        if self._mock_mode:
+            environment_name = f"mock-demo-{int(self._clock())}"
+            state = self._load_state()
+            state["current"] = {
+                "environment_name": environment_name,
+                "target": target,
+                "portal": portal,
+                "profile": profile,
+                "eda": eda,
+            }
+            state["controls"] = {"ssh_root_login": True, "portal_service_health": True}
+            state["eda_enabled"] = eda == "enabled"
+            self._save_state(state)
+            return self._record_action(
+                ActionName.CREATE_ENVIRONMENT.value,
+                ActionStatus.SUCCEEDED.value,
+                f"create_environment succeeded (mock): {environment_name} provisioned",
+                "ok",
+            )
 
         if target != "local-lab":
             return self._record_action(
@@ -245,6 +283,16 @@ class LocalLabBackend:
     def apply_baseline(self) -> dict[str, Any]:
         """Apply the baseline operational workflow to the active local lab."""
 
+        if self._mock_mode:
+            controls: dict[str, bool] = {"ssh_root_login": True, "portal_service_health": True}
+            return self._record_action(
+                ActionName.APPLY_BASELINE.value,
+                ActionStatus.SUCCEEDED.value,
+                "apply_baseline succeeded (mock): operational workflow applied",
+                "ok",
+                controls=controls,
+            )
+
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
         extra_vars = self._ansible_vars(env_dir)
@@ -262,6 +310,40 @@ class LocalLabBackend:
 
     def run_compliance_scan(self) -> dict[str, Any]:
         """Run executable compliance checks against the active local lab."""
+
+        if self._mock_mode:
+            state = self._load_state()
+            raw = state.get("controls") or {"ssh_root_login": True, "portal_service_health": True}
+            mock_controls: dict[str, bool] = {
+                "ssh_root_login": bool(raw.get("ssh_root_login", True)),
+                "portal_service_health": bool(raw.get("portal_service_health", True)),
+            }
+            failing = [name for name, passed in mock_controls.items() if not passed]
+            state["scan_count"] = int(state.get("scan_count", 0)) + 1
+            pct = self._score_pct(mock_controls)
+            trend = state.setdefault("trend", [])
+            trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
+            del trend[8:]
+            self._save_state(state)
+            detail = (
+                f"run_compliance_scan detected drift: {', '.join(failing)}"
+                if failing
+                else "run_compliance_scan succeeded (mock): all controls compliant"
+            )
+            response = self._record_action(
+                ActionName.RUN_COMPLIANCE_SCAN.value,
+                ActionStatus.FAILED.value if failing else ActionStatus.SUCCEEDED.value,
+                detail,
+                "fail" if failing else "ok",
+                controls=mock_controls,
+            )
+            if state.get("eda_enabled") and failing:
+                self._append_eda_event(
+                    f"compliance_drift event emitted for {', '.join(failing)}",
+                    "warn",
+                )
+                response["state"] = self.get_state()
+            return response
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
@@ -325,6 +407,27 @@ class LocalLabBackend:
     def inject_ssh_drift(self) -> dict[str, Any]:
         """Inject SSH drift into the lab state using Ansible."""
 
+        if self._mock_mode:
+            state = self._load_state()
+            raw = state.get("controls") or {}
+            ssh_controls: dict[str, bool] = {
+                "ssh_root_login": False,
+                "portal_service_health": bool(raw.get("portal_service_health", True)),
+            }
+            state["controls"] = ssh_controls
+            self._save_state(state)
+            response = self._record_action(
+                ActionName.INJECT_SSH_DRIFT.value,
+                ActionStatus.SUCCEEDED.value,
+                "inject_ssh_drift succeeded (mock): PermitRootLogin set to yes",
+                "warn",
+                controls=ssh_controls,
+            )
+            if self._load_state().get("eda_enabled"):
+                self._append_eda_event("ssh_root_login drift injected - rulebook triggered", "warn")
+                response["state"] = self.get_state()
+            return response
+
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
         self._run_playbook("playbooks/drift_ssh_root.yml", self._ansible_vars(env_dir))
@@ -343,6 +446,29 @@ class LocalLabBackend:
 
     def inject_service_drift(self) -> dict[str, Any]:
         """Inject portal service drift into the lab state using Ansible."""
+
+        if self._mock_mode:
+            state = self._load_state()
+            raw = state.get("controls") or {}
+            svc_controls: dict[str, bool] = {
+                "ssh_root_login": bool(raw.get("ssh_root_login", True)),
+                "portal_service_health": False,
+            }
+            state["controls"] = svc_controls
+            self._save_state(state)
+            response = self._record_action(
+                "inject_service_drift",
+                ActionStatus.SUCCEEDED.value,
+                "inject_service_drift succeeded (mock): portal service stopped",
+                "warn",
+                controls=svc_controls,
+            )
+            if self._load_state().get("eda_enabled"):
+                self._append_eda_event(
+                    "portal_service_health drift injected - rulebook triggered", "warn"
+                )
+                response["state"] = self.get_state()
+            return response
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
@@ -366,6 +492,23 @@ class LocalLabBackend:
 
     def run_remediation(self) -> dict[str, Any]:
         """Restore the approved state for all local-lab controls."""
+
+        if self._mock_mode:
+            rem_controls: dict[str, bool] = {
+                "ssh_root_login": True,
+                "portal_service_health": True,
+            }
+            response = self._record_action(
+                ActionName.RUN_REMEDIATION.value,
+                ActionStatus.SUCCEEDED.value,
+                "run_remediation succeeded (mock): all controls restored",
+                "ok",
+                controls=rem_controls,
+            )
+            if self._load_state().get("eda_enabled"):
+                self._append_eda_event("remediation complete - all drift cleared", "ok")
+                response["state"] = self.get_state()
+            return response
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))

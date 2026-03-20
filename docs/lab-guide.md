@@ -61,7 +61,7 @@ Copy the sample environment file and populate it with your values:
 cp .env.example .env
 ```
 
-Open `.env` and fill in the required values. See [.env.example](./.env.example) for field descriptions. Do **not** commit `.env` — it is in `.gitignore`.
+Open `.env` and fill in the required values. See [.env.example](../.env.example) for field descriptions. Do **not** commit `.env` — it is in `.gitignore`.
 
 Minimum required variables for the offline/mock mode:
 
@@ -87,10 +87,10 @@ For a first fork-and-run, start with **offline mode**.
 ## 5. Running the offline demo
 
 ```bash
-TERRAABLE_MOCK_MODE=true python3 -m terraable.orchestrator
+TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
 ```
 
-Open `ui/index.html` in a browser. All actions will use pre-seeded mock state — no live credentials required.
+Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state — no live credentials required.
 
 ---
 

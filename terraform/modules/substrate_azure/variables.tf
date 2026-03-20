@@ -67,7 +67,6 @@ variable "ssh_public_key" {
 }
 
 variable "allowed_source_prefix" {
-  description = "Source IP prefix permitted for SSH, HTTP, and HTTPS inbound rules. Restrict to operator IP ranges in non-demo environments."
+  description = "Source IP prefix permitted for SSH, HTTP, and HTTPS inbound rules. Must be set explicitly — restrict to operator IP ranges to avoid world-open access."
   type        = string
-  default     = "*"
 }

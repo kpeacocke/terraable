@@ -55,24 +55,35 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         self._handle_action(parsed)
 
     def _handle_auth_configure(self) -> None:
-        payload = self._read_json_payload()
-        raw_credentials = payload.get("credentials")
-        credentials: dict[str, str] = {}
-        if isinstance(raw_credentials, dict):
-            typed_credentials = cast(dict[object, object], raw_credentials)
-            credential_items = typed_credentials.items()
-            for key, value in credential_items:
-                if isinstance(key, str) and isinstance(value, str):
-                    credentials[key] = value
-        self._send_json({"auth": self.backend.configure_credentials(credentials)})
+        try:
+            payload = self._read_json_payload()
+            raw_credentials = payload.get("credentials")
+            target = str(payload.get("target", "local-lab"))
+            portal = str(payload.get("portal", "backstage"))
+            credentials: dict[str, str] = {}
+            if isinstance(raw_credentials, dict):
+                typed_credentials = cast(dict[object, object], raw_credentials)
+                credential_items = typed_credentials.items()
+                for key, value in credential_items:
+                    if isinstance(key, str) and isinstance(value, str):
+                        credentials[key] = value
+            self._send_json(
+                {
+                    "auth": self.backend.configure_credentials(
+                        credentials, target=target, portal=portal
+                    )
+                }
+            )
+        except Exception as exc:
+            self.send_error(HTTPStatus.BAD_REQUEST, str(exc))
 
     def _handle_action(self, parsed: ParseResult) -> None:
-        payload = self._read_json_payload()
         action = parsed.path.rsplit("/", 1)[-1]
         response: dict[str, Any] | None
         try:
+            payload = self._read_json_payload()
             response = self._dispatch_action(action, payload)
-        except RuntimeError as exc:
+        except Exception as exc:
             response = {
                 "action": action,
                 "status": "failed",
@@ -110,7 +121,10 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
 
     def _read_json_payload(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
-        raw_payload = json.loads(self.rfile.read(length) or b"{}")
+        try:
+            raw_payload = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON payload: {exc}") from exc
         if isinstance(raw_payload, dict):
             normalized_payload: dict[str, Any] = {}
             typed_payload = cast(dict[object, object], raw_payload)
