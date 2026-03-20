@@ -85,9 +85,10 @@ class HcpTerraformConfig:
 
         Precedence:
         1. Explicit keyword arguments.
-        2. Environment variables. Token env var is derived from hostname:
+        2. Environment variables. Token env var is derived from hostname by
+           lowercasing and replacing any non-alphanumeric character with underscore:
            - app.terraform.io → TF_TOKEN_app_terraform_io
-           - tfe.example.com → TF_TOKEN_tfe_example_com
+           - tfc.my-company.internal → TF_TOKEN_tfc_my_company_internal
         3. Built-in defaults (hostname only).
         """
 
