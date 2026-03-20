@@ -132,7 +132,6 @@ class HcpTerraformClient:
         run = self.get_run(run_id)
         return str(run["data"]["attributes"]["status"])
 
-
     def get_apply(self, apply_id: str) -> dict[str, Any]:
         """Return the apply payload from HCP Terraform."""
 
