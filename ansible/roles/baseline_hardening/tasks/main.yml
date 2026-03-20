@@ -1,0 +1,21 @@
+---
+- name: Record selected security profile
+  debug:
+    msg: "Applying baseline hardening with profile={{ security_profile | default('baseline') }}"
+
+- name: Ensure SSH daemon root login is hardened
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^\s*#?\s*PermitRootLogin\b'
+    line: 'PermitRootLogin no'
+    create: true
+    backup: true
+  become: true
+  register: sshd_root_login
+
+- name: Restart SSH daemon if configuration changed
+  ansible.builtin.service:
+    name: "{{ ssh_service_name | default('sshd') }}"
+    state: restarted
+  become: true
+  when: sshd_root_login is changed

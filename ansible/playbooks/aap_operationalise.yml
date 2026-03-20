@@ -1,0 +1,25 @@
+---
+- name: Post-provision operationalisation workflow
+  hosts: "{{ connection.ansible_inventory_group | default(target_group | default('all')) }}"
+  gather_facts: false
+  vars:
+    portal_impl_in: "{{ portal_impl | default('backstage') }}"
+    security_profile_in: "{{ security_profile | default('baseline') }}"
+  tasks:
+    - name: Normalise portal and security profile variables
+      set_fact:
+        portal_impl: "{{ portal_impl_in }}"
+        security_profile: "{{ security_profile_in }}"
+    - name: Apply baseline hardening role set
+      include_role:
+        name: baseline_hardening
+
+    - name: Deploy selected portal implementation
+      include_role:
+        name: portal_deploy
+
+    - name: Run SSH compliance validation
+      include_role:
+        name: ssh_root_control
+      vars:
+        ssh_control_mode: validate

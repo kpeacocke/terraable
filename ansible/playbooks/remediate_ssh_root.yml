@@ -1,0 +1,16 @@
+---
+- name: Manual remediation workflow for SSH root login
+  hosts: "{{ connection.ansible_inventory_group | default(target_group | default('all')) }}"
+  gather_facts: false
+  tasks:
+    - name: Remediate SSH root login control
+      include_role:
+        name: ssh_root_control
+      vars:
+        ssh_control_mode: remediate
+
+    - name: Validate remediated SSH root login control
+      include_role:
+        name: ssh_root_control
+      vars:
+        ssh_control_mode: validate

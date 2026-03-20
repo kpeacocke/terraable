@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Terraable MVP Control Plane</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --ink: #162029;
+      --accent: #ba4a00;
+      --accent-2: #2563eb;
+      --card: #fffaf1;
+      --border: #d7c8b6;
+      --ok: #1e7f3b;
+      --warn: #94570b;
+      --fail: #a11d1d;
+      --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background: radial-gradient(circle at 20% 10%, #fff5dc 0%, var(--bg) 35%, #e8e2d8 100%);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 8px; letter-spacing: 0.02em; }
+    .subtitle { margin: 0 0 20px; color: #3d4a56; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 26px rgba(22, 32, 41, 0.08);
+      animation: rise 300ms ease-out;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .field { margin: 0 0 10px; }
+    .field label { display: block; font-size: 0.9rem; margin-bottom: 4px; }
+    .field select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 12px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+    button.secondary { background: var(--accent-2); }
+    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    ul { margin: 0; padding-left: 20px; }
+    li { margin: 6px 0; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .fail { color: var(--fail); }
+    @media (max-width: 780px) {
+      .grid { grid-template-columns: 1fr; }
+      .actions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Terraable Control Plane</h1>
+    <p class="subtitle">MVP action panel and evidence timeline for baseline, scan, drift, and remediation.</p>
+
+    <section class="grid">
+      <article class="panel">
+        <h2>Environment Request</h2>
+        <div class="field">
+          <label for="target">Target platform</label>
+          <select id="target">
+            <option value="openshift">openshift</option>
+            <option value="aws">aws</option>
+            <option value="local-lab">local-lab</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="portal">Portal implementation</label>
+          <select id="portal">
+            <option value="rhdh">rhdh</option>
+            <option value="backstage">backstage</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="profile">Security profile</label>
+          <select id="profile">
+            <option value="baseline">baseline</option>
+            <option value="strict">strict</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="eda">EDA mode</label>
+          <select id="eda">
+            <option value="disabled">disabled</option>
+            <option value="enabled">enabled</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button id="create">Create environment</button>
+          <button class="secondary" id="baseline">Apply baseline</button>
+          <button class="secondary" id="scan">Run compliance scan</button>
+          <button class="secondary" id="drift">Inject SSH drift</button>
+          <button class="secondary" id="remediate">Run remediation</button>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>Evidence and Status</h2>
+        <ul id="evidence" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const evidence = document.getElementById("evidence");
+    let driftActive = false;
+
+    function addEvidence(message, tone) {
+      const item = document.createElement("li");
+      item.className = tone;
+      item.textContent = message;
+      evidence.prepend(item);
+    }
+
+    function selected(id) {
+      return document.getElementById(id).value;
+    }
+
+    document.getElementById("create").addEventListener("click", () => {
+      const target = selected("target");
+      const portal = selected("portal");
+      if (target === "local-lab" && portal === "rhdh") {
+        addEvidence("create_environment failed: unsupported combination local-lab + rhdh", "fail");
+        return;
+      }
+
+      addEvidence(
+        `create_environment succeeded: target=${target}, portal=${portal}, profile=${selected("profile")}, eda=${selected("eda")}`,
+        "ok"
+      );
+    });
+
+    document.getElementById("baseline").addEventListener("click", () => {
+      addEvidence("apply_baseline succeeded: CIS-aligned baseline role set applied", "ok");
+    });
+
+    document.getElementById("scan").addEventListener("click", () => {
+      if (driftActive) {
+        addEvidence("run_compliance_scan failed: detected PermitRootLogin yes drift", "fail");
+      } else {
+        addEvidence("run_compliance_scan succeeded: baseline controls compliant", "ok");
+      }
+    });
+
+    document.getElementById("drift").addEventListener("click", () => {
+      driftActive = true;
+      addEvidence("inject_ssh_drift succeeded: set PermitRootLogin yes", "warn");
+    });
+
+    document.getElementById("remediate").addEventListener("click", () => {
+      driftActive = false;
+      addEvidence("run_remediation succeeded: restored PermitRootLogin no", "ok");
+    });
+  </script>
+</body>
+</html>
