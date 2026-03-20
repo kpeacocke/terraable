@@ -1,7 +1,7 @@
 # MVP Demo Runbook
 
 ## Preconditions
-- Python 3.11+, Terraform 1.9+, and Ansible 10 are available.
+- Python 3.11+, Terraform 1.5+, and Ansible 10 are available.
 - Repository checks pass locally.
 - Target credentials are configured through environment variables.
 
