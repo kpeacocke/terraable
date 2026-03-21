@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import threading
 from pathlib import Path
@@ -187,6 +188,40 @@ def test_handler_returns_fail_payload_for_runtime_error_and_404(
         thread.join(timeout=2)
 
 
+    @pytest.mark.unit
+    def test_handler_configure_auth_accepts_non_object_json_payload(
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+        ui_dir = tmp_path / "ui"
+        ui_dir.mkdir()
+        (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+        handler = api_server.make_handler(tmp_path)
+        server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            base = f"http://127.0.0.1:{server.server_port}"
+            request = Request(
+                f"{base}/api/auth/configure?target=local-lab&portal=backstage",
+                data=b"[]",
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            payload = json.loads(urlopen(request).read().decode("utf-8"))
+            assert payload["authenticated"] is False
+
+            backend = handler.backend
+            assert isinstance(backend, _FakeBackend)
+            assert backend.auth_configured == {}
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+
 @pytest.mark.unit
 def test_handler_serves_healthz_and_other_actions(
     monkeypatch: pytest.MonkeyPatch,
@@ -236,6 +271,17 @@ def test_handler_serves_healthz_and_other_actions(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "2"}
+    handler.rfile = io.BytesIO(b"[]")
+
+    payload = handler._read_json_payload()
+
+    assert payload == {}
 
 
 @pytest.mark.unit

@@ -12,6 +12,7 @@ import pytest
 
 from terraable.local_lab import (
     DRIFT_SERVICE_PLAYBOOK,
+    HCP_TOKEN_REQUIREMENT,
     MOCK_MODE_ENV_VAR,
     CommandResult,
     LocalLabBackend,
@@ -532,6 +533,44 @@ def test_read_dotenv_skips_comments_and_invalid_lines(tmp_path: Path) -> None:
     loaded = backend._read_dotenv(dotenv_path)
 
     assert loaded == {"HCP_TERRAFORM_TOKEN": "from-dotenv"}
+
+
+@pytest.mark.unit
+def test_credential_value_prefers_hostname_specific_token_and_non_token_value(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "app.terraform.io")
+    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "hostname-token")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    backend.configure_credentials(
+        {
+            "HCP_TERRAFORM_TOKEN": "alias-token",
+            "AWS_ACCESS_KEY_ID": "aws-key",
+        }
+    )
+
+    assert backend._credential_value(HCP_TOKEN_REQUIREMENT) == "hostname-token"
+    assert backend._credential_value("AWS_ACCESS_KEY_ID") == "aws-key"
+
+
+@pytest.mark.unit
+def test_auth_source_includes_hostname_specific_and_non_token_sources(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "app.terraform.io")
+    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "hostname-token")
+    backend = _InspectableLocalLabBackend(tmp_path)
+    tf_token_key = backend._tf_token_env_var()
+
+    backend.configure_credentials({"AWS_ACCESS_KEY_ID": "aws-key"})
+
+    sources = backend._auth_source((HCP_TOKEN_REQUIREMENT, "AWS_ACCESS_KEY_ID"))
+
+    assert sources[tf_token_key] == "env"
+    assert sources["AWS_ACCESS_KEY_ID"] == "ui"
 
 
 @pytest.mark.unit
