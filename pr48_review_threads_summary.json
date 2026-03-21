@@ -1,0 +1,1027 @@
+{
+  "totalThreads": 111,
+  "unresolvedCount": 9,
+  "unresolvedByPath": {
+    ".github/workflows/pr-merge-agent.yml": 1,
+    "integration/local_lab/terraform/main.tf": 1,
+    "modes/offline/README.md": 1,
+    "terraable/api_server.py": 1,
+    "terraable/local_lab.py": 1,
+    "terraform/modules/substrate_aws/versions.tf": 1,
+    "terraform/modules/substrate_local/versions.tf": 1,
+    "terraform/modules/substrate_okd/versions.tf": 1,
+    "ui/index.html": 1
+  },
+  "threads": [
+    {
+      "id": "PRRT_kwDORpHzoc51qErU",
+      "path": "modes/offline/README.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Both docs are correctly updated.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qErp",
+      "path": "docs/lab-guide.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Fixed \u2014 lab-guide.md:64 now links to ../.env.example.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEr1",
+      "path": "ui/index.html",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The UI now pulls fonts from `fonts.googleapis.com/fonts.gstatic.com`. This introduces an external network dependency (and potential tracking surface) that can break offline/demo reliability in constrained environments. Consider bundling fonts locally, making them optional, or providing a fully offline-safe default font stack.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEr8",
+      "path": "ui/index.html",
+      "line": 739,
+      "startLine": 731,
+      "resolved": true,
+      "latestCommentBody": "After saving credentials, the UI trusts the `/api/auth/configure` response without re-checking readiness for the currently selected target/portal. Given the backend can report auth status for a different selection, call `refreshAuthStatus()` after `saveCredentials()` succeeds (and update `authState` from that) so button locking and status text reflect the current selectors.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEsE",
+      "path": "tests/test_local_lab.py",
+      "line": 313,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "This test shells out to `python3`, which can fail on platforms/environments where the executable is named `python` (or when running under Windows without `python3`). Using `sys.executable` (or parametrising the runner) will make the test portable and less dependent on PATH layout.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEsM",
+      "path": "terraform/modules/substrate_aws/variables.tf",
+      "line": 61,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`allowed_cidr_blocks` defaults to `0.0.0.0/0`, which exposes SSH/HTTP/HTTPS to the public internet by default. For least-privilege defaults, consider requiring this variable (no default) or defaulting to an empty list / a documentation-only placeholder, and make the module fail fast unless the operator explicitly opts in.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEsc",
+      "path": "terraform/modules/substrate_azure/variables.tf",
+      "line": 72,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`allowed_source_prefix` defaults to `\"*\"`, which permits inbound SSH/HTTP/HTTPS from anywhere by default. Consider making this variable required (no default) or defaulting to a restricted CIDR (e.g. operator IP) to avoid insecure-by-default deployments.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEsr",
+      "path": "terraform/modules/substrate_aws/.terraform.lock.hcl",
+      "line": 7,
+      "startLine": 1,
+      "resolved": true,
+      "latestCommentBody": "These module-scoped `.terraform.lock.hcl` files are ignored when the module is consumed as a child module, but they add churn and can become stale. Consider removing them (and keeping provider locks only in root/integration stacks), or add lock files consistently for every root stack that runs `terraform init` so dependency pinning is deterministic.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEs8",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`configure_credentials()` always returns auth status for `local-lab/backstage` (`SUPPORTED_EXECUTION_TARGET`), regardless of what the UI currently has selected. This can cause the UI to mark other targets as \u201cready\u201d (and unlock buttons) immediately after saving credentials. Consider returning auth status for the caller\u2019s selected `target`/`portal` (e.g., accept them in the configure payload), or stop returning auth here and require the UI to refresh `/api/auth/status` for the active selection after saving.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEtF",
+      "path": "ui/index.html",
+      "line": 580,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`renderState()` updates the target/portal/profile/eda selectors from `state.current`, but it does not call `syncCredentialGroups()` afterwards. If the backend changes the target (or a persisted state is loaded), the credential panels can remain out of sync with the selector value until the user manually changes the target. Call `syncCredentialGroups(state.current.target)` after setting the select value.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEtQ",
+      "path": "terraable/api_server.py",
+      "line": 192,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`_read_json_payload()` calls `json.loads(...)` without handling malformed JSON. A bad payload will raise `JSONDecodeError` and crash the request handler instead of returning a 4xx. Catch `json.JSONDecodeError` (and consider a max body size guard), then return a structured 400 response.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qEtd",
+      "path": "terraable/api_server.py",
+      "line": 107,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`_handle_action()` only catches `RuntimeError`. Other exceptions (e.g. `KeyError`, `JSONDecodeError`, `FileNotFoundError`) will propagate and can terminate the handler thread without returning a JSON failure payload. Catch `Exception` here (and optionally log) so the UI consistently receives a `status=failed` response.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzbV",
+      "path": "ui/index.html",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. Removed the external Google Fonts preconnect/stylesheet tags and switched to a system font stack so the UI no longer depends on external font CDNs in offline/demo environments.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzbY",
+      "path": "tests/test_local_lab.py",
+      "line": 313,
+      "startLine": 313,
+      "resolved": true,
+      "latestCommentBody": "Addressed. The subprocess portability test now uses `sys.executable` rather than hard-coded `python3`.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzbd",
+      "path": "terraable/local_lab.py",
+      "line": 152,
+      "startLine": 152,
+      "resolved": true,
+      "latestCommentBody": "Addressed. `configure_credentials()` now accepts `target` and `portal` and returns auth status for the requested selection instead of always using `local-lab/backstage`. The API handler passes these fields from the configure payload.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzbf",
+      "path": "ui/index.html",
+      "line": 739,
+      "startLine": 739,
+      "resolved": true,
+      "latestCommentBody": "Addressed. After `/api/auth/configure`, the UI now calls `refreshAuthStatus()` and uses that response for status/button locking. I also included `target`/`portal` in the configure payload to keep backend and UI selection context aligned.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzbt",
+      "path": "ui/index.html",
+      "line": 580,
+      "startLine": 580,
+      "resolved": true,
+      "latestCommentBody": "Addressed. `renderState()` now calls `syncCredentialGroups(state.current.target)` immediately after selector values are restored, so credential panels stay aligned with backend-provided state.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzq2",
+      "path": "terraform/modules/substrate_aws/.terraform.lock.hcl",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. Removed module-scoped lock files from both AWS and Azure child modules to reduce stale/churn risk; provider locks should remain in root/integration stacks that execute `terraform init`.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzq6",
+      "path": "terraform/modules/substrate_azure/variables.tf",
+      "line": 72,
+      "startLine": 72,
+      "resolved": true,
+      "latestCommentBody": "Addressed. Removed the `\"*\"` default and made `allowed_source_prefix` explicit input-only to avoid insecure-by-default inbound exposure.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzrA",
+      "path": "terraable/api_server.py",
+      "line": 192,
+      "startLine": 192,
+      "resolved": true,
+      "latestCommentBody": "Addressed. `_read_json_payload()` now catches `json.JSONDecodeError` and raises `ValueError`; `/api/auth/configure` converts that into a 400 response, while action routes return a structured failed action payload.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzrC",
+      "path": "terraable/api_server.py",
+      "line": 107,
+      "startLine": 107,
+      "resolved": true,
+      "latestCommentBody": "Addressed. `_handle_action()` now wraps payload parsing and dispatch in a broad `except Exception` block so unexpected errors return a consistent JSON failure payload instead of bubbling out of the handler.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51qzrJ",
+      "path": "terraform/modules/substrate_aws/variables.tf",
+      "line": 61,
+      "startLine": 61,
+      "resolved": true,
+      "latestCommentBody": "Addressed. Removed the permissive default and made `allowed_cidr_blocks` explicit input-only so operators must opt in to allowed source ranges.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sf_i",
+      "path": "ui/index.html",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`saveCredentials()` posts `HCP_TERRAFORM_TOKEN` to the backend, but the repo\u2019s HCP Terraform integration expects `TF_TOKEN_<hostname>` (Terraform CLI convention). Without aligning these, credentials entered in the UI won\u2019t satisfy the documented HCP auth mechanism. Consider sending/storing the derived `TF_TOKEN_<hostname>` key (or having the backend translate UI fields into the expected token env var name).",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sf_2",
+      "path": "docs/credentials-matrix.md",
+      "line": 58,
+      "startLine": 58,
+      "resolved": true,
+      "latestCommentBody": "The credential matrix references `.env.example`, but the file does not exist in the repo, so readers have no canonical source for the listed variables. Either add `.env.example` at the repository root or update this doc to point to an existing configuration reference. ```suggestion Configure these via environment variables or your approved secrets manager. For setup guidance and safe defaults, refer to `SECURITY.md` and related runbook documentation. ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgAK",
+      "path": "DEVELOP.md",
+      "line": 179,
+      "startLine": 179,
+      "resolved": true,
+      "latestCommentBody": "This repository structure section lists `.env.example`, but the file is not present at the repo root. That makes the documented local setup/tooling checks (and other docs that reference `.env.example`) inconsistent. Either add `.env.example` or remove/replace these references with a file that actually exists. ```suggestion ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgAS",
+      "path": "ui/index.html",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The UI/backend uses `HCP_TERRAFORM_TOKEN` as the required HCP credential, but the existing HCP Terraform integration docs/client (`docs/hcp-terraform.md`, `HcpTerraformConfig.from_env`) use the Terraform CLI convention `TF_TOKEN_<hostname>` (derived from `TERRAABLE_TFC_HOSTNAME`). This mismatch means users following the documented setup will still appear \"Blocked\" in the UI. Align the required credential key(s) with `TF_TOKEN_<hostname>` (and optionally accept `HCP_TERRAFORM_TOKEN` as a backward-compatible alias).",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgAg",
+      "path": "README.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "This README states `HCP_TERRAFORM_TOKEN` is required for the executable path, but the HCP Terraform client/docs in this repo use `TF_TOKEN_<hostname>` (derived from `TERRAABLE_TFC_HOSTNAME`). As written, users may set the wrong variable and remain blocked. Update the README to reference the `TF_TOKEN_<hostname>` convention (or document clearly that the local-lab API currently expects `HCP_TERRAFORM_TOKEN`, and why). ```suggestion - For the current executable path (`local-lab`), an HCP Terraform API token must be available via the standard Terraform CLI convention: set `TERRAABLE_TFC_HOSTNAME` (for example `app.terraform.io`) and export `TF_TOKEN_<hostname>=<redacted-token>` (for example `TF_TOKEN_app.terraform.io=<redacted-token>`). The client does not read `HCP_TERRAFORM_TOKEN`. ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgAp",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`_run_playbook()` always writes Ansible extra vars to a single shared path (`.terraable/local-lab/extra-vars.json`). Because the API server is `ThreadingHTTPServer`, concurrent requests can clobber this file (and potentially run playbooks with the wrong vars). Write extra-vars to a per-action/per-environment file (e.g., include environment name + action + timestamp/thread id) or guard playbook execution with a lock to make concurrent requests safe.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgA3",
+      "path": "terraable/local_lab.py",
+      "line": 793,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`_save_state()` writes `state.json` without any locking, but the API server uses `ThreadingHTTPServer` and shares a single `LocalLabBackend` instance across threads. Parallel requests can interleave writes and corrupt the JSON state or lose updates. Add a `threading.Lock` (or similar) around state load/modify/save operations (and consider atomic writes via write-to-temp + rename) to keep state consistent under concurrent access.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgBH",
+      "path": "terraable/local_lab.py",
+      "line": 520,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`inject_service_drift()` returns an action name string literal (\"inject_service_drift\") instead of using `ActionName.*` like the other actions. This makes action naming inconsistent and prevents type-safe reuse alongside `terraable.orchestrator.ActionName`. Add an `INJECT_SERVICE_DRIFT` member to `ActionName` and use it here (and anywhere else actions are enumerated), so the action set stays consistent across backend/UI/tests.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgBR",
+      "path": "docs/lab-guide.md",
+      "line": 66,
+      "startLine": 56,
+      "resolved": true,
+      "latestCommentBody": "This repo currently does not include a `.env.example` file, but the lab guide instructs users to copy it. That makes the quick-start steps fail immediately. Either add a `.env.example` at the repository root (preferred), or update the guide to reference an existing file/location and explain how to create `.env` from scratch.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgBc",
+      "path": "modes/offline/README.md",
+      "line": 22,
+      "startLine": 18,
+      "resolved": true,
+      "latestCommentBody": "The offline quick start instructs `cp .env.example .env`, but there is no `.env.example` in the repository, so the procedure can\u2019t be followed as written. Add the missing `.env.example` file at repo root or adjust the steps to match the files that actually exist. ```suggestion # Enable mock mode via environment variable export TERRAABLE_MOCK_MODE=true source .venv/bin/activate python -m terraable.api_server --host 127.0.0.1 --port 8000 ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgBp",
+      "path": "ansible/ansible.cfg",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`ansible.cfg` disables `host_key_checking`, which removes SSH host key verification and makes man-in-the-middle attacks easier if this is used against real hosts. If this is only meant for local-lab/demo, consider keeping the secure default (host key checking enabled) and documenting how to disable it explicitly for workshops, or scope the setting to lab-only inventory/config. ```suggestion # Host key checking is left enabled (Ansible default) to enforce SSH host verification. # For lab-only or workshop environments, explicitly disable via: # ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook ... ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sgB0",
+      "path": "ui/index.html",
+      "line": 625,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`refreshState()` always sets the masthead badge to \"Live local-lab\" even when the backend reports `state.mode` as `offline-mock`, or if the current environment target changes. This will misreport runtime mode and can confuse users during offline/mock demos. Update the badge based on the `/api/state` payload (e.g., `state.mode` and/or `state.current.target`) instead of a hard-coded label.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51szu5",
+      "path": "terraable/local_lab.py",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. Added `ActionName.INJECT_SERVICE_DRIFT` and switched `inject_service_drift()` to use the enum value for consistent action naming across backend/UI/tests.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51szu8",
+      "path": "terraable/local_lab.py",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. State persistence now uses a lock and atomic temp-file replace in `_save_state()`, and state reads are lock-protected in `_load_state()`, reducing corruption/lost-update risk with `ThreadingHTTPServer` concurrency.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51szu_",
+      "path": "terraable/local_lab.py",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. `_run_playbook()` now writes per-invocation extra-vars files (playbook/thread/timestamp scoped) and cleans them up after execution, removing the shared-file clobber risk under threaded requests.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51szvH",
+      "path": "README.md",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. README credential guidance now references `TF_TOKEN_<hostname>` with `TERRAABLE_TFC_HOSTNAME`, and documents `HCP_TERRAFORM_TOKEN` as a backward-compatible alias for the local-lab UI path.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51szvJ",
+      "path": "ui/index.html",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. The backend now translates the UI's `HCP_TERRAFORM_TOKEN` input to satisfy the canonical `TF_TOKEN_<hostname>` requirement (`TERRAABLE_TFC_HOSTNAME` aware), while still accepting the UI key as a backward-compatible alias.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51szvL",
+      "path": "ui/index.html",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. Runtime badge text is now derived from `/api/state` (`state.mode` and current target) instead of a hard-coded `Live local-lab`, so offline/mock mode is correctly shown in the masthead.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sz9I",
+      "path": "modes/offline/README.md",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Checked current tree: `.env.example` exists at repo root, so the copy step remains valid. The offline flow also now correctly starts the API server in mock mode.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sz9O",
+      "path": "docs/credentials-matrix.md",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Checked current tree: `.env.example` exists at the repository root, so this reference is now valid and actionable.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sz9R",
+      "path": "docs/lab-guide.md",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Checked current tree: `.env.example` is present at repository root, and the guide now links to it via `../.env.example`.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sz9n",
+      "path": "DEVELOP.md",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Checked current tree: `.env.example` exists at repository root and the structure reference remains valid.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51sz-F",
+      "path": "ansible/ansible.cfg",
+      "line": 1,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed. `host_key_checking` has been switched back to `True` in `ansible/ansible.cfg` so secure SSH host verification is the default.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51125m",
+      "path": "terraable/api_server.py",
+      "line": 69,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The API server executes Terraform/Ansible actions and accepts credentials, but there is no request authentication/authorisation or CSRF/Origin protection on `do_POST()`. If the server is running on localhost, a malicious web page can still POST to `http://127.0.0.1:8000/api/actions/*` and trigger provisioning/remediation without the user's intent (CORS prevents reading responses, not sending requests). Add a lightweight protection (e.g. require a bearer token header sourced from an env var, and/or reject requests with unexpected `Origin`/`Host`), especially when binding to non-loopback hosts.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51125p",
+      "path": "ui/index.html",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`renderAuthStatus()` builds its own `requiredFieldsByTarget()` list and shows `HCP_TERRAFORM_TOKEN` as required, but the backend reports the canonical required/missing keys (including `TF_TOKEN_<hostname>`). This can produce confusing \u2018Required: \u2026\u2019 output that disagrees with `authState.blockers`/`missing_credentials`. Prefer rendering `authState.required_credentials` and/or `authState.missing_credentials` from the API response instead of duplicating the mapping in the UI.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51125t",
+      "path": "scripts/check-tools.sh",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The script header says it verifies tools \"meet minimum version requirements\", but the implementation only checks tool presence and prints the first line of `--version` output (no comparison/enforcement). Either implement actual minimum-version checks (per tool) or reword the header/comments so contributors aren\u2019t misled about what the script guarantees.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc511251",
+      "path": "README.md",
+      "line": 58,
+      "startLine": 55,
+      "resolved": true,
+      "latestCommentBody": "PR metadata/title says \"Add AWS target implementation\" and closes #18, but the repo still documents and enforces that only `local-lab + backstage` is executable end-to-end and other targets (including AWS) return an explicit failure until provider-specific execution paths are implemented. If AWS support is intended to be Terraform-module-only for now, consider adjusting the PR title/description (and issue closure) to avoid implying end-to-end AWS execution is delivered.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51125-",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`get_auth_status()` defaults unknown targets to requiring `HCP_TERRAFORM_TOKEN`, which bypasses the `TF_TOKEN_<hostname>` mapping used elsewhere (`HCP_TOKEN_REQUIREMENT`). If a user provides only `TF_TOKEN_<hostname>` (Terraform CLI convention), unknown targets will be incorrectly reported as missing credentials. Default the fallback requirements to `HCP_TOKEN_REQUIREMENT` so the derived token env var is honoured consistently.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51126H",
+      "path": "terraable/local_lab.py",
+      "line": 185,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 57b133d. `get_auth_status()` now treats `local-lab` as ready only when `portal == \"backstage\"`, so `local-lab + rhdh` is blocked up front instead of letting the UI proceed to a later failure.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc51126Q",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 57b133d. I introduced a dedicated `_credentials_lock` and now guard credential writes in `configure_credentials()` plus reads via `_credential_value()` / `_auth_source()` so auth status is consistent under `ThreadingHTTPServer`.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5118IB",
+      "path": "terraable/local_lab.py",
+      "line": 663,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 57b133d. `_run_playbook()` now sets `env[\"ANSIBLE_CONFIG\"]` explicitly to the repository-local `ansible/ansible.cfg`, so ambient CI or user settings no longer override execution.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5118IP",
+      "path": "tests/test_api_server.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 57b133d. The test is now top-level, collected by pytest, and asserts against `payload[\"auth\"][\"authenticated\"]`. Local validation is green at 64/64 tests with 100% coverage.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5118IT",
+      "path": "ui/index.html",
+      "line": 649,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 57b133d. `refreshAuthStatus()` now wraps the API call in `try/catch`, populates a failed `authState` on errors, and still calls `renderAuthStatus()` / `updateActionButtons()` so the UI remains usable when the backend is offline.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512HbU",
+      "path": "ansible/eda/sources/compliance_webhook.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 68e3e55. The webhook source now uses `port: \"{{ eda_webhook_port | default(5000) }}\"`, matching the comment and the intended configurability.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512HbY",
+      "path": "scripts/check-tools.sh",
+      "line": 87,
+      "startLine": 87,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 68e3e55. The tooling check now reads the installed `ansible` package version via `pip show ansible`, so the comparison is against the package requirement (`>= 10.0.0`) instead of the `ansible-core` banner output.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512Hbc",
+      "path": "scripts/check-tools.sh",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 68e3e55. `check()` now initialises `hint` directly from `$4`; the redundant assignment from `$3` was removed.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512Hbg",
+      "path": "DEVELOP.md",
+      "line": 55,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 68e3e55 and kept aligned in 31c0988. `DEVELOP.md` now lists Terraform CLI 1.9 to match both `scripts/check-tools.sh` and CI.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512Hbj",
+      "path": "terraable/local_lab.py",
+      "line": 192,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 68e3e55. The blocker message is now built from the display keys (`display_missing`) rather than the internal `__HCP_TF_TOKEN__` placeholder.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512Hbn",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed by the PR metadata and documentation alignment in 31c0988. The PR now explicitly describes AWS as module groundwork, not an end-to-end executable control-plane target, and the branch docs were updated to match that scope.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc512Hbs",
+      "path": "ui/index.html",
+      "line": 281,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 68e3e55. The masthead anchor now includes `onclick=\"return false;\"`, so clicking it no longer causes the page to jump to the top.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5128JM",
+      "path": "docs/mvp-demo-runbook.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31c0988. The MVP runbook now lists the full selector surface and explicitly marks `local-lab + backstage` as the executable MVP path, with the other target selectors called out as scaffolding only.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5128JS",
+      "path": "DEVELOP.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31c0988. `DEVELOP.md` now matches the enforced tooling requirements: Terraform 1.9, Ansible package 10.0, and markdownlint-cli2 0.14.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5128JW",
+      "path": "modes/showcase/README.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31c0988. `modes/showcase/README.md` now describes the non-local targets as module/contract scaffolding and states that the only end-to-end control-plane path in this branch is `local-lab + backstage`.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5128JZ",
+      "path": "modes/lab/README.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31c0988. `modes/lab/README.md` now distinguishes the current executable lab backend (`local-lab`) from the planned AWS/Azure/OKD target paths that are not yet wired end-to-end.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5128Jb",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed by the PR title/body update plus the documentation alignment in 31c0988. The branch no longer claims non-`local-lab` targets are executable through the control-plane backend; they are now documented as scaffolding/groundwork only.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5128Jd",
+      "path": "terraform/modules/substrate_azure/.terraform.lock.hcl",
+      "line": 7,
+      "startLine": 1,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31c0988. I removed `terraform/modules/substrate_azure/.terraform.lock.hcl` so the reusable module no longer carries a misleading child-module lockfile.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513aD0",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 1e3733f. `LabActionResult` was not used anywhere, so I removed the dead dataclass to keep the backend surface area minimal.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513aD_",
+      "path": "scripts/check-tools.sh",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 1e3733f. `check()` now captures the full command output with `|| true`, which avoids early exit under `set -euo pipefail` and lets version extraction work for multi-line tools such as `shellcheck --version`.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513aEI",
+      "path": "scripts/check-tools.sh",
+      "line": 68,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 1e3733f. `raw_output` and `parsed_version` are now declared `local` inside `check()` so they do not leak across calls.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513aEN",
+      "path": "docs/lab-guide.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 1e3733f. `docs/lab-guide.md` now lists Terraform CLI 1.9, matching the enforced contributor tooling requirements and CI setup.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513eHb",
+      "path": "DEVELOP.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31fc8f9. The Terraform validation section now validates the concrete Terraform working directories instead of suggesting `terraform validate` from the repository root.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513eH3",
+      "path": "ui/index.html",
+      "line": 609,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31fc8f9. `api()` now reads the non-2xx response body, extracts `detail` / `message` when present, and includes that text in the thrown error so the UI surfaces actionable backend failures.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513eIL",
+      "path": "terraable/orchestrator.py",
+      "line": 19,
+      "startLine": 15,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 31fc8f9. `DemoOrchestrator` now exposes `inject_service_drift()` so the orchestrator API matches `ActionName` and the control-plane action set, and the happy-path orchestrator test covers it.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513gA2",
+      "path": "docs/lab-guide.md",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in cb6ef89. `docs/lab-guide.md` now lists Ansible 10.0 so the lab guide matches the enforced repo tooling requirements and the rest of the contributor guidance.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513gA8",
+      "path": "terraable/api_server.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in cb6ef89. `_read_json_payload()` now validates `Content-Length` explicitly, raising `ValueError(\"Invalid Content-Length\")` for malformed or negative values, and the API-server tests now cover invalid, missing, and negative header cases.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513hva",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 597da2e. `_load_state()` now falls back to the default state for malformed JSON and for valid non-object JSON, so a corrupted `state.json` no longer breaks the control plane or silently drops required structure.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513hvh",
+      "path": "terraable/api_server.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in 597da2e. `do_GET()` now handles missing and invalid UTF-8 `ui/index.html` reads deterministically, returning 404/500 instead of throwing, and the API-server tests cover both cases.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513jnh",
+      "path": "terraable/local_lab.py",
+      "line": 745,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "`LocalLabBackend` uses `ThreadingHTTPServer`, but state updates in `_record_action` / `_append_eda_event` do a read-modify-write cycle without holding `_state_lock` across the whole mutation. With concurrent requests, this can drop evidence/trend/EDA entries (last writer wins). Consider taking `_state_lock` for the full update (or providing a single helper that loads, mutates, and saves atomically) for all state mutations, not just file IO.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513jnj",
+      "path": "ansible/eda/sources/compliance_webhook.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The EDA webhook source is configured to bind on `0.0.0.0` by default, which exposes the listener on all interfaces if someone runs it on a non-local host/network. For safer defaults, bind to `127.0.0.1` (or make the host configurable via a variable) and document when/how to intentionally expose it. ```suggestion # host: \"{{ eda_webhook_host | default('127.0.0.1') }}\" # port: \"{{ eda_webhook_port | default(5000) }}\" # # To intentionally expose this webhook beyond localhost (for example, in a # controlled lab network), set eda_webhook_host explicitly, such as: # eda_webhook_host: \"0.0.0.0\" # Ensure you protect the listener with appropriate network controls. plugin: ansible.eda.webhook host: \"{{ eda_webhook_host | default('127.0.0.1') }}\" ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513jnl",
+      "path": "ansible/eda/rulebooks/ssh_compliance_drift.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The rulebook\u2019s webhook source binds to `0.0.0.0` by default. For safer-by-default behaviour (especially if someone runs this on a shared host), consider binding to `127.0.0.1` (or a configurable `eda_webhook_host` var) and only using `0.0.0.0` when you explicitly want remote event sources. ```suggestion host: \"{{ eda_webhook_host | default('127.0.0.1') }}\" ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513wF5",
+      "path": "terraform/modules/substrate_aws/main.tf",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Defining an explicit `provider \"aws\"` configuration inside a reusable module makes it harder for callers to pass provider settings (assume_role, default tags, endpoints) or use provider aliases. Prefer removing the in-module provider block and letting the root module configure/pin the AWS provider, passing it into this module as needed.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513wF_",
+      "path": "terraform/modules/substrate_azure/main.tf",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "This module configures `provider \"azurerm\"` internally. In-module provider configuration reduces reusability (callers can\u2019t easily supply provider aliases, custom features, or environment-specific settings) and can lead to surprising behaviour when the same provider is needed elsewhere. Prefer configuring the AzureRM provider in the root module and inheriting it here.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513zFp",
+      "path": "scripts/check-tools.sh",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 8756cd0: scripts/check-tools.sh now uses a portable numeric dotted-version comparison instead of sort -V.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513zFr",
+      "path": "terraable/api_server.py",
+      "line": 183,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 8756cd0: terraable/api_server.py now enforces max_json_payload_bytes and rejects oversized Content-Length values.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc513zFt",
+      "path": "terraform/README.md",
+      "line": 12,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 8756cd0: terraform/README.md now frames OpenShift work as Phase 2 groundwork instead of an MVP target.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5131SR",
+      "path": "scripts/check-tools.sh",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 77acd1e: updated scripts/check-tools.sh to use `ansible --version` for the ansible presence check so it validates the executable available on PATH.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5131Sa",
+      "path": "terraable/api_server.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 77acd1e: tightened origin validation in terraable/api_server.py to reject Origin/Referer values that are null or missing a hostname.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5131Sb",
+      "path": "terraform/modules/substrate_azure/versions.tf",
+      "line": 5,
+      "startLine": 1,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 77acd1e: added the module dependency lockfile at terraform/modules/substrate_azure/.terraform.lock.hcl to pin providers for terraform/modules/substrate_azure/versions.tf.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5136FX",
+      "path": "ui/index.html",
+      "line": 672,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 2e8a364. `saveCredentials` now trims input values and builds the payload with only non-empty credential fields, so blank inputs are no longer sent and do not clear previously cached UI credentials unintentionally.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5136Fc",
+      "path": "terraable/local_lab.py",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Fixed in commit 2e8a364. `create_environment` now compares the requested target against the `SUPPORTED_EXECUTION_TARGET` constant instead of a hard-coded `\"local-lab\"` string, removing duplicated target knowledge and keeping behavior aligned with the declared supported target.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5139Lm",
+      "path": "terraable/local_lab.py",
+      "line": 150,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 66c4c84. `configure_credentials()` now preserves fallback source/value when a UI override is set, and clearing the UI value restores the prior env/.env-backed credential instead of losing it. This implements the intended precedence and reversion behavior.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc5139L4",
+      "path": "terraform/modules/substrate_aws/variables.tf",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 66c4c84. The unused aws_region input was removed from terraform/modules/substrate_aws/variables.tf because this module does not configure a provider directly; region comes from the caller provider configuration.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514BjH",
+      "path": "ui/index.html",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 34801d2. saveCredentials now sends all known credential keys with trimmed values (including empty strings), so clearing a field in the UI is propagated to /api/auth/configure and LocalLabBackend can clear UI-sourced values as intended.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514BjM",
+      "path": "terraable/local_lab.py",
+      "line": 248,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Addressed in commit 34801d2. Mock create_environment now persists a consistent current-state schema including runtime_dir and runtime_vars, and _current_environment now raises a clear runtime-context error if those keys are missing, instead of failing later with a KeyError.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514F7W",
+      "path": ".github/workflows/pr-merge-agent.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "The hardcoded PR 48 in the schedule context is intentional \u2014 the scheduled runs are only meant to monitor this specific PR. The pull_request_review and check_run events resolve the PR number dynamically from the event context, so they work on any PR. The branch guard (feat/phase-2) prevents accidental merges on other branches. This design keeps the schedule focused while allowing broader monitoring on review/check events.",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514TJi",
+      "path": ".github/workflows/pr-merge-agent.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "removed file. ni longer needed",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514TJn",
+      "path": ".github/workflows/pr-merge-agent.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": false,
+      "latestCommentBody": "removed file. ni longer needed",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514WKq",
+      "path": ".github/workflows/pr-merge-agent.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "removed the file",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514WKr",
+      "path": ".github/workflows/pr-merge-agent.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "removed the file",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514WKs",
+      "path": "terraable/local_lab.py",
+      "line": 123,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "Implemented in 886b463: added a dedicated backend action lock and serialised mutating actions (`create_environment`, `apply_baseline`, `run_compliance_scan`, `inject_ssh_drift`, `inject_service_drift`, `run_remediation`) via a decorator so requests cannot interleave Terraform/Ansible/state mutations across tabs. Also added `test_create_environment_serializes_concurrent_requests` to verify no overlap under concurrent calls. Full suite passes (80 passed, 100% coverage).",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514WKv",
+      "path": ".github/workflows/pr-merge-agent.yml",
+      "line": null,
+      "startLine": null,
+      "resolved": true,
+      "latestCommentBody": "removed the file",
+      "latestCommentAuthor": "kpeacocke"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDO",
+      "path": "ui/index.html",
+      "line": 408,
+      "startLine": 403,
+      "resolved": false,
+      "latestCommentBody": "The UI initialises the compliance score display to `100%` with a full bar, which can be misleading when the API is offline or before `/api/state` has been loaded (the page will still show 100% even though no posture data is available). Initialise this section to an \"unknown\"/empty state (e.g., `--` and 0% width) and/or update `refreshState()`'s error path to clear the score/trend/control list when the backend cannot be reached.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDa",
+      "path": "terraform/modules/substrate_aws/versions.tf",
+      "line": 3,
+      "startLine": 1,
+      "resolved": false,
+      "latestCommentBody": "`required_version` is set to `>= 1.5.0`, but the repo tooling/docs in this PR now require Terraform 1.9+ (see `scripts/check-tools.sh`, `docs/mvp-demo-runbook.md`, and CI setup). Align the module's `required_version` with the repo's documented minimum to avoid contributors thinking older Terraform versions are supported.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDd",
+      "path": "terraform/modules/substrate_okd/versions.tf",
+      "line": 3,
+      "startLine": 1,
+      "resolved": false,
+      "latestCommentBody": "`required_version` is set to `>= 1.5.0` while this PR's tooling/CI/docs require Terraform 1.9+. Update this to match the repo minimum so module consumers don't get mixed signals about supported Terraform versions.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDh",
+      "path": "integration/local_lab/terraform/main.tf",
+      "line": 2,
+      "startLine": 2,
+      "resolved": false,
+      "latestCommentBody": "The integration Terraform entrypoint also advertises `required_version = \">= 1.5.0\"`, but this PR's repo-wide minimum is Terraform 1.9+. Aligning `required_version` here with the documented/tooling minimum will prevent confusing version drift and make failures clearer. ```suggestion required_version = \">= 1.9.0\" ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDk",
+      "path": "terraable/api_server.py",
+      "line": 184,
+      "startLine": 168,
+      "resolved": false,
+      "latestCommentBody": "`_read_json_payload()` reads exactly `Content-Length` bytes from `self.rfile`. If a client sends an incorrect (too-large) `Content-Length` and then stalls, the handler thread can block indefinitely on `read(length)`, which is a reliability risk even for a localhost-only server. Consider setting a per-connection read timeout (e.g., `self.connection.settimeout(...)`) and/or defensively handling short reads so requests fail fast instead of hanging.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDr",
+      "path": "modes/offline/README.md",
+      "line": 45,
+      "startLine": 39,
+      "resolved": false,
+      "latestCommentBody": "This section implies the offline/mock mode uses the JSON files under `mock-data/` as the pre-seeded scan outputs, but the current mock implementation (`LocalLabBackend` mock mode) does not read these files at runtime (no code references them). Please reword this to clarify these JSON files are sample fixtures for screenshots/tests rather than inputs consumed by the backend, or wire the backend to load them to match the documentation. ```suggestion Sample mock scan output JSON files are in [mock-data/](./mock-data/): - `scan-clean.json` \u2014 scan result with all controls passing - `scan-ssh-drift.json` \u2014 scan result with SSH drift present - `scan-service-drift.json` \u2014 scan result with service health drift These files are not loaded by `LocalLabBackend` at runtime. They are provided as fixture inputs for integration tests, offline screenshot or recording scripts, and for manually inspecting example scan payloads. ```",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDu",
+      "path": "terraform/modules/substrate_local/versions.tf",
+      "line": 3,
+      "startLine": 1,
+      "resolved": false,
+      "latestCommentBody": "`required_version` is set to `>= 1.5.0`, but the repo now standardises on Terraform 1.9+ in docs/tool checks. Please align this module's `required_version` with the repo minimum (or update the tooling/docs) to keep version expectations consistent.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    },
+    {
+      "id": "PRRT_kwDORpHzoc514cDy",
+      "path": "terraable/local_lab.py",
+      "line": 737,
+      "startLine": 733,
+      "resolved": false,
+      "latestCommentBody": "`_record_action()` prepends to `state[\"evidence\"]` but never bounds the list size. Over repeated UI use this can grow `state.json` without limit (and `eda_history` has the same pattern), which can degrade state load times over long-running demos. Consider trimming these lists to a reasonable maximum, similar to how `trend` is capped.",
+      "latestCommentAuthor": "copilot-pull-request-reviewer"
+    }
+  ],
+  "unresolvedBullets": [
+    "- PRRT_kwDORpHzoc514TJn | .github/workflows/pr-merge-agent.yml:n/a | removed file. ni longer needed",
+    "- PRRT_kwDORpHzoc514cDO | ui/index.html:408 | The UI initialises the compliance score display to `100%` with a full bar, which can be misleading when the API is offline or before `/api/s",
+    "- PRRT_kwDORpHzoc514cDa | terraform/modules/substrate_aws/versions.tf:3 | `required_version` is set to `>= 1.5.0`, but the repo tooling/docs in this PR now require Terraform 1.9+ (see `scripts/check-tools.sh`, `doc",
+    "- PRRT_kwDORpHzoc514cDd | terraform/modules/substrate_okd/versions.tf:3 | `required_version` is set to `>= 1.5.0` while this PR's tooling/CI/docs require Terraform 1.9+. Update this to match the repo minimum so mod",
+    "- PRRT_kwDORpHzoc514cDh | integration/local_lab/terraform/main.tf:2 | The integration Terraform entrypoint also advertises `required_version = \">= 1.5.0\"`, but this PR's repo-wide minimum is Terraform 1.9+. Ali",
+    "- PRRT_kwDORpHzoc514cDk | terraable/api_server.py:184 | `_read_json_payload()` reads exactly `Content-Length` bytes from `self.rfile`. If a client sends an incorrect (too-large) `Content-Length` a",
+    "- PRRT_kwDORpHzoc514cDr | modes/offline/README.md:45 | This section implies the offline/mock mode uses the JSON files under `mock-data/` as the pre-seeded scan outputs, but the current mock imple",
+    "- PRRT_kwDORpHzoc514cDu | terraform/modules/substrate_local/versions.tf:3 | `required_version` is set to `>= 1.5.0`, but the repo now standardises on Terraform 1.9+ in docs/tool checks. Please align this module's `re",
+    "- PRRT_kwDORpHzoc514cDy | terraable/local_lab.py:737 | `_record_action()` prepends to `state[\"evidence\"]` but never bounds the list size. Over repeated UI use this can grow `state.json` without l"
+  ]
+}
