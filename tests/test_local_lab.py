@@ -16,6 +16,7 @@ from terraable.local_lab import (
     DRIFT_SERVICE_PLAYBOOK,
     HCP_TOKEN_REQUIREMENT,
     MOCK_MODE_ENV_VAR,
+    STATE_LOG_LIMIT,
     CommandResult,
     LocalLabBackend,
     default_runner,
@@ -358,6 +359,32 @@ def test_append_eda_event_persists_history_entry(tmp_path: Path) -> None:
     state = backend.get_state()
     assert state["eda_history"]
     assert state["eda_history"][0]["message"] == "eda event detail"
+
+
+@pytest.mark.unit
+def test_record_action_caps_evidence_history(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    for i in range(STATE_LOG_LIMIT + 5):
+        backend._record_action("unit_action", "succeeded", f"detail-{i}", "ok")
+
+    state = backend.get_state()
+    evidence = state["evidence"]
+    assert len(evidence) == STATE_LOG_LIMIT
+    assert evidence[0]["message"] == f"detail-{STATE_LOG_LIMIT + 4}"
+
+
+@pytest.mark.unit
+def test_append_eda_event_caps_history(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    for i in range(STATE_LOG_LIMIT + 5):
+        backend._append_eda_event(f"event-{i}", "warn")
+
+    state = backend.get_state()
+    eda_history = state["eda_history"]
+    assert len(eda_history) == STATE_LOG_LIMIT
+    assert eda_history[0]["message"] == f"event-{STATE_LOG_LIMIT + 4}"
 
 
 @pytest.mark.unit

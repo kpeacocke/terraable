@@ -36,10 +36,10 @@ Open `http://127.0.0.1:8000` in a browser. All UI actions (create, baseline, sca
 
 ## Mock data location
 
-Pre-seeded scan outputs for offline demos are in [mock-data/](./mock-data/):
+Sample mock scan output JSON files are in [mock-data/](./mock-data/):
 
 - `scan-clean.json` — scan result with all controls passing
 - `scan-ssh-drift.json` — scan result with SSH drift present
 - `scan-service-drift.json` — scan result with service health drift
 
-These files can be used as fixture inputs for integration tests or screenshot scripts.
+These files are not loaded by `LocalLabBackend` at runtime. They are provided as fixture inputs for integration tests, offline screenshot or recording scripts, and manual inspection of example scan payloads.

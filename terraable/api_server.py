@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import socket
 from collections.abc import Callable
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +20,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     backend: ClassVar[LocalLabBackend]
     ui_path: ClassVar[Path]
     max_json_payload_bytes: ClassVar[int] = 1024 * 1024
+    json_read_timeout_seconds: ClassVar[float] = 5.0
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -166,20 +168,16 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         return None
 
     def _read_json_payload(self) -> dict[str, Any]:
-        header_value = self.headers.get("Content-Length")
-        if header_value is None:
-            length = 0
-        else:
-            try:
-                length = int(header_value)
-            except (TypeError, ValueError) as exc:
-                raise ValueError("Invalid Content-Length") from exc
-            if length < 0:
-                raise ValueError("Invalid Content-Length")
-            if length > self.max_json_payload_bytes:
-                raise ValueError("Content-Length exceeds maximum allowed size")
+        length = self._parse_content_length()
+        if length == 0:
+            return {}
+
+        raw_bytes = self._read_payload_bytes(length)
+        if len(raw_bytes) != length:
+            raise ValueError("Incomplete JSON payload")
+
         try:
-            raw_payload = json.loads(self.rfile.read(length) or b"{}")
+            raw_payload = json.loads(raw_bytes)
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid JSON payload: {exc}") from exc
         if isinstance(raw_payload, dict):
@@ -190,6 +188,34 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 normalized_payload[str(key)] = value
             return normalized_payload
         return {}
+
+    def _parse_content_length(self) -> int:
+        header_value = self.headers.get("Content-Length")
+        if header_value is None:
+            return 0
+        try:
+            length = int(header_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid Content-Length") from exc
+        if length < 0:
+            raise ValueError("Invalid Content-Length")
+        if length > self.max_json_payload_bytes:
+            raise ValueError("Content-Length exceeds maximum allowed size")
+        return length
+
+    def _read_payload_bytes(self, length: int) -> bytes:
+        connection = getattr(self, "connection", None)
+        if connection is None:
+            return self.rfile.read(length)
+
+        original_timeout = connection.gettimeout()
+        try:
+            connection.settimeout(self.json_read_timeout_seconds)
+            return self.rfile.read(length)
+        except (TimeoutError, socket.timeout) as exc:
+            raise ValueError("Timed out while reading JSON payload") from exc
+        finally:
+            connection.settimeout(original_timeout)
 
     def log_message(self, format: str, *args: object) -> None:
         del format, args

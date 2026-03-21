@@ -401,12 +401,12 @@
     <section class="grid-3">
       <article class="panel">
         <h2>Compliance Score</h2>
-        <p class="score-pct" id="score-pct">100%</p>
+        <p class="score-pct" id="score-pct">--</p>
         <div class="score-bar-wrap">
           <div class="score-label">Controls passing</div>
-          <div class="score-bar"><div class="score-bar-fill" id="score-bar-fill" style="width:100%"></div></div>
+          <div class="score-bar"><div class="score-bar-fill" id="score-bar-fill" style="width:0%"></div></div>
         </div>
-        <ul id="control-status" style="margin-top:10px; padding-left:16px; font-size:0.82rem;"></ul>
+        <ul id="control-status" style="margin-top:10px; padding-left:16px; font-size:0.82rem;"><li class="warn">State unavailable</li></ul>
       </article>
 
       <article class="panel">
@@ -467,6 +467,20 @@
         li.textContent = `${name}: ${pass ? "pass" : "FAIL"}`;
         controlStatusEl.appendChild(li);
       }
+    }
+
+    function clearComplianceState() {
+      scorePctEl.textContent = "--";
+      scoreBarFill.style.width = "0%";
+      scoreBarFill.className = "score-bar-fill fail";
+      controlStatusEl.innerHTML = "";
+      const li = document.createElement("li");
+      li.className = "warn";
+      li.textContent = "State unavailable";
+      controlStatusEl.appendChild(li);
+      trendListEl.innerHTML = "";
+      evidence.innerHTML = "";
+      edaHistory.innerHTML = "";
     }
 
     function renderTrend(trend) {
@@ -622,6 +636,7 @@
             : "Browser is connected to the Terraable API server.";
         setRuntimeBadge(runtimeLabel, runtimeDetail, false);
       } catch (error) {
+        clearComplianceState();
         setRuntimeBadge("API offline", String(error), true);
       }
     }

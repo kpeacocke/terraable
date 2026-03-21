@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import socket
 import threading
 from pathlib import Path
 from urllib.error import HTTPError
@@ -371,6 +372,83 @@ def test_read_json_payload_rejects_oversized_content_length() -> None:
 
     with pytest.raises(ValueError, match="Content-Length exceeds maximum allowed size"):
         handler._read_json_payload()
+
+
+class _FakeConnection:
+    def __init__(self) -> None:
+        self.timeout: float | None = None
+
+    def gettimeout(self) -> float | None:
+        return self.timeout
+
+    def settimeout(self, value: float | None) -> None:
+        self.timeout = value
+
+
+class _TimeoutReader:
+    def read(self, _length: int) -> bytes:
+        raise TimeoutError("timed out")
+
+
+class _SocketTimeoutReader:
+    def read(self, _length: int) -> bytes:
+        raise socket.timeout("timed out")
+
+
+@pytest.mark.unit
+def test_read_json_payload_rejects_incomplete_body() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "10"}
+    handler.rfile = io.BytesIO(b"{}")
+    handler.connection = _FakeConnection()
+
+    with pytest.raises(ValueError, match="Incomplete JSON payload"):
+        handler._read_json_payload()
+
+
+@pytest.mark.unit
+def test_read_json_payload_restores_socket_timeout_after_read() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "2"}
+    handler.rfile = io.BytesIO(b"{}")
+    fake_connection = _FakeConnection()
+    fake_connection.settimeout(30.0)
+    handler.connection = fake_connection
+
+    payload = handler._read_json_payload()
+
+    assert payload == {}
+    assert handler.connection.gettimeout() == pytest.approx(30.0)
+
+
+@pytest.mark.unit
+def test_read_json_payload_reports_timeout_and_restores_socket_timeout() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "2"}
+    handler.rfile = _TimeoutReader()
+    fake_connection = _FakeConnection()
+    fake_connection.settimeout(15.0)
+    handler.connection = fake_connection
+
+    with pytest.raises(ValueError, match="Timed out while reading JSON payload"):
+        handler._read_json_payload()
+
+    assert handler.connection.gettimeout() == pytest.approx(15.0)
+
+
+@pytest.mark.unit
+def test_read_json_payload_reports_socket_timeout_and_restores_timeout() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "2"}
+    handler.rfile = _SocketTimeoutReader()
+    fake_connection = _FakeConnection()
+    fake_connection.settimeout(20.0)
+    handler.connection = fake_connection
+
+    with pytest.raises(ValueError, match="Timed out while reading JSON payload"):
+        handler._read_json_payload()
+
+    assert handler.connection.gettimeout() == pytest.approx(20.0)
 
 
 @pytest.mark.unit

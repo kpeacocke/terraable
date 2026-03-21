@@ -23,6 +23,7 @@ MOCK_MODE_ENV_VAR = "TERRAABLE_MOCK_MODE"
 PORTAL_SERVICE_STATE_FILE = "portal_service.state"
 SUPPORTED_EXECUTION_TARGET = "local-lab"
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
+STATE_LOG_LIMIT = 50
 CREDENTIAL_KEYS = (
     "HCP_TERRAFORM_TOKEN",
     "AWS_ACCESS_KEY_ID",
@@ -731,7 +732,9 @@ class LocalLabBackend:
         controls: dict[str, bool] | None = None,
     ) -> dict[str, Any]:
         def mutate(state: dict[str, Any]) -> None:
-            state.setdefault("evidence", []).insert(0, {"message": detail, "tone": tone})
+            evidence = state.setdefault("evidence", [])
+            evidence.insert(0, {"message": detail, "tone": tone})
+            del evidence[STATE_LOG_LIMIT:]
             if controls is not None:
                 state["controls"] = controls
 
@@ -746,7 +749,9 @@ class LocalLabBackend:
 
     def _append_eda_event(self, detail: str, tone: str) -> None:
         def mutate(state: dict[str, Any]) -> None:
-            state.setdefault("eda_history", []).insert(0, {"message": detail, "tone": tone})
+            history = state.setdefault("eda_history", [])
+            history.insert(0, {"message": detail, "tone": tone})
+            del history[STATE_LOG_LIMIT:]
 
         self._mutate_state(mutate)
 
