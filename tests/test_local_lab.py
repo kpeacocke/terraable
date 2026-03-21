@@ -9,11 +9,13 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.error import URLError
 
 import pytest
 
 from terraable.local_lab import (
     DRIFT_SERVICE_PLAYBOOK,
+    EXECUTION_MODE_ENV_VAR,
     HCP_TOKEN_REQUIREMENT,
     MOCK_MODE_ENV_VAR,
     STATE_LOG_LIMIT,
@@ -50,7 +52,7 @@ class _FakeLocalLabBackend(LocalLabBackend):
             },
         }
 
-    def _run_playbook(self, playbook: str, extra_vars: dict[str, Any]) -> None:
+    def _run_playbook(self, playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
         self.playbook_calls.append(playbook)
         env_dir = Path(str(extra_vars["sshd_config_path"])).parent
 
@@ -66,6 +68,12 @@ class _FakeLocalLabBackend(LocalLabBackend):
         if handler is None:
             raise AssertionError(f"Unexpected playbook call: {playbook}")
         handler(env_dir, extra_vars)
+        return {
+            "backend": "direct",
+            "job_id": f"fake-{playbook}",
+            "status": "successful",
+            "playbook": playbook,
+        }
 
     def _handle_operationalise(self, env_dir: Path, extra_vars: dict[str, Any]) -> None:
         del extra_vars
@@ -165,8 +173,8 @@ class _InspectableLocalLabBackend(LocalLabBackend):
     def save_state_for_test(self, state: dict[str, Any]) -> None:
         self._save_state(state)
 
-    def run_playbook_for_test(self, playbook: str, extra_vars: dict[str, Any]) -> None:
-        self._run_playbook(playbook, extra_vars)
+    def run_playbook_for_test(self, playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        return self._run_playbook(playbook, extra_vars)
 
     def ansible_vars_for_test(self, env_dir: Path) -> dict[str, Any]:
         return self._ansible_vars(env_dir)
@@ -206,6 +214,7 @@ def test_create_environment_builds_real_local_lab_state(tmp_path: Path) -> None:
 
     assert result["status"] == "succeeded"
     assert result["state"]["current"]["target"] == "local-lab"
+    assert result["state"]["terraform"]["status"] == "applied"
     assert result["state"]["controls"] == {
         "ssh_root_login": False,
         "portal_service_health": False,
@@ -289,6 +298,8 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
         "ssh_root_login": True,
         "portal_service_health": True,
     }
+    assert remediation["state"]["jobs"]["last_action"] == "run_remediation"
+    assert remediation["state"]["jobs"]["last_status"] == "succeeded"
 
 
 @pytest.mark.unit
@@ -665,14 +676,30 @@ def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_local_lab_rhdh_portal_not_marked_ready(tmp_path: Path) -> None:
+def test_local_lab_rhdh_portal_marked_ready(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
 
     auth = backend.get_auth_status(target="local-lab", portal="rhdh")
 
     assert auth["authenticated"] is True
-    assert auth["ready"] is False
+    assert auth["ready"] is True
+
+
+@pytest.mark.unit
+def test_create_environment_allows_local_lab_rhdh(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+
+    result = backend.create_environment(
+        target="local-lab",
+        portal="rhdh",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["state"]["current"]["portal"] == "rhdh"
 
 
 @pytest.mark.unit
@@ -859,6 +886,296 @@ def test_mock_mode_eda_events_on_drift_and_remediation(
     assert "state" in result
     state = backend.get_state()
     assert any("remediation complete" in e["message"] for e in state["eda_history"])
+
+
+@pytest.mark.unit
+def test_awx_execution_mode_requires_awx_connection_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
+
+    auth = backend.get_auth_status(target="local-lab", portal="backstage")
+
+    assert auth["authenticated"] is True
+    assert auth["ready"] is False
+    assert any("awx execution mode requires" in blocker for blocker in auth["blockers"])
+
+
+@pytest.mark.unit
+def test_run_playbook_awx_mode_launches_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    requests: list[tuple[str, str]] = []
+
+    def fake_awx_request(
+        host: str,
+        username: str,
+        password: str,
+        path: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        del host, username, password, body
+        requests.append((method, path))
+        if path.startswith("/api/v2/job_templates/?name="):
+            return {"results": [{"id": 42}]}
+        if path == "/api/v2/job_templates/42/launch/":
+            return {"job": 99}
+        if path == "/api/v2/jobs/99/":
+            return {"status": "successful"}
+        raise AssertionError(f"Unexpected AWX path: {path}")
+
+    monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
+
+    result = backend.run_playbook_for_test(
+        "playbooks/compliance_scan.yml",
+        {"target_group": "all"},
+    )
+
+    assert result["backend"] == "awx"
+    assert result["job_id"] == "99"
+    assert requests[0][0] == "GET"
+    assert requests[1][0] == "POST"
+    assert requests[2][0] == "GET"
+
+
+@pytest.mark.unit
+def test_invalid_execution_mode_defaults_to_direct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "invalid-mode")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    state = backend.get_state()
+
+    assert state["controller_mode"] == "direct"
+
+
+@pytest.mark.unit
+def test_awx_run_rejects_unmapped_playbook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    with pytest.raises(RuntimeError, match="No AWX template mapping"):
+        backend._run_awx_job_template("playbooks/unknown.yml", {})
+
+
+@pytest.mark.unit
+def test_awx_run_requires_awx_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    with pytest.raises(RuntimeError, match="AWX execution requires"):
+        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+
+
+@pytest.mark.unit
+def test_awx_run_raises_when_template_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    def fake_awx_request(*args: object, **kwargs: object) -> dict[str, Any]:
+        del args, kwargs
+        return {"results": []}
+
+    monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
+
+    with pytest.raises(RuntimeError, match="AWX template not found"):
+        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+
+
+@pytest.mark.unit
+def test_awx_run_raises_when_launch_missing_job_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    def fake_awx_request(
+        host: str,
+        username: str,
+        password: str,
+        path: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        del host, username, password, method, body
+        if path.startswith("/api/v2/job_templates/?name="):
+            return {"results": [{"id": 42}]}
+        if path == "/api/v2/job_templates/42/launch/":
+            return {}
+        raise AssertionError(f"Unexpected path {path}")
+
+    monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
+
+    with pytest.raises(RuntimeError, match="did not return job id"):
+        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+
+
+@pytest.mark.unit
+def test_awx_run_raises_when_job_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    def fake_awx_request(
+        host: str,
+        username: str,
+        password: str,
+        path: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        del host, username, password, method, body
+        if path.startswith("/api/v2/job_templates/?name="):
+            return {"results": [{"id": 42}]}
+        if path == "/api/v2/job_templates/42/launch/":
+            return {"job": 99}
+        if path == "/api/v2/jobs/99/":
+            return {"status": "failed"}
+        raise AssertionError(f"Unexpected path {path}")
+
+    monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
+
+    with pytest.raises(RuntimeError, match="ended with status failed"):
+        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+
+
+@pytest.mark.unit
+def test_awx_request_raises_on_non_object_response(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    class _Response:
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(["not-an-object"]).encode("utf-8")
+
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+
+    with pytest.raises(RuntimeError, match="not a JSON object"):
+        backend._awx_request(
+            "https://awx.example.invalid",
+            "admin",
+            "password",
+            "/api/v2/ping/",
+            method="GET",
+        )
+
+
+@pytest.mark.unit
+def test_awx_request_wraps_url_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    def raise_url_error(req: object, timeout: int = 30) -> object:
+        del req, timeout
+        raise URLError("network down")
+
+    monkeypatch.setattr("terraable.local_lab.urlopen", raise_url_error)
+
+    with pytest.raises(RuntimeError, match="AWX API request failed"):
+        backend._awx_request(
+            "https://awx.example.invalid",
+            "admin",
+            "password",
+            "/api/v2/ping/",
+            method="GET",
+        )
+
+
+@pytest.mark.unit
+def test_awx_run_raises_when_job_times_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    def fake_awx_request(
+        host: str,
+        username: str,
+        password: str,
+        path: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        del host, username, password, method, body
+        if path.startswith("/api/v2/job_templates/?name="):
+            return {"results": [{"id": 42}]}
+        if path == "/api/v2/job_templates/42/launch/":
+            return {"job": 99}
+        if path == "/api/v2/jobs/99/":
+            return {"status": "running"}
+        raise AssertionError(f"Unexpected path {path}")
+
+    monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
+    monkeypatch.setattr("terraable.local_lab.time.sleep", lambda seconds: None)
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+
+
+@pytest.mark.unit
+def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    class _Response:
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps({"status": "ok"}).encode("utf-8")
+
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+
+    payload = backend._awx_request(
+        "https://awx.example.invalid",
+        "admin",
+        "password",
+        "/api/v2/ping/",
+        method="GET",
+    )
+
+    assert payload == {"status": "ok"}
 
 
 @pytest.mark.unit

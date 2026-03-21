@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import subprocess
@@ -13,6 +14,8 @@ from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
 from typing import Any, Concatenate, ParamSpec, TypeVar, cast
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 from .contract import build_handoff_payload
 from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, hostname_to_token_env_var
@@ -20,6 +23,7 @@ from .orchestrator import ActionName, ActionStatus
 
 DRIFT_SERVICE_PLAYBOOK = "playbooks/drift_service_health.yml"
 MOCK_MODE_ENV_VAR = "TERRAABLE_MOCK_MODE"
+EXECUTION_MODE_ENV_VAR = "TERRAABLE_EXECUTION_MODE"
 PORTAL_SERVICE_STATE_FILE = "portal_service.state"
 SUPPORTED_EXECUTION_TARGET = "local-lab"
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
@@ -118,6 +122,9 @@ class LocalLabBackend:
         self._runner = runner or default_runner
         self._clock = clock or time.time
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
+        self._execution_mode = os.getenv(EXECUTION_MODE_ENV_VAR, "direct").strip().lower()
+        if self._execution_mode not in {"direct", "awx"}:
+            self._execution_mode = "direct"
         self.action_lock = threading.RLock()
         self._state_lock = threading.RLock()
         self._credentials_lock = threading.RLock()
@@ -128,6 +135,7 @@ class LocalLabBackend:
 
         state = self._load_state()
         state["mode"] = "offline-mock" if self._mock_mode else "live-local-lab"
+        state["controller_mode"] = self._execution_mode
         current = _as_str_any_dict(state.get("current"))
         target = str(current.get("target", SUPPORTED_EXECUTION_TARGET))
         portal = str(current.get("portal", "backstage"))
@@ -174,7 +182,7 @@ class LocalLabBackend:
 
         target_ready = target == SUPPORTED_EXECUTION_TARGET
         portal_ready = (
-            portal == "backstage"
+            portal in {"backstage", "rhdh"}
             if target == SUPPORTED_EXECUTION_TARGET
             else portal
             in {
@@ -196,6 +204,15 @@ class LocalLabBackend:
             )
         if not portal_ready:
             blockers.append(f"portal={portal} is not supported")
+        if self._execution_mode == "awx":
+            awx_host = os.getenv("AWX_HOST", "").strip()
+            awx_username = os.getenv("AWX_USERNAME", "").strip()
+            awx_password = os.getenv("AWX_PASSWORD", "").strip()
+            if not awx_host or not awx_username or not awx_password:
+                blockers.append(
+                    "awx execution mode requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD"
+                )
+                ready = False
 
         return {
             "authenticated": authenticated,
@@ -219,10 +236,16 @@ class LocalLabBackend:
 
         if self._mock_mode:
             environment_name = f"mock-demo-{int(self._clock())}"
+            run_id = f"mock-{environment_name}"
+            self._set_terraform_status(
+                status="applied",
+                detail=f"mock terraform apply completed for {environment_name}",
+                run_id=run_id,
+            )
             env_dir = self._ensure_environment(environment_name)
             runtime_vars: dict[str, Any] = {
                 "environment_name": environment_name,
-                "terraform_run_id": f"mock-{environment_name}",
+                "terraform_run_id": run_id,
                 "target_platform": target,
                 "portal_impl": portal,
                 "security_profile": profile,
@@ -272,7 +295,13 @@ class LocalLabBackend:
             )
 
         environment_name = f"local-lab-{int(self._clock())}"
+        run_id = f"local-{environment_name}"
         env_dir = self._ensure_environment(environment_name)
+        self._set_terraform_status(
+            status="running",
+            detail=f"terraform apply started for {environment_name}",
+            run_id=run_id,
+        )
 
         try:
             outputs = self._terraform_apply(
@@ -283,7 +312,7 @@ class LocalLabBackend:
             )
             payload = build_handoff_payload(
                 environment_name=str(outputs["environment_name"]),
-                terraform_run_id=f"local-{environment_name}",
+                terraform_run_id=run_id,
                 target_platform=str(outputs["target_platform"]),
                 portal_impl=str(outputs["portal_impl"]),
                 security_profile=str(outputs["security_profile"]),
@@ -291,12 +320,23 @@ class LocalLabBackend:
                 metadata={"mode": "local-lab", "runtime_dir": str(env_dir)},
             )
         except Exception as exc:  # pragma: no cover - exercised via tests with fakes
+            self._set_terraform_status(
+                status="failed",
+                detail=f"terraform apply failed for {environment_name}: {exc}",
+                run_id=run_id,
+            )
             return self._record_action(
                 ActionName.CREATE_ENVIRONMENT.value,
                 ActionStatus.FAILED.value,
                 f"create_environment failed: {exc}",
                 "fail",
             )
+
+        self._set_terraform_status(
+            status="applied",
+            detail=f"terraform apply completed for {payload.environment_name}",
+            run_id=run_id,
+        )
 
         state = self._load_state()
         state["current"] = {
@@ -342,7 +382,13 @@ class LocalLabBackend:
         extra_vars = self._ansible_vars(env_dir)
         extra_vars["portal_impl"] = str(current["portal"])
         extra_vars["security_profile"] = str(current["profile"])
-        self._run_playbook("playbooks/aap_operationalise.yml", extra_vars)
+        job = self._run_playbook("playbooks/aap_operationalise.yml", extra_vars)
+        self._set_job_status(
+            action=ActionName.APPLY_BASELINE.value,
+            status="succeeded",
+            detail="baseline workflow completed",
+            job=job,
+        )
         controls = self._read_controls(env_dir)
         return self._record_action(
             ActionName.APPLY_BASELINE.value,
@@ -397,7 +443,7 @@ class LocalLabBackend:
 
         ssh_vars = self._ansible_vars(env_dir)
         ssh_vars["scan_output_path"] = str(ssh_scan_path)
-        self._run_playbook("playbooks/compliance_scan.yml", ssh_vars)
+        ssh_job = self._run_playbook("playbooks/compliance_scan.yml", ssh_vars)
 
         svc_vars = self._ansible_vars(env_dir)
         svc_vars.update(
@@ -407,7 +453,17 @@ class LocalLabBackend:
                 "scan_output_path": str(service_scan_path),
             }
         )
-        self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
+        service_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
+        self._set_job_status(
+            action=ActionName.RUN_COMPLIANCE_SCAN.value,
+            status="succeeded",
+            detail="compliance scan workflow completed",
+            job={
+                "backend": service_job.get("backend", ssh_job.get("backend", "direct")),
+                "job_id": service_job.get("job_id", ssh_job.get("job_id", "")),
+                "jobs": [ssh_job, service_job],
+            },
+        )
 
         ssh_scan = json.loads(ssh_scan_path.read_text(encoding="utf-8"))
         service_scan = json.loads(service_scan_path.read_text(encoding="utf-8"))
@@ -480,7 +536,13 @@ class LocalLabBackend:
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
-        self._run_playbook("playbooks/drift_ssh_root.yml", self._ansible_vars(env_dir))
+        job = self._run_playbook("playbooks/drift_ssh_root.yml", self._ansible_vars(env_dir))
+        self._set_job_status(
+            action=ActionName.INJECT_SSH_DRIFT.value,
+            status="succeeded",
+            detail="ssh drift injection completed",
+            job=job,
+        )
         controls = self._read_controls(env_dir)
         response = self._record_action(
             ActionName.INJECT_SSH_DRIFT.value,
@@ -529,7 +591,13 @@ class LocalLabBackend:
         env_dir = Path(str(current["runtime_dir"]))
         extra_vars = self._ansible_vars(env_dir)
         extra_vars.update({"drift_action": "inject", "portal_service": str(current["portal"])})
-        self._run_playbook(DRIFT_SERVICE_PLAYBOOK, extra_vars)
+        job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, extra_vars)
+        self._set_job_status(
+            action=ActionName.INJECT_SERVICE_DRIFT.value,
+            status="succeeded",
+            detail="service drift injection completed",
+            job=job,
+        )
         controls = self._read_controls(env_dir)
         response = self._record_action(
             ActionName.INJECT_SERVICE_DRIFT.value,
@@ -568,10 +636,20 @@ class LocalLabBackend:
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
-        self._run_playbook("playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir))
+        ssh_job = self._run_playbook("playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir))
         svc_vars = self._ansible_vars(env_dir)
         svc_vars.update({"drift_action": "remediate", "portal_service": str(current["portal"])})
-        self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
+        svc_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
+        self._set_job_status(
+            action=ActionName.RUN_REMEDIATION.value,
+            status="succeeded",
+            detail="remediation workflow completed",
+            job={
+                "backend": svc_job.get("backend", ssh_job.get("backend", "direct")),
+                "job_id": svc_job.get("job_id", ssh_job.get("job_id", "")),
+                "jobs": [ssh_job, svc_job],
+            },
+        )
         controls = self._read_controls(env_dir)
         response = self._record_action(
             ActionName.RUN_REMEDIATION.value,
@@ -653,7 +731,10 @@ class LocalLabBackend:
         raw = json.loads(output.stdout)
         return {key: value["value"] for key, value in raw.items()}
 
-    def _run_playbook(self, playbook: str, extra_vars: dict[str, Any]) -> None:
+    def _run_playbook(self, playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        if self._execution_mode == "awx":
+            return self._run_awx_job_template(playbook, extra_vars)
+
         vars_path = self.runtime_root / (
             f"extra-vars-{Path(playbook).stem}-{threading.get_ident()}-{time.time_ns()}.json"
         )
@@ -677,8 +758,116 @@ class LocalLabBackend:
                 cwd=self.ansible_root,
                 env=env,
             )
+            return {
+                "backend": "direct",
+                "job_id": f"local-{time.time_ns()}",
+                "playbook": playbook,
+                "status": "successful",
+            }
         finally:
             vars_path.unlink(missing_ok=True)
+
+    def _run_awx_job_template(self, playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        template_map = {
+            "playbooks/aap_operationalise.yml": "terraable-operationalise",
+            "playbooks/compliance_scan.yml": "terraable-compliance-scan",
+            "playbooks/drift_ssh_root.yml": "terraable-drift-ssh-root",
+            "playbooks/remediate_ssh_root.yml": "terraable-remediate-ssh",
+            DRIFT_SERVICE_PLAYBOOK: "terraable-drift-second-scenario",
+        }
+        template_name = template_map.get(playbook)
+        if not template_name:
+            raise RuntimeError(f"No AWX template mapping configured for playbook {playbook}")
+
+        awx_host = os.getenv("AWX_HOST", "").strip().rstrip("/")
+        awx_username = os.getenv("AWX_USERNAME", "").strip()
+        awx_password = os.getenv("AWX_PASSWORD", "").strip()
+        if not awx_host or not awx_username or not awx_password:
+            raise RuntimeError(
+                "AWX execution requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD"
+            )
+
+        template_response = self._awx_request(
+            awx_host,
+            awx_username,
+            awx_password,
+            f"/api/v2/job_templates/?name={template_name}",
+            method="GET",
+        )
+        results = template_response.get("results", [])
+        first_result = results[0] if isinstance(results, list) and results else {}
+        template_id = int(first_result.get("id", 0))
+        if not template_id:
+            raise RuntimeError(f"AWX template not found: {template_name}")
+
+        launch_payload = json.dumps({"extra_vars": extra_vars}).encode("utf-8")
+        launch_response = self._awx_request(
+            awx_host,
+            awx_username,
+            awx_password,
+            f"/api/v2/job_templates/{template_id}/launch/",
+            method="POST",
+            body=launch_payload,
+        )
+        job_id = int(launch_response.get("job", launch_response.get("id", 0)))
+        if not job_id:
+            raise RuntimeError(f"AWX did not return job id for template {template_name}")
+
+        max_polls = 300
+        for _ in range(max_polls):
+            job_response = self._awx_request(
+                awx_host,
+                awx_username,
+                awx_password,
+                f"/api/v2/jobs/{job_id}/",
+                method="GET",
+            )
+            status = str(job_response.get("status", "")).lower()
+            if status == "successful":
+                return {
+                    "backend": "awx",
+                    "job_id": str(job_id),
+                    "playbook": playbook,
+                    "template": template_name,
+                    "status": status,
+                }
+            if status in {"failed", "error", "canceled"}:
+                raise RuntimeError(
+                    f"AWX job {job_id} for {template_name} ended with status {status}"
+                )
+            time.sleep(1)
+
+        raise RuntimeError(f"AWX job {job_id} for {template_name} timed out")
+
+    def _awx_request(
+        self,
+        host: str,
+        username: str,
+        password: str,
+        path: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+        request = Request(
+            url=f"{host}{path}",
+            method=method,
+            data=body,
+            headers={
+                "Authorization": f"Basic {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urlopen(request, timeout=30) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+                if isinstance(payload, dict):
+                    return cast(dict[str, Any], payload)
+                raise RuntimeError("AWX API response is not a JSON object")
+        except URLError as exc:
+            raise RuntimeError(f"AWX API request failed for {path}") from exc
 
     def _ansible_vars(self, env_dir: Path) -> dict[str, Any]:
         current = self._current_environment()
@@ -755,6 +944,49 @@ class LocalLabBackend:
 
         self._mutate_state(mutate)
 
+    def _set_terraform_status(self, *, status: str, detail: str, run_id: str) -> None:
+        def mutate(state: dict[str, Any]) -> None:
+            state["terraform"] = {
+                "run_id": run_id,
+                "status": status,
+                "detail": detail,
+                "updated_at": int(self._clock()),
+            }
+
+        self._mutate_state(mutate)
+
+    def _set_job_status(
+        self,
+        *,
+        action: str,
+        status: str,
+        detail: str,
+        job: dict[str, Any],
+    ) -> None:
+        def mutate(state: dict[str, Any]) -> None:
+            jobs = _as_str_any_dict(state.get("jobs"))
+            history = cast(list[dict[str, Any]], jobs.get("history", []))
+            record = {
+                "action": action,
+                "status": status,
+                "detail": detail,
+                "backend": str(job.get("backend", "direct")),
+                "job_id": str(job.get("job_id", "")),
+                "updated_at": int(self._clock()),
+            }
+            history.insert(0, record)
+            del history[STATE_LOG_LIMIT:]
+            state["jobs"] = {
+                "last_action": action,
+                "last_status": status,
+                "last_detail": detail,
+                "last_backend": record["backend"],
+                "last_job_id": record["job_id"],
+                "history": history,
+            }
+
+        self._mutate_state(mutate)
+
     def _score_pct(self, controls: dict[str, bool]) -> int:
         total = len(controls)
         passed = sum(1 for value in controls.values() if value)
@@ -767,6 +999,20 @@ class LocalLabBackend:
             "controls": {
                 "ssh_root_login": False,
                 "portal_service_health": False,
+            },
+            "terraform": {
+                "run_id": None,
+                "status": "idle",
+                "detail": "terraform has not run yet",
+                "updated_at": 0,
+            },
+            "jobs": {
+                "last_action": None,
+                "last_status": "idle",
+                "last_detail": "no workflow has run yet",
+                "last_backend": None,
+                "last_job_id": None,
+                "history": [],
             },
             "evidence": [],
             "eda_history": [],

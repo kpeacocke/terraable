@@ -85,6 +85,20 @@
         validate_certs: true
         state: present
 
+    - name: Create or update SSH drift injection job template
+      awx.awx.job_template:
+        name: terraable-drift-ssh-root
+        description: Inject SSH root login drift
+        project: terraable-lab
+        playbook: ansible/playbooks/drift_ssh_root.yml
+        inventory: terraable-lab-inventory
+        ask_variables_on_launch: true
+        controller_host: "{{ awx_host }}"
+        controller_username: "{{ awx_username }}"
+        controller_password: "{{ awx_password }}"
+        validate_certs: true
+        state: present
+
     - name: Create or update SSH remediation job template
       awx.awx.job_template:
         name: terraable-remediate-ssh

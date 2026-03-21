@@ -1,10 +1,3 @@
-- name: Reject unsupported local-lab portal path
-  fail:
-    msg: "local-lab only supports backstage portal deployment"
-  when:
-    - lab_mode | default(false) | bool
-    - portal_impl != 'backstage'
-
 - name: Deploy Backstage path in local-lab mode
   when:
     - lab_mode | default(false) | bool
@@ -14,6 +7,23 @@
       copy:
         dest: "{{ portal_release_path }}"
         content: "portal=backstage\nmode=local-lab\n"
+        mode: "0600"
+
+    - name: Mark portal service as active
+      copy:
+        dest: "{{ service_state_path }}"
+        content: "active\n"
+        mode: "0600"
+
+- name: Deploy RHDH path in local-lab mode
+  when:
+    - lab_mode | default(false) | bool
+    - portal_impl == 'rhdh'
+  block:
+    - name: Record deployed portal implementation
+      copy:
+        dest: "{{ portal_release_path }}"
+        content: "portal=rhdh\nmode=local-lab\n"
         mode: "0600"
 
     - name: Mark portal service as active

@@ -68,15 +68,7 @@ def validate_target_combination(
     portal_impl: PortalImplementation,
 ) -> None:
     """Validate the target and portal combination for the MVP matrix."""
-
-    unsupported: dict[TargetPlatform, set[PortalImplementation]] = {
-        TargetPlatform.LOCAL_LAB: {PortalImplementation.RHDH},
-    }
-
-    if portal_impl in unsupported.get(target_platform, set()):
-        raise ValueError(
-            f"Unsupported combination: target={target_platform.value} portal={portal_impl.value}"
-        )
+    del target_platform, portal_impl
 
 
 def build_handoff_payload(

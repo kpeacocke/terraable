@@ -19,7 +19,7 @@ Terraform provisions infrastructure. Ansible operationalises and enforces contro
 - Offline/mock mode: Simulated evidence for rehearsals.
 
 ## Selectors
-- `target_platform`: `openshift`, `aws`, `local-lab`
+- `target_platform`: `openshift`, `aws`, `azure`, `okd`, `local-lab`
 - `portal_impl`: `rhdh`, `backstage`
 - `security_profile`: `baseline`, `strict`
 - `eda`: UI-only selector for future event-driven path (`enabled` / `disabled`, Phase 2, not present in MVP handoff contract)
