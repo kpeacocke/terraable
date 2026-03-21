@@ -1,0 +1,128 @@
+name: PR merge agent
+
+# Monitors a target PR and merges it once:
+#   1. All Copilot review threads are resolved, AND
+#   2. The "Copilot review present" gate is completed:success on the current head.
+#
+# Between checks it re-requests a Copilot review so the gate can advance.
+# Runs on a schedule, on every review submission, and on every check-run completion.
+
+"on":
+  pull_request_review:
+    types:
+      - submitted
+  check_run:
+    types:
+      - completed
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to monitor and merge when clean
+        required: false
+        default: "48"
+      merge_method:
+        description: "Merge method: squash | merge | rebase"
+        required: false
+        default: squash
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  monitor-and-merge:
+    name: Monitor PR and merge when clean
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      OWNER: ${{ github.repository_owner }}
+
+    steps:
+      - name: Resolve target PR number
+        id: pr
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request_review)
+              echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              ;;
+            check_run)
+              HEAD_SHA="${{ github.event.check_run.head_sha }}"
+              PR_NUM=$(gh api "repos/$REPO/pulls" \
+                --jq "[.[] | select(.head.sha == \"$HEAD_SHA\" and .state == \"open\") | .number] | first // empty")
+              echo "number=${PR_NUM}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "number=${{ inputs.pr_number || '48' }}" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Skip if no target PR
+        if: steps.pr.outputs.number == ''
+        run: |
+          echo "No open PR found for this event — nothing to do."
+
+      - name: Check PR is still open
+        if: steps.pr.outputs.number != ''
+        id: state
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          STATE=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.state')
+          echo "state=$STATE" >> "$GITHUB_OUTPUT"
+          echo "PR #$PR_NUMBER state: $STATE"
+
+      - name: Evaluate conditions and act
+        if: steps.pr.outputs.number != '' && steps.state.outputs.state == 'open'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          MERGE_METHOD: ${{ inputs.merge_method || 'squash' }}
+        run: |
+          # ── 1. Current head SHA ──────────────────────────────────────────────
+          HEAD_SHA=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
+          echo "PR #$PR_NUMBER  head=$HEAD_SHA"
+
+          # ── 2. Unresolved review threads (GraphQL) ───────────────────────────
+          UNRESOLVED=$(gh api graphql \
+            -f query='query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){reviewThreads(first:100){nodes{isResolved}}}}}' \
+            -f owner="$OWNER" \
+            -f repo="${REPO#*/}" \
+            -F pr="$PR_NUMBER" | \
+            python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          nodes = d['data']['repository']['pullRequest']['reviewThreads']['nodes']
+          print(sum(1 for n in nodes if not n['isResolved']))
+          ")
+          echo "unresolved_threads=$UNRESOLVED"
+
+          # ── 3. Copilot review gate on the current head ───────────────────────
+          COPILOT=$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" | \
+            python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for r in d.get('check_runs', []):
+              if r.get('name') == 'Copilot review present':
+                  print(r.get('status', '?') + ':' + str(r.get('conclusion', 'none')))
+                  break
+          else:
+              print('missing')
+          ")
+          echo "copilot_gate=$COPILOT"
+
+          # ── 4. Act ────────────────────────────────────────────────────────────
+          if [[ "$UNRESOLVED" == "0" && "$COPILOT" == "completed:success" ]]; then
+            echo "✅ All conditions met — merging PR #$PR_NUMBER via $MERGE_METHOD"
+            gh pr merge "$PR_NUMBER" --repo "$REPO" "--${MERGE_METHOD}"
+
+          elif [[ "$UNRESOLVED" == "0" ]]; then
+            echo "🔄 Threads clean, gate not yet green — re-requesting Copilot review"
+            gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" \
+              -f "reviewers[]=github-copilot[bot]" 2>&1 || true
+            echo "Re-request posted; next schedule run or check_run event will re-evaluate."
+
+          else
+            echo "⏳ $UNRESOLVED unresolved thread(s) remain — standing by for Copilot to complete its review"
+          fi
