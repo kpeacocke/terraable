@@ -67,7 +67,11 @@ def validate_target_combination(
     target_platform: TargetPlatform,
     portal_impl: PortalImplementation,
 ) -> None:
-    """Validate the target and portal combination for the MVP matrix."""
+    """Validate target and portal combinations when a matrix rule is defined.
+
+    Currently all enum combinations are accepted. The helper is retained so
+    target-specific restrictions can be reintroduced without changing callers.
+    """
     del target_platform, portal_impl
 
 

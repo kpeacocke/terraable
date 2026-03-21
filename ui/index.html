@@ -395,7 +395,7 @@
       <article class="panel">
         <h2>Evidence and Status</h2>
         <div style="margin-bottom:10px; font-size:0.8rem; color:var(--ink-muted);">Runtime status</div>
-        <ul id="runtime-status" style="margin-bottom:10px;"></ul>
+        <output id="runtime-status" aria-live="polite" aria-relevant="additions text" aria-atomic="false" style="display:block; margin-bottom:10px;"></output>
         <ul id="evidence" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
       </article>
     </section>
@@ -508,7 +508,7 @@
       const terraform = state.terraform || {};
       const jobs = state.jobs || {};
 
-      const terraformItem = document.createElement("li");
+      const terraformItem = document.createElement("div");
       const tfStatus = terraform.status || "unknown";
       let terraformClass = "warn";
       if (tfStatus === "applied") {
@@ -520,7 +520,7 @@
       terraformItem.textContent = `terraform: status=${tfStatus} run=${terraform.run_id || "n/a"}`;
       runtimeStatusEl.appendChild(terraformItem);
 
-      const jobItem = document.createElement("li");
+      const jobItem = document.createElement("div");
       const jobStatus = jobs.last_status || "idle";
       let jobClass = "warn";
       if (jobStatus === "succeeded") {

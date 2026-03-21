@@ -983,6 +983,20 @@ def test_awx_run_requires_awx_credentials(
 
 
 @pytest.mark.unit
+def test_awx_run_requires_https_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "http://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    with pytest.raises(RuntimeError, match="AWX_HOST must use an https:// URL"):
+        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+
+
+@pytest.mark.unit
 def test_awx_run_raises_when_template_not_found(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1176,6 +1190,84 @@ def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.Mon
     )
 
     assert payload == {"status": "ok"}
+
+
+@pytest.mark.unit
+def test_awx_request_raises_on_json_decode_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    class _Response:
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"{invalid-json"
+
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+
+    with pytest.raises(RuntimeError, match="AWX API response parse failed"):
+        backend._awx_request(
+            "https://awx.example.invalid",
+            "admin",
+            "password",
+            "/api/v2/ping/",
+            method="GET",
+        )
+
+
+@pytest.mark.unit
+def test_apply_baseline_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+    backend.create_environment(
+        target="local-lab",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    def failing_run_playbook(playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        del playbook, extra_vars
+        raise RuntimeError("playbook failed")
+
+    backend._run_playbook = failing_run_playbook  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="playbook failed"):
+        backend.apply_baseline()
+
+    state = backend.get_state()
+    assert state["jobs"]["last_action"] == "apply_baseline"
+    assert state["jobs"]["last_status"] == "failed"
+
+
+@pytest.mark.unit
+def test_run_compliance_scan_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+    backend.create_environment(
+        target="local-lab",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    def failing_run_playbook(playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        del playbook, extra_vars
+        raise RuntimeError("scan playbook failed")
+
+    backend._run_playbook = failing_run_playbook  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="scan playbook failed"):
+        backend.run_compliance_scan()
+
+    state = backend.get_state()
+    assert state["jobs"]["last_action"] == "run_compliance_scan"
+    assert state["jobs"]["last_status"] == "failed"
 
 
 @pytest.mark.unit

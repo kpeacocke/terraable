@@ -382,21 +382,30 @@ class LocalLabBackend:
         extra_vars = self._ansible_vars(env_dir)
         extra_vars["portal_impl"] = str(current["portal"])
         extra_vars["security_profile"] = str(current["profile"])
-        job = self._run_playbook("playbooks/aap_operationalise.yml", extra_vars)
-        self._set_job_status(
-            action=ActionName.APPLY_BASELINE.value,
-            status="succeeded",
-            detail="baseline workflow completed",
-            job=job,
-        )
-        controls = self._read_controls(env_dir)
-        return self._record_action(
-            ActionName.APPLY_BASELINE.value,
-            ActionStatus.SUCCEEDED.value,
-            f"apply_baseline succeeded: operational workflow applied to {current['environment_name']}",
-            "ok",
-            controls=controls,
-        )
+        try:
+            job = self._run_playbook("playbooks/aap_operationalise.yml", extra_vars)
+            self._set_job_status(
+                action=ActionName.APPLY_BASELINE.value,
+                status="succeeded",
+                detail="baseline workflow completed",
+                job=job,
+            )
+            controls = self._read_controls(env_dir)
+            return self._record_action(
+                ActionName.APPLY_BASELINE.value,
+                ActionStatus.SUCCEEDED.value,
+                f"apply_baseline succeeded: operational workflow applied to {current['environment_name']}",
+                "ok",
+                controls=controls,
+            )
+        except Exception as exc:
+            self._set_job_status(
+                action=ActionName.APPLY_BASELINE.value,
+                status="failed",
+                detail=f"baseline workflow failed: {exc}",
+                job={"backend": self._execution_mode, "job_id": ""},
+            )
+            raise
 
     @_serialize_action
     def run_compliance_scan(self) -> dict[str, Any]:
@@ -441,32 +450,43 @@ class LocalLabBackend:
         ssh_scan_path = env_dir / "ssh_scan.json"
         service_scan_path = env_dir / "service_scan.json"
 
-        ssh_vars = self._ansible_vars(env_dir)
-        ssh_vars["scan_output_path"] = str(ssh_scan_path)
-        ssh_job = self._run_playbook("playbooks/compliance_scan.yml", ssh_vars)
+        try:
+            ssh_vars = self._ansible_vars(env_dir)
+            ssh_vars["scan_output_path"] = str(ssh_scan_path)
+            ssh_job = self._run_playbook("playbooks/compliance_scan.yml", ssh_vars)
 
-        svc_vars = self._ansible_vars(env_dir)
-        svc_vars.update(
-            {
-                "drift_action": "validate",
-                "portal_service": str(current["portal"]),
-                "scan_output_path": str(service_scan_path),
-            }
-        )
-        service_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
-        self._set_job_status(
-            action=ActionName.RUN_COMPLIANCE_SCAN.value,
-            status="succeeded",
-            detail="compliance scan workflow completed",
-            job={
-                "backend": service_job.get("backend", ssh_job.get("backend", "direct")),
-                "job_id": service_job.get("job_id", ssh_job.get("job_id", "")),
-                "jobs": [ssh_job, service_job],
-            },
-        )
+            svc_vars = self._ansible_vars(env_dir)
+            svc_vars.update(
+                {
+                    "drift_action": "validate",
+                    "portal_service": str(current["portal"]),
+                    "scan_output_path": str(service_scan_path),
+                }
+            )
+            service_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
 
-        ssh_scan = json.loads(ssh_scan_path.read_text(encoding="utf-8"))
-        service_scan = json.loads(service_scan_path.read_text(encoding="utf-8"))
+            ssh_scan = json.loads(ssh_scan_path.read_text(encoding="utf-8"))
+            service_scan = json.loads(service_scan_path.read_text(encoding="utf-8"))
+
+            self._set_job_status(
+                action=ActionName.RUN_COMPLIANCE_SCAN.value,
+                status="succeeded",
+                detail="compliance scan workflow completed",
+                job={
+                    "backend": service_job.get("backend", ssh_job.get("backend", "direct")),
+                    "job_id": service_job.get("job_id", ssh_job.get("job_id", "")),
+                    "jobs": [ssh_job, service_job],
+                },
+            )
+        except Exception as exc:
+            self._set_job_status(
+                action=ActionName.RUN_COMPLIANCE_SCAN.value,
+                status="failed",
+                detail=f"compliance scan workflow failed: {exc}",
+                job={"backend": self._execution_mode, "job_id": ""},
+            )
+            raise
+
         controls = {
             "ssh_root_login": ssh_scan.get("status") == "pass",
             "portal_service_health": service_scan.get("status") == "pass",
@@ -786,6 +806,8 @@ class LocalLabBackend:
             raise RuntimeError(
                 "AWX execution requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD"
             )
+        if not awx_host.startswith("https://"):
+            raise RuntimeError("AWX_HOST must use an https:// URL")
 
         template_response = self._awx_request(
             awx_host,
@@ -862,7 +884,10 @@ class LocalLabBackend:
         )
         try:
             with urlopen(request, timeout=30) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+                try:
+                    payload = json.loads(response.read().decode("utf-8"))
+                except ValueError as exc:
+                    raise RuntimeError(f"AWX API response parse failed for {path}") from exc
                 if isinstance(payload, dict):
                     return cast(dict[str, Any], payload)
                 raise RuntimeError("AWX API response is not a JSON object")
