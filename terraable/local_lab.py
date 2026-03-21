@@ -11,10 +11,10 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .contract import build_handoff_payload
-from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, _hostname_to_token_env_var
+from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, hostname_to_token_env_var
 from .orchestrator import ActionName, ActionStatus
 
 DRIFT_SERVICE_PLAYBOOK = "playbooks/drift_service_health.yml"
@@ -33,7 +33,10 @@ CREDENTIAL_KEYS = (
     "OPENSHIFT_API_URL",
     "OPENSHIFT_TOKEN",
 )
-TARGET_CREDENTIAL_REQUIREMENTS = {
+CredentialRequirements = tuple[str, ...]
+CredentialEntry = dict[str, str]
+
+TARGET_CREDENTIAL_REQUIREMENTS: dict[str, CredentialRequirements] = {
     "local-lab": (HCP_TOKEN_REQUIREMENT,),
     "openshift": (HCP_TOKEN_REQUIREMENT, "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
     "okd": (HCP_TOKEN_REQUIREMENT, "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
@@ -58,6 +61,12 @@ class CommandResult:
 
 CommandRunner = Callable[[list[str], Path | None, dict[str, str] | None], CommandResult]
 StateMutator = Callable[[dict[str, Any]], None]
+
+
+def _as_str_any_dict(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return cast(dict[str, Any], value)
 
 
 def default_runner(
@@ -103,15 +112,9 @@ class LocalLabBackend:
 
         state = self._load_state()
         state["mode"] = "offline-mock" if self._mock_mode else "live-local-lab"
-        current = state.get("current")
-        target = (
-            str(current.get("target", SUPPORTED_EXECUTION_TARGET))
-            if isinstance(current, dict)
-            else SUPPORTED_EXECUTION_TARGET
-        )
-        portal = (
-            str(current.get("portal", "backstage")) if isinstance(current, dict) else "backstage"
-        )
+        current = _as_str_any_dict(state.get("current"))
+        target = str(current.get("target", SUPPORTED_EXECUTION_TARGET))
+        portal = str(current.get("portal", "backstage"))
         state["auth"] = self.get_auth_status(target=target, portal=portal)
         return state
 
@@ -128,31 +131,7 @@ class LocalLabBackend:
             for key, value in credentials.items():
                 if key not in CREDENTIAL_KEYS:
                     continue
-                trimmed = value.strip()
-                existing = self._credentials.get(key)
-                if trimmed:
-                    next_item = {"value": trimmed, "source": "ui"}
-                    if existing and existing.get("source") != "ui":
-                        next_item["fallback_value"] = existing.get("value", "")
-                        next_item["fallback_source"] = existing.get("source", "")
-                    elif existing and existing.get("source") == "ui":
-                        fallback_value = existing.get("fallback_value", "")
-                        fallback_source = existing.get("fallback_source", "")
-                        if fallback_value and fallback_source:
-                            next_item["fallback_value"] = fallback_value
-                            next_item["fallback_source"] = fallback_source
-                    self._credentials[key] = next_item
-                elif existing and existing.get("source") == "ui":
-                    # Clearing a UI field should remove only user-entered values.
-                    fallback_value = existing.get("fallback_value", "").strip()
-                    fallback_source = existing.get("fallback_source", "").strip()
-                    if fallback_value and fallback_source:
-                        self._credentials[key] = {
-                            "value": fallback_value,
-                            "source": fallback_source,
-                        }
-                    else:
-                        self._credentials.pop(key)
+                self._apply_credential_value(key, value)
 
         return self.get_auth_status(target=target, portal=portal)
 
@@ -169,7 +148,10 @@ class LocalLabBackend:
                 "blockers": [],
             }
 
-        requirements = TARGET_CREDENTIAL_REQUIREMENTS.get(target, (HCP_TOKEN_REQUIREMENT,))
+        requirements: CredentialRequirements = TARGET_CREDENTIAL_REQUIREMENTS.get(
+            target,
+            (HCP_TOKEN_REQUIREMENT,),
+        )
         missing = [key for key in requirements if not self._credential_value(key)]
         authenticated = not missing
         source = self._auth_source(requirements)
@@ -221,7 +203,7 @@ class LocalLabBackend:
         if self._mock_mode:
             environment_name = f"mock-demo-{int(self._clock())}"
             env_dir = self._ensure_environment(environment_name)
-            runtime_vars = {
+            runtime_vars: dict[str, Any] = {
                 "environment_name": environment_name,
                 "terraform_run_id": f"mock-{environment_name}",
                 "target_platform": target,
@@ -453,7 +435,11 @@ class LocalLabBackend:
 
         if self._mock_mode:
             state = self._load_state()
-            raw = state.get("controls") or {}
+            raw = self._controls_from_state(
+                state,
+                ssh_root_login=True,
+                portal_service_health=True,
+            )
             ssh_controls: dict[str, bool] = {
                 "ssh_root_login": False,
                 "portal_service_health": bool(raw.get("portal_service_health", True)),
@@ -493,7 +479,11 @@ class LocalLabBackend:
 
         if self._mock_mode:
             state = self._load_state()
-            raw = state.get("controls") or {}
+            raw = self._controls_from_state(
+                state,
+                ssh_root_login=True,
+                portal_service_health=True,
+            )
             svc_controls: dict[str, bool] = {
                 "ssh_root_login": bool(raw.get("ssh_root_login", True)),
                 "portal_service_health": False,
@@ -575,8 +565,8 @@ class LocalLabBackend:
 
     def _current_environment(self) -> dict[str, Any]:
         state = self._load_state()
-        current = state.get("current")
-        if not isinstance(current, dict):
+        current = _as_str_any_dict(state.get("current"))
+        if not current:
             raise RuntimeError("No environment has been created yet.")
         required_keys = ("runtime_dir", "runtime_vars")
         missing = [key for key in required_keys if key not in current]
@@ -670,7 +660,7 @@ class LocalLabBackend:
 
     def _ansible_vars(self, env_dir: Path) -> dict[str, Any]:
         current = self._current_environment()
-        runtime_vars = dict(current["runtime_vars"])
+        runtime_vars = _as_str_any_dict(current["runtime_vars"]).copy()
         runtime_vars.update(
             {
                 "lab_mode": True,
@@ -767,7 +757,7 @@ class LocalLabBackend:
                 raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 return self._default_state()
-            return raw_state if isinstance(raw_state, dict) else self._default_state()
+            return cast(dict[str, Any], raw_state) if isinstance(raw_state, dict) else self._default_state()
 
     def _save_state(self, state: dict[str, Any]) -> None:
         with self._state_lock:
@@ -878,4 +868,61 @@ class LocalLabBackend:
 
     def _tf_token_env_var(self) -> str:
         hostname = os.getenv(TFC_HOSTNAME_ENV_VAR, "app.terraform.io")
-        return _hostname_to_token_env_var(hostname)
+        return hostname_to_token_env_var(hostname)
+
+    def _apply_credential_value(self, key: str, value: str) -> None:
+        trimmed = value.strip()
+        existing = self._credentials.get(key)
+        if trimmed:
+            self._credentials[key] = self._ui_credential_entry(trimmed, existing)
+            return
+        if existing and existing.get("source") == "ui":
+            restored = self._restore_credential_entry(existing)
+            if restored is not None:
+                self._credentials[key] = restored
+            else:
+                self._credentials.pop(key, None)
+
+    def _ui_credential_entry(
+        self,
+        value: str,
+        existing: CredentialEntry | None,
+    ) -> CredentialEntry:
+        next_item: CredentialEntry = {"value": value, "source": "ui"}
+        if not existing:
+            return next_item
+
+        existing_source = existing.get("source", "")
+        if existing_source != "ui":
+            next_item["fallback_value"] = existing.get("value", "")
+            next_item["fallback_source"] = existing_source
+            return next_item
+
+        fallback_value = existing.get("fallback_value", "")
+        fallback_source = existing.get("fallback_source", "")
+        if fallback_value and fallback_source:
+            next_item["fallback_value"] = fallback_value
+            next_item["fallback_source"] = fallback_source
+        return next_item
+
+    def _restore_credential_entry(self, existing: CredentialEntry) -> CredentialEntry | None:
+        fallback_value = existing.get("fallback_value", "").strip()
+        fallback_source = existing.get("fallback_source", "").strip()
+        if fallback_value and fallback_source:
+            return {"value": fallback_value, "source": fallback_source}
+        return None
+
+    def _controls_from_state(
+        self,
+        state: dict[str, Any],
+        *,
+        ssh_root_login: bool,
+        portal_service_health: bool,
+    ) -> dict[str, bool]:
+        raw = _as_str_any_dict(state.get("controls"))
+        return {
+            "ssh_root_login": bool(raw.get("ssh_root_login", ssh_root_login)),
+            "portal_service_health": bool(
+                raw.get("portal_service_health", portal_service_health)
+            ),
+        }

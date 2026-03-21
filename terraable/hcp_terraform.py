@@ -13,6 +13,12 @@ from urllib.request import Request, urlopen
 TFC_HOSTNAME_ENV_VAR = "TERRAABLE_TFC_HOSTNAME"
 
 
+def hostname_to_token_env_var(hostname: str) -> str:
+    """Public wrapper for deriving the Terraform token environment variable name."""
+
+    return _hostname_to_token_env_var(hostname)
+
+
 def _hostname_to_token_env_var(hostname: str) -> str:
     """Convert hostname to TF_TOKEN_* environment variable name.
 
