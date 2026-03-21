@@ -191,7 +191,9 @@ def test_get_run_raises_when_response_is_not_object() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
     with (
-        patch("terraable.hcp_terraform.urlopen", return_value=_FakeResponse(["not", "an", "object"])),
+        patch(
+            "terraable.hcp_terraform.urlopen", return_value=_FakeResponse(["not", "an", "object"])
+        ),
         pytest.raises(RuntimeError, match="response was not a JSON object"),
     ):
         client.get_run("run-list-response")

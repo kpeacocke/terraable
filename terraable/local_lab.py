@@ -176,18 +176,18 @@ class LocalLabBackend:
         )
         ready = authenticated and target_ready and portal_ready
 
+        display_requirements = [self._display_requirement_key(key) for key in requirements]
+        display_missing = [self._display_requirement_key(key) for key in missing]
+
         blockers: list[str] = []
         if missing:
-            blockers.append(f"missing credentials: {', '.join(missing)}")
+            blockers.append(f"missing credentials: {', '.join(display_missing)}")
         if not target_ready:
             blockers.append(
                 f"target={target} is not executable yet; select {SUPPORTED_EXECUTION_TARGET}"
             )
         if not portal_ready:
             blockers.append(f"portal={portal} is not supported")
-
-        display_requirements = [self._display_requirement_key(key) for key in requirements]
-        display_missing = [self._display_requirement_key(key) for key in missing]
 
         return {
             "authenticated": authenticated,

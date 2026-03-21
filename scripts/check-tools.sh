@@ -31,9 +31,7 @@ check() {
   local name="$1"
   local cmd="$2"
   local min_version="$3"
-  local hint="$3"
-
-  hint="$4"
+  local hint="$4"
 
   if command -v "$name" > /dev/null 2>&1; then
     raw_output=$(eval "$cmd" 2>&1 | head -1)
@@ -56,7 +54,7 @@ echo ""
 check "python3"          "python3 --version"          "3.11.0" "Install Python 3.11+ from https://python.org"
 check "poetry"           "poetry --version"           "1.8.0" "curl -sSL https://install.python-poetry.org | python3 -"
 check "terraform"        "terraform version"          "1.9.0" "https://developer.hashicorp.com/terraform/install"
-check "ansible"          "ansible --version"          "10.0.0" "pip install ansible"
+check "ansible"          "pip show ansible | grep Version | awk '{print \$2}'" "10.0.0" "pip install ansible"
 check "ansible-rulebook" "ansible-rulebook --version" "1.0.0" "pip install ansible-rulebook"
 check "shellcheck"       "shellcheck --version"       "0.9.0" "apt install shellcheck  or  brew install shellcheck"
 check "markdownlint-cli2" "markdownlint-cli2 --version" "0.14.0" "npm install -g markdownlint-cli2"
