@@ -649,18 +649,28 @@
     }
 
     async function saveCredentials() {
+      const credentialInputs = {
+        HCP_TERRAFORM_TOKEN: document.getElementById("hcp-token").value,
+        AWS_ACCESS_KEY_ID: document.getElementById("aws-key").value,
+        AWS_SECRET_ACCESS_KEY: document.getElementById("aws-secret").value,
+        ARM_CLIENT_ID: document.getElementById("arm-client-id").value,
+        ARM_CLIENT_SECRET: document.getElementById("arm-client-secret").value,
+        ARM_TENANT_ID: document.getElementById("arm-tenant-id").value,
+        ARM_SUBSCRIPTION_ID: document.getElementById("arm-subscription-id").value,
+        OPENSHIFT_API_URL: document.getElementById("openshift-api").value,
+        OPENSHIFT_TOKEN: document.getElementById("openshift-token").value,
+      };
+
+      const credentials = {};
+      for (const [key, value] of Object.entries(credentialInputs)) {
+        const trimmed = value.trim();
+        if (trimmed) {
+          credentials[key] = trimmed;
+        }
+      }
+
       const payload = {
-        credentials: {
-          HCP_TERRAFORM_TOKEN: document.getElementById("hcp-token").value,
-          AWS_ACCESS_KEY_ID: document.getElementById("aws-key").value,
-          AWS_SECRET_ACCESS_KEY: document.getElementById("aws-secret").value,
-          ARM_CLIENT_ID: document.getElementById("arm-client-id").value,
-          ARM_CLIENT_SECRET: document.getElementById("arm-client-secret").value,
-          ARM_TENANT_ID: document.getElementById("arm-tenant-id").value,
-          ARM_SUBSCRIPTION_ID: document.getElementById("arm-subscription-id").value,
-          OPENSHIFT_API_URL: document.getElementById("openshift-api").value,
-          OPENSHIFT_TOKEN: document.getElementById("openshift-token").value,
-        },
+        credentials,
         target: selected("target"),
         portal: selected("portal"),
       };

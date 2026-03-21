@@ -219,7 +219,7 @@ class LocalLabBackend:
                 "ok",
             )
 
-        if target != "local-lab":
+        if target != SUPPORTED_EXECUTION_TARGET:
             return self._record_action(
                 ActionName.CREATE_ENVIRONMENT.value,
                 ActionStatus.FAILED.value,
