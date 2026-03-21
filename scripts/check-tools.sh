@@ -24,7 +24,35 @@ version_ge() {
   if [[ -z "$current" ]]; then
     return 1
   fi
-  [[ "$(printf "%s\n%s\n" "$minimum" "$current" | sort -V | head -1)" == "$minimum" ]]
+
+  local IFS=.
+  local -a current_parts minimum_parts
+  local max_parts=0
+  local idx=0
+  local current_part=0
+  local minimum_part=0
+
+  read -r -a current_parts <<< "$current"
+  read -r -a minimum_parts <<< "$minimum"
+
+  max_parts=${#current_parts[@]}
+  if (( ${#minimum_parts[@]} > max_parts )); then
+    max_parts=${#minimum_parts[@]}
+  fi
+
+  for (( idx=0; idx<max_parts; idx++ )); do
+    current_part=${current_parts[idx]:-0}
+    minimum_part=${minimum_parts[idx]:-0}
+
+    if (( 10#$current_part > 10#$minimum_part )); then
+      return 0
+    fi
+    if (( 10#$current_part < 10#$minimum_part )); then
+      return 1
+    fi
+  done
+
+  return 0
 }
 
 check() {

@@ -18,6 +18,7 @@ from .local_lab import LocalLabBackend
 class TerraableRequestHandler(BaseHTTPRequestHandler):
     backend: ClassVar[LocalLabBackend]
     ui_path: ClassVar[Path]
+    max_json_payload_bytes: ClassVar[int] = 1024 * 1024
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -28,7 +29,9 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(HTTPStatus.NOT_FOUND, "UI index file not found")
                 return
             except UnicodeDecodeError:
-                self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, "UI index file is not valid UTF-8")
+                self.send_error(
+                    HTTPStatus.INTERNAL_SERVER_ERROR, "UI index file is not valid UTF-8"
+                )
                 return
             self._send_html(content)
         elif parsed.path == "/api/state":
@@ -167,6 +170,8 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 raise ValueError("Invalid Content-Length") from exc
             if length < 0:
                 raise ValueError("Invalid Content-Length")
+            if length > self.max_json_payload_bytes:
+                raise ValueError("Content-Length exceeds maximum allowed size")
         try:
             raw_payload = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError as exc:
