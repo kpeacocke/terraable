@@ -74,18 +74,18 @@ jobs:
           echo "state=$STATE" >> "$GITHUB_OUTPUT"
           echo "PR #$PR_NUMBER state: $STATE"
 
-        - name: Check PR head branch
-          if: steps.pr.outputs.number != '' && steps.state.outputs.state == 'open'
-          id: branch
-          env:
-            PR_NUMBER: ${{ steps.pr.outputs.number }}
-          run: |
-            HEAD_BRANCH=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.ref')
-            echo "head_branch=$HEAD_BRANCH" >> "$GITHUB_OUTPUT"
-            echo "PR #$PR_NUMBER head branch: $HEAD_BRANCH"
+      - name: Check PR head branch
+        if: steps.pr.outputs.number != '' && steps.state.outputs.state == 'open'
+        id: branch
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          HEAD_BRANCH=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.ref')
+          echo "head_branch=$HEAD_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "PR #$PR_NUMBER head branch: $HEAD_BRANCH"
 
       - name: Evaluate conditions and act
-          if: steps.pr.outputs.number != '' && steps.state.outputs.state == 'open' && steps.branch.outputs.head_branch == 'feat/phase-2'
+        if: steps.pr.outputs.number != '' && steps.state.outputs.state == 'open' && steps.branch.outputs.head_branch == 'feat/phase-2'
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           MERGE_METHOD: ${{ inputs.merge_method || 'squash' }}
