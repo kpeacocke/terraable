@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,12 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from .contract import build_handoff_payload
+from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, _hostname_to_token_env_var
 from .orchestrator import ActionName, ActionStatus
 
 DRIFT_SERVICE_PLAYBOOK = "playbooks/drift_service_health.yml"
 MOCK_MODE_ENV_VAR = "TERRAABLE_MOCK_MODE"
 PORTAL_SERVICE_STATE_FILE = "portal_service.state"
 SUPPORTED_EXECUTION_TARGET = "local-lab"
+HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
 CREDENTIAL_KEYS = (
     "HCP_TERRAFORM_TOKEN",
     "AWS_ACCESS_KEY_ID",
@@ -31,12 +34,12 @@ CREDENTIAL_KEYS = (
     "OPENSHIFT_TOKEN",
 )
 TARGET_CREDENTIAL_REQUIREMENTS = {
-    "local-lab": ("HCP_TERRAFORM_TOKEN",),
-    "openshift": ("HCP_TERRAFORM_TOKEN", "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
-    "okd": ("HCP_TERRAFORM_TOKEN", "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
-    "aws": ("HCP_TERRAFORM_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"),
+    "local-lab": (HCP_TOKEN_REQUIREMENT,),
+    "openshift": (HCP_TOKEN_REQUIREMENT, "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
+    "okd": (HCP_TOKEN_REQUIREMENT, "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
+    "aws": (HCP_TOKEN_REQUIREMENT, "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"),
     "azure": (
-        "HCP_TERRAFORM_TOKEN",
+        HCP_TOKEN_REQUIREMENT,
         "ARM_CLIENT_ID",
         "ARM_CLIENT_SECRET",
         "ARM_TENANT_ID",
@@ -100,6 +103,7 @@ class LocalLabBackend:
         self._runner = runner or default_runner
         self._clock = clock or time.time
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
+        self._state_lock = threading.RLock()
         self._credentials = self._bootstrap_credentials()
 
     def get_state(self) -> dict[str, Any]:
@@ -172,11 +176,14 @@ class LocalLabBackend:
         if not portal_ready:
             blockers.append(f"portal={portal} is not supported")
 
+        display_requirements = [self._display_requirement_key(key) for key in requirements]
+        display_missing = [self._display_requirement_key(key) for key in missing]
+
         return {
             "authenticated": authenticated,
             "ready": ready,
-            "required_credentials": list(requirements),
-            "missing_credentials": missing,
+            "required_credentials": display_requirements,
+            "missing_credentials": display_missing,
             "credential_sources": source,
             "blockers": blockers,
         }
@@ -457,7 +464,7 @@ class LocalLabBackend:
             state["controls"] = svc_controls
             self._save_state(state)
             response = self._record_action(
-                "inject_service_drift",
+                ActionName.INJECT_SERVICE_DRIFT.value,
                 ActionStatus.SUCCEEDED.value,
                 "inject_service_drift succeeded (mock): portal service stopped",
                 "warn",
@@ -477,7 +484,7 @@ class LocalLabBackend:
         self._run_playbook(DRIFT_SERVICE_PLAYBOOK, extra_vars)
         controls = self._read_controls(env_dir)
         response = self._record_action(
-            "inject_service_drift",
+            ActionName.INJECT_SERVICE_DRIFT.value,
             ActionStatus.SUCCEEDED.value,
             "inject_service_drift succeeded: portal service stopped",
             "warn",
@@ -590,26 +597,31 @@ class LocalLabBackend:
         return {key: value["value"] for key, value in raw.items()}
 
     def _run_playbook(self, playbook: str, extra_vars: dict[str, Any]) -> None:
-        vars_path = self.runtime_root / "extra-vars.json"
+        vars_path = self.runtime_root / (
+            f"extra-vars-{Path(playbook).stem}-{threading.get_ident()}-{time.time_ns()}.json"
+        )
         vars_path.parent.mkdir(parents=True, exist_ok=True)
         vars_path.write_text(json.dumps(extra_vars), encoding="utf-8")
         env = os.environ.copy()
         env.setdefault("ANSIBLE_CONFIG", str(self.ansible_root / "ansible.cfg"))
         inventory_path = Path(str(extra_vars["inventory_path"]))
-        self._run(
-            [
-                sys.executable,
-                "-m",
-                "ansible.cli.playbook",
-                "-i",
-                str(inventory_path),
-                playbook,
-                "--extra-vars",
-                f"@{vars_path}",
-            ],
-            cwd=self.ansible_root,
-            env=env,
-        )
+        try:
+            self._run(
+                [
+                    sys.executable,
+                    "-m",
+                    "ansible.cli.playbook",
+                    "-i",
+                    str(inventory_path),
+                    playbook,
+                    "--extra-vars",
+                    f"@{vars_path}",
+                ],
+                cwd=self.ansible_root,
+                env=env,
+            )
+        finally:
+            vars_path.unlink(missing_ok=True)
 
     def _ansible_vars(self, env_dir: Path) -> dict[str, Any]:
         current = self._current_environment()
@@ -686,25 +698,29 @@ class LocalLabBackend:
         return round((passed / total) * 100) if total else 0
 
     def _load_state(self) -> dict[str, Any]:
-        if not self.state_file.exists():
-            return {
-                "current": None,
-                "controls": {
-                    "ssh_root_login": False,
-                    "portal_service_health": False,
-                },
-                "evidence": [],
-                "eda_history": [],
-                "trend": [],
-                "scan_count": 0,
-                "eda_enabled": False,
-            }
-        raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
-        return raw_state if isinstance(raw_state, dict) else {}
+        with self._state_lock:
+            if not self.state_file.exists():
+                return {
+                    "current": None,
+                    "controls": {
+                        "ssh_root_login": False,
+                        "portal_service_health": False,
+                    },
+                    "evidence": [],
+                    "eda_history": [],
+                    "trend": [],
+                    "scan_count": 0,
+                    "eda_enabled": False,
+                }
+            raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
+            return raw_state if isinstance(raw_state, dict) else {}
 
     def _save_state(self, state: dict[str, Any]) -> None:
-        self.runtime_root.mkdir(parents=True, exist_ok=True)
-        self.state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        with self._state_lock:
+            self.runtime_root.mkdir(parents=True, exist_ok=True)
+            temp_path = self.runtime_root / f"state-{threading.get_ident()}-{time.time_ns()}.json"
+            temp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            temp_path.replace(self.state_file)
 
     def _run(
         self,
@@ -726,7 +742,7 @@ class LocalLabBackend:
     def _bootstrap_credentials(self) -> dict[str, dict[str, str]]:
         creds: dict[str, dict[str, str]] = {}
         dotenv_values = self._read_dotenv(self.workspace_root / ".env")
-        for key in CREDENTIAL_KEYS:
+        for key in self._credential_keys():
             env_value = os.environ.get(key, "").strip()
             if env_value:
                 creds[key] = {"value": env_value, "source": "env"}
@@ -741,6 +757,7 @@ class LocalLabBackend:
         if not dotenv_path.exists():
             return {}
 
+        allowed_keys = self._credential_keys()
         loaded: dict[str, str] = {}
         for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
             line = raw_line.strip()
@@ -750,11 +767,19 @@ class LocalLabBackend:
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip().strip("\"'")
-            if key in CREDENTIAL_KEYS:
+            if key in allowed_keys:
                 loaded[key] = value
         return loaded
 
     def _credential_value(self, key: str) -> str:
+        if key == HCP_TOKEN_REQUIREMENT:
+            tf_key = self._tf_token_env_var()
+            tf_item = self._credentials.get(tf_key)
+            if tf_item and tf_item["value"]:
+                return tf_item["value"]
+            alias_item = self._credentials.get("HCP_TERRAFORM_TOKEN")
+            return alias_item["value"] if alias_item else ""
+
         item = self._credentials.get(key)
         if not item:
             return ""
@@ -763,7 +788,29 @@ class LocalLabBackend:
     def _auth_source(self, requirements: tuple[str, ...]) -> dict[str, str]:
         sources: dict[str, str] = {}
         for key in requirements:
+            display_key = self._display_requirement_key(key)
+            if key == HCP_TOKEN_REQUIREMENT:
+                tf_key = self._tf_token_env_var()
+                tf_item = self._credentials.get(tf_key)
+                if tf_item:
+                    sources[display_key] = tf_item["source"]
+                    continue
+                alias_item = self._credentials.get("HCP_TERRAFORM_TOKEN")
+                if alias_item:
+                    sources[display_key] = f"{alias_item['source']} (from HCP_TERRAFORM_TOKEN)"
+                continue
+
             item = self._credentials.get(key)
             if item:
-                sources[key] = item["source"]
+                sources[display_key] = item["source"]
         return sources
+
+    def _display_requirement_key(self, key: str) -> str:
+        return self._tf_token_env_var() if key == HCP_TOKEN_REQUIREMENT else key
+
+    def _credential_keys(self) -> tuple[str, ...]:
+        return (*CREDENTIAL_KEYS, self._tf_token_env_var())
+
+    def _tf_token_env_var(self) -> str:
+        hostname = os.getenv(TFC_HOSTNAME_ENV_VAR, "app.terraform.io")
+        return _hostname_to_token_env_var(hostname)

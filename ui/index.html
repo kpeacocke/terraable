@@ -618,7 +618,14 @@
       try {
         const data = await api("/api/state");
         renderState(data.state);
-        setRuntimeBadge("Live local-lab", "Browser is connected to the Terraable API server.", false);
+        const mode = data.state?.mode || "live-local-lab";
+        const target = data.state?.current?.target || "local-lab";
+        const runtimeLabel = mode === "offline-mock" ? "Offline mock" : `Live ${target}`;
+        const runtimeDetail =
+          mode === "offline-mock"
+            ? "Browser is connected to the Terraable API server in deterministic mock mode."
+            : "Browser is connected to the Terraable API server.";
+        setRuntimeBadge(runtimeLabel, runtimeDetail, false);
       } catch (error) {
         setRuntimeBadge("API offline", String(error), true);
       }

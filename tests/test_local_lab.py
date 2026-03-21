@@ -391,11 +391,12 @@ def test_auth_status_uses_dotenv_credentials(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
     auth = backend.get_auth_status(target="local-lab", portal="backstage")
+    tf_token_key = backend._tf_token_env_var()
 
     assert auth["authenticated"] is True
     assert auth["ready"] is True
     assert auth["missing_credentials"] == []
-    assert auth["credential_sources"] == {"HCP_TERRAFORM_TOKEN": "dotenv"}
+    assert auth["credential_sources"] == {tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"}
 
 
 @pytest.mark.unit
@@ -403,11 +404,12 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
     backend = _InspectableLocalLabBackend(tmp_path)
 
     auth = backend.get_auth_status(target="aws", portal="backstage")
+    tf_token_key = backend._tf_token_env_var()
 
     assert auth["authenticated"] is False
     assert auth["ready"] is False
     assert auth["missing_credentials"] == [
-        "HCP_TERRAFORM_TOKEN",
+        tf_token_key,
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
     ]
@@ -419,10 +421,11 @@ def test_configure_credentials_merges_ui_values(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
     auth = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+    tf_token_key = backend._tf_token_env_var()
 
     assert auth["authenticated"] is True
     assert auth["ready"] is True
-    assert auth["credential_sources"] == {"HCP_TERRAFORM_TOKEN": "ui"}
+    assert auth["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
 
 
 @pytest.mark.unit
@@ -460,9 +463,10 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
     )
 
     auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "})
+    tf_token_key = backend._tf_token_env_var()
 
     assert auth_after_clear["authenticated"] is False
-    assert "HCP_TERRAFORM_TOKEN" in auth_after_clear["missing_credentials"]
+    assert tf_token_key in auth_after_clear["missing_credentials"]
 
 
 @pytest.mark.unit
@@ -502,8 +506,9 @@ def test_bootstrap_prefers_environment_over_dotenv(
 
     backend = _InspectableLocalLabBackend(tmp_path)
     auth = backend.get_auth_status(target="local-lab", portal="backstage")
+    tf_token_key = backend._tf_token_env_var()
 
-    assert auth["credential_sources"] == {"HCP_TERRAFORM_TOKEN": "env"}
+    assert auth["credential_sources"] == {tf_token_key: "env (from HCP_TERRAFORM_TOKEN)"}
 
 
 @pytest.mark.unit

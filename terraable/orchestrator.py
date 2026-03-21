@@ -15,6 +15,7 @@ class ActionName(StrEnum):
     APPLY_BASELINE = "apply_baseline"
     RUN_COMPLIANCE_SCAN = "run_compliance_scan"
     INJECT_SSH_DRIFT = "inject_ssh_drift"
+    INJECT_SERVICE_DRIFT = "inject_service_drift"
     RUN_REMEDIATION = "run_remediation"
 
 

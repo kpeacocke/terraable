@@ -34,6 +34,7 @@ Local-lab now has an executable end-to-end path: UI -> Python API -> Terraform c
 ## Running The Control Plane
 
 Preconditions:
+
 - `terraform` available on `PATH`.
 - Python environment has `ansible` installed.
 
@@ -46,11 +47,13 @@ python -m terraable.api_server --host 127.0.0.1 --port 8000
 Then open `http://127.0.0.1:8000`.
 
 Credential authentication:
+
 - Credentials can be provided from `.env` and/or entered in the UI Authentication panel.
 - Action buttons stay disabled until the selected target and portal are authenticated and executable.
-- For the current executable path (`local-lab`), `HCP_TERRAFORM_TOKEN` is required.
+- For the current executable path (`local-lab`), provide an HCP Terraform token via Terraform CLI convention (`TF_TOKEN_<hostname>`, with `TERRAABLE_TFC_HOSTNAME` defaulting to `app.terraform.io`). The UI also accepts `HCP_TERRAFORM_TOKEN` as a backwards-compatible alias.
 
 Current executable scope:
+
 - `local-lab + backstage` is wired end-to-end.
 - Other target selectors remain contract scaffolding and return an explicit failure from the API until provider-specific execution paths are implemented.
 
