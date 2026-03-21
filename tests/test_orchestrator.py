@@ -29,6 +29,7 @@ def test_orchestrator_happy_path() -> None:
     baseline = orchestrator.apply_baseline()
     scan = orchestrator.run_compliance_scan(drift_present=False)
     drift = orchestrator.inject_ssh_drift()
+    service_drift = orchestrator.inject_service_drift()
     remediation = orchestrator.run_remediation()
 
     assert create.action == ActionName.CREATE_ENVIRONMENT
@@ -36,8 +37,9 @@ def test_orchestrator_happy_path() -> None:
     assert baseline.action == ActionName.APPLY_BASELINE
     assert scan.status == ActionStatus.SUCCEEDED
     assert drift.action == ActionName.INJECT_SSH_DRIFT
+    assert service_drift.action == ActionName.INJECT_SERVICE_DRIFT
     assert remediation.action == ActionName.RUN_REMEDIATION
-    assert len(orchestrator.evidence) == 5
+    assert len(orchestrator.evidence) == 6
 
 
 @pytest.mark.unit

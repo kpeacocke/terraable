@@ -1,0 +1,22 @@
+{
+  "scan_id": "mock-scan-002",
+  "timestamp": "2026-03-20T00:01:00Z",
+  "environment": "demo-offline",
+  "controls": [
+    {
+      "control": "ssh_root_login",
+      "status": "fail",
+      "evidence": "PermitRootLogin yes detected — drift injected"
+    },
+    {
+      "control": "portal_service_health",
+      "status": "pass",
+      "evidence": "Service backstage active and responding"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passing": 1,
+    "score_pct": 50
+  }
+}

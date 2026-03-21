@@ -54,8 +54,13 @@ jobs:
           python -m pip install poetry
           poetry install --no-interaction --no-ansi --no-root
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3
+        with:
+          terraform_version: "1.9.5"
+
       - name: Run tests
-        run: poetry run pytest
+        run: poetry run pytest -p no:pytest_terraform.plugin
 
   terraform-fmt:
     name: Terraform fmt

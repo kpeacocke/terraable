@@ -1,0 +1,158 @@
+---
+- name: Service health drift scenario
+  hosts: "{{ connection.ansible_inventory_group | default(target_group | default('all')) }}"
+  gather_facts: false
+  vars:
+    drift_mode: "{{ drift_action | default('inject') }}"
+    target_service: "{{ portal_service | default('backstage') }}"
+  tasks:
+    - name: Inject service health drift — stop the portal service
+      when:
+        - drift_mode == 'inject'
+        - not (lab_mode | default(false) | bool)
+      block:
+        - name: Stop portal service to simulate health drift
+          ansible.builtin.service:
+            name: "{{ target_service }}"
+            state: stopped
+          become: true
+          register: service_stopped
+          ignore_errors: true
+
+        - name: Record drift injection evidence
+          set_fact:
+            service_drift_status: "drifted"
+            service_drift_evidence: >-
+              Service {{ target_service }} stopped to simulate health drift.
+              rc={{ service_stopped.rc | default('n/a') }}
+
+        - name: Emit drift injection summary
+          debug:
+            msg: "{{ service_drift_evidence }}"
+
+    - name: Inject service health drift in lab mode
+      when:
+        - drift_mode == 'inject'
+        - lab_mode | default(false) | bool
+      block:
+        - name: Write stopped state for lab portal service
+          copy:
+            dest: "{{ service_state_path }}"
+            content: "stopped\n"
+            mode: "0600"
+
+        - name: Record lab drift injection evidence
+          set_fact:
+            service_drift_status: "drifted"
+            service_drift_evidence: >-
+              Service {{ target_service }} marked stopped in {{ service_state_path }}.
+
+        - name: Emit lab drift injection summary
+          debug:
+            msg: "{{ service_drift_evidence }}"
+
+    - name: Remediate service health drift — restore portal service
+      when:
+        - drift_mode == 'remediate'
+        - not (lab_mode | default(false) | bool)
+      block:
+        - name: Start portal service to restore approved state
+          ansible.builtin.service:
+            name: "{{ target_service }}"
+            state: started
+            enabled: true
+          become: true
+          register: service_started
+
+        - name: Record remediation evidence
+          set_fact:
+            service_drift_status: "remediated"
+            service_drift_evidence: >-
+              Service {{ target_service }} restored to running state.
+              changed={{ service_started.changed }}
+
+        - name: Emit remediation summary
+          debug:
+            msg: "{{ service_drift_evidence }}"
+
+    - name: Remediate service health drift in lab mode
+      when:
+        - drift_mode == 'remediate'
+        - lab_mode | default(false) | bool
+      block:
+        - name: Write active state for lab portal service
+          copy:
+            dest: "{{ service_state_path }}"
+            content: "active\n"
+            mode: "0600"
+
+        - name: Record lab remediation evidence
+          set_fact:
+            service_drift_status: "remediated"
+            service_drift_evidence: >-
+              Service {{ target_service }} restored to active in {{ service_state_path }}.
+
+        - name: Emit lab remediation summary
+          debug:
+            msg: "{{ service_drift_evidence }}"
+
+    - name: Validate portal service health
+      when:
+        - drift_mode == 'validate'
+        - not (lab_mode | default(false) | bool)
+      block:
+        - name: Check portal service state
+          ansible.builtin.command: systemctl is-active "{{ target_service }}"
+          register: service_check
+          become: true
+          changed_when: false
+          failed_when: false
+
+        - name: Set service health facts
+          set_fact:
+            service_health_status: >-
+              {{ 'pass' if service_check.stdout | default('') == 'active' else 'fail' }}
+            service_health_evidence: >-
+              Service {{ target_service }} status: {{ service_check.stdout | default('unknown') }}
+
+        - name: Emit scan result
+          copy:
+            dest: "{{ scan_output_path | default('/tmp/terraable-service-scan.json') }}"
+            content: >-
+              {{ {
+                'control': 'portal_service_health',
+                'service': target_service,
+                'status': service_health_status,
+                'evidence': service_health_evidence
+              } | to_json }}
+            mode: "{{ scan_output_mode | default('0600') }}"
+
+    - name: Validate portal service health in lab mode
+      when:
+        - drift_mode == 'validate'
+        - lab_mode | default(false) | bool
+      block:
+        - name: Read portal service state file
+          slurp:
+            path: "{{ service_state_path }}"
+          register: lab_service_state
+
+        - name: Set lab service health facts
+          set_fact:
+            service_health_status: >-
+              {{ 'pass' if (lab_service_state.content | b64decode | trim) == 'active' else 'fail' }}
+            service_health_evidence: >-
+              Service {{ target_service }} status from {{ service_state_path }}:
+              {{ lab_service_state.content | b64decode | trim }}
+
+        - name: Emit lab scan result
+          copy:
+            dest: "{{ scan_output_path | default('/tmp/terraable-service-scan.json') }}"
+            content: >-
+              {{ {
+                'control': 'portal_service_health',
+                'service': target_service,
+                'status': service_health_status,
+                'evidence': service_health_evidence
+              } | to_json }}
+            mode: "{{ scan_output_mode | default('0600') }}"

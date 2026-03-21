@@ -13,7 +13,7 @@ from terraable.hcp_terraform import HcpTerraformClient, HcpTerraformConfig
 
 
 class _FakeResponse:
-    def __init__(self, payload: dict[str, Any]) -> None:
+    def __init__(self, payload: Any) -> None:
         self._payload = payload
 
     def __enter__(self) -> _FakeResponse:
@@ -184,6 +184,19 @@ def test_api_error_raises_runtime_error() -> None:
         pytest.raises(RuntimeError, match="HCP Terraform request failed"),
     ):
         client.get_run("run-3")
+
+
+@pytest.mark.unit
+def test_get_run_raises_when_response_is_not_object() -> None:
+    client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
+
+    with (
+        patch(
+            "terraable.hcp_terraform.urlopen", return_value=_FakeResponse(["not", "an", "object"])
+        ),
+        pytest.raises(RuntimeError, match="response was not a JSON object"),
+    ):
+        client.get_run("run-list-response")
 
 
 @pytest.mark.unit

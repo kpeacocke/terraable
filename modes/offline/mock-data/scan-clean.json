@@ -1,0 +1,22 @@
+{
+  "scan_id": "mock-scan-001",
+  "timestamp": "2026-03-20T00:00:00Z",
+  "environment": "demo-offline",
+  "controls": [
+    {
+      "control": "ssh_root_login",
+      "status": "pass",
+      "evidence": "PermitRootLogin no confirmed in effective sshd configuration"
+    },
+    {
+      "control": "portal_service_health",
+      "status": "pass",
+      "evidence": "Service backstage active and responding"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passing": 2,
+    "score_pct": 100
+  }
+}

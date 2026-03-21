@@ -15,6 +15,7 @@ class ActionName(StrEnum):
     APPLY_BASELINE = "apply_baseline"
     RUN_COMPLIANCE_SCAN = "run_compliance_scan"
     INJECT_SSH_DRIFT = "inject_ssh_drift"
+    INJECT_SERVICE_DRIFT = "inject_service_drift"
     RUN_REMEDIATION = "run_remediation"
 
 
@@ -89,6 +90,15 @@ class DemoOrchestrator:
             action=ActionName.INJECT_SSH_DRIFT,
             status=ActionStatus.SUCCEEDED,
             detail="SSH drift injected: PermitRootLogin yes.",
+        )
+        self._evidence.append(record)
+        return record
+
+    def inject_service_drift(self) -> EvidenceRecord:
+        record = EvidenceRecord(
+            action=ActionName.INJECT_SERVICE_DRIFT,
+            status=ActionStatus.SUCCEEDED,
+            detail="Service drift injected: portal service stopped.",
         )
         self._evidence.append(record)
         return record

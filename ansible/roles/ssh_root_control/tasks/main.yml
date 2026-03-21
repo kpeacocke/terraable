@@ -1,6 +1,28 @@
----
+- name: Validate SSH root login is disabled in lab mode
+  when:
+    - ssh_control_mode == 'validate'
+    - lab_mode | default(false) | bool
+  block:
+    - name: Read rendered SSH configuration file
+      slurp:
+        path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
+      register: sshd_config_file
+
+    - name: Set scan facts from lab file content
+      set_fact:
+        ssh_root_login_status: >-
+          {{
+            'pass'
+            if ('permitrootlogin no' in (sshd_config_file.content | b64decode | lower))
+            else 'fail'
+          }}
+        ssh_root_login_evidence: >-
+          PermitRootLogin validation executed against {{ sshd_config_path | default('/etc/ssh/sshd_config') }}
+
 - name: Validate SSH root login is disabled
-  when: ssh_control_mode == 'validate'
+  when:
+    - ssh_control_mode == 'validate'
+    - not (lab_mode | default(false) | bool)
   block:
     - name: Get effective sshd configuration
       command: sshd -T
@@ -25,19 +47,44 @@
 
 - name: Remediate SSH root login to approved state
   when: ssh_control_mode == 'remediate'
-  become: true
   block:
     - name: Enforce PermitRootLogin setting in sshd_config
       lineinfile:
-        path: /etc/ssh/sshd_config
+        path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
         regexp: '^\s*#?\s*PermitRootLogin\b'
         line: 'PermitRootLogin no'
         create: true
         backup: true
+      become: "{{ not (lab_mode | default(false) | bool) }}"
       register: ssh_root_login_remediation
 
     - name: Restart SSH daemon to apply root login configuration
       ansible.builtin.service:
         name: "{{ ssh_service_name | default('sshd') }}"
         state: restarted
-      when: ssh_root_login_remediation is changed
+      become: true
+      when:
+        - not (lab_mode | default(false) | bool)
+        - ssh_root_login_remediation is changed
+
+- name: Inject SSH root login drift
+  when: ssh_control_mode == 'inject'
+  block:
+    - name: Set PermitRootLogin to yes
+      lineinfile:
+        path: "{{ sshd_config_path | default('/etc/ssh/sshd_config') }}"
+        regexp: '^\s*#?\s*PermitRootLogin\b'
+        line: 'PermitRootLogin yes'
+        create: true
+        backup: true
+      become: "{{ not (lab_mode | default(false) | bool) }}"
+      register: ssh_root_login_injected
+
+    - name: Restart SSH daemon after drift injection
+      ansible.builtin.service:
+        name: "{{ ssh_service_name | default('sshd') }}"
+        state: restarted
+      become: true
+      when:
+        - not (lab_mode | default(false) | bool)
+        - ssh_root_login_injected is changed

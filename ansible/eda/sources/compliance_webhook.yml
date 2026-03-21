@@ -1,0 +1,25 @@
+---
+# EDA event source: HTTP webhook receiver for compliance drift events.
+# Listens on the configured port and emits events to the rulebook engine.
+#
+# Event payload expected (JSON):
+#   {
+#     "event_type": "compliance_drift",
+#     "control": "ssh_root_login" | "portal_service_health",
+#     "status": "fail",
+#     "environment": "<environment_name>",
+#     "target_group": "<ansible_inventory_group>"
+#   }
+#
+# Usage in a rulebook sources block:
+#   - ansible.eda.webhook:
+#       host: "{{ eda_webhook_host | default('127.0.0.1') }}"
+#       port: "{{ eda_webhook_port | default(5000) }}"
+#
+# To intentionally expose this webhook beyond localhost in a controlled
+# environment, set `eda_webhook_host` explicitly to `0.0.0.0` and apply
+# network controls around the listener.
+
+plugin: ansible.eda.webhook
+host: "{{ eda_webhook_host | default('127.0.0.1') }}"
+port: "{{ eda_webhook_port | default(5000) }}"

@@ -7,7 +7,7 @@
 git clone https://github.com/<your-org-or-username>/terraable.git
 cd terraable
 
-# Option A: Use VS Code dev container
+# Option A: Use VS Code dev container (recommended — all tooling pre-installed)
 # Open in VS Code and select "Reopen in Container"
 
 # Option B: Local setup (macOS/Linux/Windows with WSL)
@@ -24,6 +24,8 @@ pip install --upgrade pip
 - Docker or Podman.
 - ~2GB free disk space.
 
+The dev container installs all required tooling automatically on first launch via `.devcontainer/post-create.sh`. No manual tool installation is needed.
+
 #### SSH access inside the container
 
 The dev container forwards your host SSH agent socket (`SSH_AUTH_SOCK`) rather than
@@ -38,64 +40,49 @@ eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519  # or your preferred key
 ```
 
-If you need to mount `~/.ssh` directly (e.g. for tooling that reads `known_hosts`
-or `config` from disk), create a `.devcontainer/devcontainer.local.json`
-(gitignored) and add:
+### Local setup — tool versions
 
-```json
-{
-  "mounts": [
-    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readonly"
-  ]
-}
+| Tool | Minimum version | Install |
+|------|----------------|---------|
+| Python | 3.11 | <https://python.org> |
+| Poetry | 1.8 | `curl -sSL https://install.python-poetry.org \| python3 -` |
+| Terraform CLI | 1.9 | <https://developer.hashicorp.com/terraform/install> |
+| Ansible | 10.0 | `pip install ansible` |
+| ansible-rulebook | 1.0 | `pip install ansible-rulebook` |
+| shellcheck | 0.9 | `apt install shellcheck` or `brew install shellcheck` |
+| markdownlint-cli2 | 0.14 | `npm install -g markdownlint-cli2` |
+| yamllint | 1.35 | `pip install yamllint` |
+| Git | 2.40 | System package manager |
+
+To verify all tools are available after local setup, run:
+
+```bash
+bash scripts/check-tools.sh
 ```
-
-Note the `readonly` flag. It limits exposure if the container is compromised.
-
-### Local setup
-
-- Python 3.11+
-- Poetry (install via `curl -sSL https://install.python-poetry.org | python3 -`)
-- Terraform 1.5+
-- Ansible 10 (ansible-core 2.17+)
-- Git
 
 ## Installation
 
 ```bash
-# Install dependencies via Poetry
+# Install Python dependencies via Poetry
 poetry install
 
-# Verify Terraform
+# Verify installed tool versions
+poetry run python -c "import terraable; print('terraable OK')"
 terraform version
-
-# Verify Ansible
 ansible --version
 ```
 
-## Running tests
+## Running checks locally
 
-This branch currently contains scaffold directories for `terraable/` and `tests/`.
-Use the commands below as the baseline once implementation files are added.
+The following commands mirror the checks run in CI. Run all of them before opening a PR.
 
 ### Unit tests with coverage
 
 ```bash
-poetry run pytest tests -v
-```
-
-### Mutation testing
-
-Mutation testing becomes meaningful after unit tests are implemented.
-
-```bash
-poetry run mutmut run
-poetry run mutmut results
+poetry run pytest tests -v --cov=terraable --cov-fail-under=100
 ```
 
 ### Type checking
-
-Type checking becomes meaningful after Python modules are added under `terraable/`.
 
 ```bash
 poetry run mypy terraable
@@ -104,69 +91,97 @@ poetry run mypy terraable
 ### Linting and formatting
 
 ```bash
-# Check code style
+# Ruff: code style and import order
 poetry run ruff check terraable tests
 
 # Auto-format code
 poetry run ruff format terraable tests
+
+# YAML lint
+yamllint .
+
+# Markdown lint
+markdownlint-cli2 "**/*.md"
+
+# Shell lint
+shellcheck scripts/*.sh
 ```
 
 ### Terraform validation
 
 ```bash
-terraform fmt -check -recursive
-terraform validate
+terraform fmt -check -recursive terraform/
+
+# Validate the local lab integration Terraform
+( cd integration/local_lab/terraform && terraform validate )
+
+# Optionally validate individual reusable modules
+for dir in terraform/modules/*; do
+  if [ -d "$dir" ]; then
+    ( cd "$dir" && terraform validate )
+  fi
+done
 ```
 
 ### Integration tests
-
-Integration test scaffolding exists under `tests/`, but integration suites are not
-implemented in this branch yet. When they are added, run:
 
 ```bash
 poetry run pytest tests -m integration -v
 ```
 
+## Credential Planning
+
+Use the [credential matrix](docs/credentials-matrix.md) to assign owners, minimum scopes,
+and rotation targets for Dev, Test, Demo, and Prod before enabling live mode.
+
 ## Development workflow
 
 1. **Pick an issue** from the MVP, Phase 2, or Phase 3 milestone.
-2. **Create a feature branch**: `git checkout -b issue/123-short-title`
-3. **Implement** the feature using the appropriate agent:
-   - Architecture/design -> `mvp-architect` agent
-   - Implementation -> `platform-builder` agent
-   - Security/compliance -> `security-compliance` agent
-   - Demo/runbook -> `demo-readiness` agent
-4. **Test**: For scaffold changes, run `pytest tests -v` and
-  `ruff check terraable tests`. Add `mypy terraable` once Python modules are in
-  place. Add coverage and mutation gates (`pytest --cov`, `mutmut run`) once
-  baseline tests exist. Run integration tests (`pytest tests -m integration -v`)
-  after integration suites are added.
+2. **Create a feature branch**: `git checkout -b feat/issue-123-short-title`
+3. **Implement** using the appropriate agent:
+   - Architecture/design → `mvp-architect` agent
+   - Implementation → `platform-builder` agent
+   - Security/compliance → `security-compliance` agent
+   - Demo/runbook → `demo-readiness` agent
+4. **Test**: Run `pytest tests -v --cov`, `ruff check`, `mypy`, `yamllint`, and `terraform validate`.
 5. **Docs**: Update relevant `.md` files in Australian English.
-6. **Push and open a PR**: Include test evidence and security review in the PR summary.
+6. **Push and open a PR**: Include test evidence and security implications in the PR summary.
 
-## Structure
+## Repository structure
 
 ```text
 .
-├── .devcontainer/                  # VS Code dev container setup
-│   ├── devcontainer.json
-│   └── post-create.sh
-├── .github/                        # Copilot, agent, and PR metadata
-│   ├── AGENTS.md
-│   ├── agents/
-│   ├── copilot-instructions.md
-│   ├── instructions/
-│   └── pull_request_template.md
-├── terraable/                      # Python package scaffold
-├── tests/                          # Test scaffold
+├── .devcontainer/              # VS Code dev container setup
+├── .github/                    # Copilot, agents, workflows, and PR metadata
+├── ansible/
+│   ├── awx/                    # AWX lab-mode bootstrap playbook and config
+│   ├── eda/                    # EDA rulebooks, sources, and vars
+│   ├── inventory.yml           # Inventory stub (copy to inventory.local.yml for real use)
+│   ├── playbooks/              # Operational workflow playbooks
+│   └── roles/                  # Ansible roles (baseline_hardening, portal_deploy, ssh_root_control)
+├── docs/                       # Architecture, handoff contract, runbook, lab guide
+├── modes/
+│   ├── lab/                    # AWX-backed lab mode
+│   ├── offline/                # Offline/mock mode with pre-seeded data
+│   └── showcase/               # Live demo mode with HCP Terraform and AAP
+├── scripts/                    # Contributor helper scripts
+├── terraform/
+│   └── modules/
+│       ├── substrate_aws/      # AWS substrate module
+│       ├── substrate_azure/    # Azure substrate module
+│       ├── substrate_local/    # Local lab substrate module
+│       ├── substrate_okd/      # OKD substrate module
+│       └── substrate_openshift/ # OpenShift substrate module
+├── terraable/                  # Python package: contract, orchestrator, HCP Terraform client
+├── tests/                      # Python tests (100% coverage gate)
+├── ui/
+│   └── index.html              # Control-plane UI
+├── .env.example                # Sample environment variable reference
 ├── CODEOWNERS
 ├── CONTRIBUTING.md
-├── DEVELOP.md
+├── DEVELOP.md                  # This file
 ├── README.md
-├── SECURITY.md
-├── poetry.lock
-├── pyproject.toml                  # Poetry and tool configuration
-└── ruff.toml                       # Ruff linter/formatter configuration
+└── SECURITY.md
 ```
 
 ## Troubleshooting
@@ -180,8 +195,6 @@ poetry install
 **Poetry not found:**
 
 ```bash
-# In the dev container, rebuild the container to reapply the Poetry feature.
-# For local setup, install Poetry and ensure the user-local bin directory is on PATH.
 curl -sSL https://install.python-poetry.org | python3 -
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -190,28 +203,19 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ```bash
 terraform init
-terraform plan
+terraform validate
 ```
 
 **Ansible connectivity issues:**
 
 Check [`ansible/inventory.yml`](ansible/inventory.yml) and ensure target systems are reachable.
-This file is a stub — copy it to `ansible/inventory.local.yml` (git-ignored) and populate it
-with your actual hosts before running playbooks. Do not commit real hostnames or credentials.
+Copy it to `ansible/inventory.local.yml` (git-ignored) and populate with your actual hosts.
+Do not commit real hostnames or credentials.
 
-**Coverage gaps:**
+**AWX bootstrap fails:**
 
-```bash
-# Run this after adding test modules and package code.
-poetry run coverage report -m
-poetry run pytest --cov=terraable --cov-report=html
-```
-
-**Type checking errors:**
-
-```bash
-poetry run mypy terraable --show-error-codes
-```
+Verify `AWX_HOST`, `AWX_USERNAME`, and `AWX_PASSWORD` are set in `.env` and that the AWX instance
+is reachable. Check TLS certificate validity with `curl -v $AWX_HOST`.
 
 ## Security notes
 

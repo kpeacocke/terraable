@@ -1,0 +1,70 @@
+---
+# EDA rulebook: SSH compliance drift detection and remediation.
+# Reacts to compliance scan failure events delivered via the webhook source.
+#
+# Prerequisites:
+#   - ansible-rulebook installed
+#   - AAP controller or AWX accessible and configured with credentials
+#   - Remediation job templates registered (see ansible/awx/project-config.yml)
+#
+# Usage:
+#   ansible-rulebook --rulebook ansible/eda/rulebooks/ssh_compliance_drift.yml \
+#     --inventory ansible/inventory.yml \
+#     --vars ansible/eda/vars/eda_vars.yml
+
+- name: SSH compliance drift response
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        host: "{{ eda_webhook_host | default('127.0.0.1') }}"
+        port: "{{ eda_webhook_port | default(5000) }}"
+
+  rules:
+    - name: Detect SSH root login drift and trigger remediation
+      condition: >-
+        event.payload.event_type == "compliance_drift" and
+        event.payload.control == "ssh_root_login" and
+        event.payload.status == "fail"
+      actions:
+        - debug:
+            msg: >-
+              SSH drift detected on environment={{ event.payload.environment }}.
+              Triggering automated remediation.
+        - run_job_template:
+            name: terraable-remediate-ssh
+            organization: Default
+            job_args:
+              extra_vars:
+                target_group: "{{ event.payload.target_group }}"
+                environment_name: "{{ event.payload.environment }}"
+
+    - name: Detect portal service health drift and trigger remediation
+      condition: >-
+        event.payload.event_type == "compliance_drift" and
+        event.payload.control == "portal_service_health" and
+        event.payload.status == "fail"
+      actions:
+        - debug:
+            msg: >-
+              Portal service drift detected on environment={{ event.payload.environment }}.
+              Triggering automated service restoration.
+        - run_job_template:
+            name: terraable-drift-second-scenario
+            organization: Default
+            job_args:
+              extra_vars:
+                drift_action: remediate
+                target_group: "{{ event.payload.target_group }}"
+                environment_name: "{{ event.payload.environment }}"
+
+    - name: Log unrecognised compliance events
+      condition: >-
+        event.payload.event_type == "compliance_drift" and
+        event.payload.status == "fail" and
+        event.payload.control not in ["ssh_root_login", "portal_service_health"]
+      actions:
+        - debug:
+            msg: >-
+              Unrecognised compliance control={{ event.payload.control }}
+              for environment={{ event.payload.environment }}.
+              No automated action taken — manual review required.

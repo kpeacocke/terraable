@@ -1,0 +1,13 @@
+---
+# EDA runtime variables for the Terraable rulebook set.
+# Override these with environment-specific values at rulebook invocation time.
+# Do NOT store credentials or tokens here — use AAP/AWX credential objects.
+
+# Webhook listener port for inbound compliance drift events.
+eda_webhook_port: 5000
+
+# AAP/AWX controller organisation name.
+controller_organization: Default
+
+# Default target inventory group — overridden per-event by the payload.
+default_target_group: all
