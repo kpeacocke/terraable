@@ -32,9 +32,11 @@ check() {
   local cmd="$2"
   local min_version="$3"
   local hint="$4"
+  local raw_output
+  local parsed_version
 
   if command -v "$name" > /dev/null 2>&1; then
-    raw_output=$(eval "$cmd" 2>&1 | head -1)
+    raw_output=$(eval "$cmd" 2>&1 || true)
     parsed_version=$(extract_version "$raw_output")
     if version_ge "$parsed_version" "$min_version"; then
       printf "  %-20s OK   %s (>= %s)\n" "$name" "${parsed_version:-unknown}" "$min_version"

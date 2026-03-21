@@ -56,16 +56,6 @@ class CommandResult:
     stderr: str
 
 
-@dataclass(frozen=True, slots=True)
-class LabActionResult:
-    """Serializable response for a UI action."""
-
-    action: str
-    status: str
-    detail: str
-    tone: str
-
-
 CommandRunner = Callable[[list[str], Path | None, dict[str, str] | None], CommandResult]
 
 
