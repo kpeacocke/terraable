@@ -116,9 +116,15 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
 
         origin = self.headers.get("Origin") or self.headers.get("Referer")
         if origin:
+            if origin.strip().lower() == "null":
+                self.send_error(HTTPStatus.FORBIDDEN, "POST origin is not allowed")
+                return False
             parsed_origin = urlparse(origin)
-            origin_host = parsed_origin.hostname or ""
-            if origin_host and not self._is_loopback_host(origin_host):
+            origin_host = parsed_origin.hostname
+            if not origin_host:
+                self.send_error(HTTPStatus.FORBIDDEN, "POST origin is not allowed")
+                return False
+            if not self._is_loopback_host(origin_host):
                 self.send_error(HTTPStatus.FORBIDDEN, "POST origin must be localhost")
                 return False
 

@@ -400,6 +400,42 @@ def test_safe_post_request_rejects_non_loopback_client() -> None:
 
 
 @pytest.mark.unit
+def test_safe_post_request_rejects_null_origin() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.headers = {"Origin": "null"}
+    called: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        called.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    allowed = handler._require_safe_post_request()
+
+    assert allowed is False
+    assert called == [(403, "POST origin is not allowed")]
+
+
+@pytest.mark.unit
+def test_safe_post_request_rejects_hostname_less_origin() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.headers = {"Origin": "file:///tmp/index.html"}
+    called: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        called.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    allowed = handler._require_safe_post_request()
+
+    assert allowed is False
+    assert called == [(403, "POST origin is not allowed")]
+
+
+@pytest.mark.unit
 def test_handler_serves_auth_endpoints(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
