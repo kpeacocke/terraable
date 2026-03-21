@@ -258,6 +258,30 @@ def test_default_runner_executes_subprocess() -> None:
 
 
 @pytest.mark.unit
+def test_load_state_returns_default_for_malformed_json(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.runtime_root.mkdir(parents=True, exist_ok=True)
+    backend.state_file.write_text("{not-json", encoding="utf-8")
+
+    state = backend.get_state()
+
+    assert state["current"] is None
+    assert state["controls"] == {"ssh_root_login": False, "portal_service_health": False}
+
+
+@pytest.mark.unit
+def test_load_state_returns_default_for_non_object_json(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.runtime_root.mkdir(parents=True, exist_ok=True)
+    backend.state_file.write_text("[]", encoding="utf-8")
+
+    state = backend.get_state()
+
+    assert state["current"] is None
+    assert state["controls"] == {"ssh_root_login": False, "portal_service_health": False}
+
+
+@pytest.mark.unit
 def test_run_wraps_called_process_error(tmp_path: Path) -> None:
     def boom(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
         del argv, cwd, env

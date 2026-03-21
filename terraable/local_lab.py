@@ -697,23 +697,30 @@ class LocalLabBackend:
         passed = sum(1 for value in controls.values() if value)
         return round((passed / total) * 100) if total else 0
 
+    @staticmethod
+    def _default_state() -> dict[str, Any]:
+        return {
+            "current": None,
+            "controls": {
+                "ssh_root_login": False,
+                "portal_service_health": False,
+            },
+            "evidence": [],
+            "eda_history": [],
+            "trend": [],
+            "scan_count": 0,
+            "eda_enabled": False,
+        }
+
     def _load_state(self) -> dict[str, Any]:
         with self._state_lock:
             if not self.state_file.exists():
-                return {
-                    "current": None,
-                    "controls": {
-                        "ssh_root_login": False,
-                        "portal_service_health": False,
-                    },
-                    "evidence": [],
-                    "eda_history": [],
-                    "trend": [],
-                    "scan_count": 0,
-                    "eda_enabled": False,
-                }
-            raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
-            return raw_state if isinstance(raw_state, dict) else {}
+                return self._default_state()
+            try:
+                raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                return self._default_state()
+            return raw_state if isinstance(raw_state, dict) else self._default_state()
 
     def _save_state(self, state: dict[str, Any]) -> None:
         with self._state_lock:

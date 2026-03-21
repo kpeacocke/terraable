@@ -189,6 +189,53 @@ def test_handler_returns_fail_payload_for_runtime_error_and_404(
 
 
 @pytest.mark.unit
+def test_handler_returns_404_when_ui_index_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(f"{base}/")
+        assert excinfo.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_handler_returns_500_when_ui_index_is_invalid_utf8(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_bytes(b"\xff\xfe")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(f"{base}/")
+        assert excinfo.value.code == 500
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
 def test_handler_configure_auth_accepts_non_object_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

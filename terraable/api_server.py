@@ -22,7 +22,15 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path in {"/", "/index.html"}:
-            self._send_html(self.ui_path.read_text(encoding="utf-8"))
+            try:
+                content = self.ui_path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                self.send_error(HTTPStatus.NOT_FOUND, "UI index file not found")
+                return
+            except UnicodeDecodeError:
+                self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, "UI index file is not valid UTF-8")
+                return
+            self._send_html(content)
         elif parsed.path == "/api/state":
             self._send_json({"state": self.backend.get_state()})
         elif parsed.path == "/api/auth/status":
