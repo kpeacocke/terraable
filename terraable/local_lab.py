@@ -10,8 +10,9 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Concatenate, ParamSpec, TypeVar, cast
 
 from .contract import build_handoff_payload
 from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, hostname_to_token_env_var
@@ -61,12 +62,25 @@ class CommandResult:
 
 CommandRunner = Callable[[list[str], Path | None, dict[str, str] | None], CommandResult]
 StateMutator = Callable[[dict[str, Any]], None]
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def _as_str_any_dict(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     return cast(dict[str, Any], value)
+
+
+def _serialize_action(
+    method: Callable[Concatenate[LocalLabBackend, P], R],
+) -> Callable[Concatenate[LocalLabBackend, P], R]:
+    @wraps(method)
+    def wrapped(self: LocalLabBackend, *args: P.args, **kwargs: P.kwargs) -> R:
+        with self.action_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapped
 
 
 def default_runner(
@@ -103,6 +117,7 @@ class LocalLabBackend:
         self._runner = runner or default_runner
         self._clock = clock or time.time
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
+        self.action_lock = threading.RLock()
         self._state_lock = threading.RLock()
         self._credentials_lock = threading.RLock()
         self._credentials = self._bootstrap_credentials()
@@ -190,6 +205,7 @@ class LocalLabBackend:
             "blockers": blockers,
         }
 
+    @_serialize_action
     def create_environment(
         self,
         *,
@@ -306,6 +322,7 @@ class LocalLabBackend:
             "ok",
         )
 
+    @_serialize_action
     def apply_baseline(self) -> dict[str, Any]:
         """Apply the baseline operational workflow to the active local lab."""
 
@@ -334,6 +351,7 @@ class LocalLabBackend:
             controls=controls,
         )
 
+    @_serialize_action
     def run_compliance_scan(self) -> dict[str, Any]:
         """Run executable compliance checks against the active local lab."""
 
@@ -430,6 +448,7 @@ class LocalLabBackend:
             controls=controls,
         )
 
+    @_serialize_action
     def inject_ssh_drift(self) -> dict[str, Any]:
         """Inject SSH drift into the lab state using Ansible."""
 
@@ -474,6 +493,7 @@ class LocalLabBackend:
             response["state"] = self.get_state()
         return response
 
+    @_serialize_action
     def inject_service_drift(self) -> dict[str, Any]:
         """Inject portal service drift into the lab state using Ansible."""
 
@@ -524,6 +544,7 @@ class LocalLabBackend:
             response["state"] = self.get_state()
         return response
 
+    @_serialize_action
     def run_remediation(self) -> dict[str, Any]:
         """Restore the approved state for all local-lab controls."""
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -169,6 +171,26 @@ class _InspectableLocalLabBackend(LocalLabBackend):
         return self._ansible_vars(env_dir)
 
 
+class _ActionLockProbeBackend(LocalLabBackend):
+    def __init__(self, workspace_root: Path) -> None:
+        super().__init__(workspace_root, clock=lambda: 1_700_000_000.0)
+        self._probe_lock = threading.Lock()
+        self._active_ensures = 0
+        self.max_active_ensures = 0
+
+    def _ensure_environment(self, environment_name: str) -> Path:
+        with self._probe_lock:
+            self._active_ensures += 1
+            self.max_active_ensures = max(self.max_active_ensures, self._active_ensures)
+
+        try:
+            time.sleep(0.05)
+            return super()._ensure_environment(environment_name)
+        finally:
+            with self._probe_lock:
+                self._active_ensures -= 1
+
+
 @pytest.mark.unit
 def test_create_environment_builds_real_local_lab_state(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
@@ -191,6 +213,40 @@ def test_create_environment_builds_real_local_lab_state(tmp_path: Path) -> None:
     assert (env_dir / "inventory.yml").exists()
     assert (env_dir / "sshd_config").exists()
     assert (env_dir / "portal_service.state").exists()
+
+
+@pytest.mark.unit
+def test_create_environment_serializes_concurrent_requests(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
+    backend = _ActionLockProbeBackend(tmp_path)
+    start = threading.Event()
+    failures: list[Exception] = []
+
+    def worker() -> None:
+        start.wait()
+        try:
+            backend.create_environment(
+                target="local-lab",
+                portal="backstage",
+                profile="baseline",
+                eda="disabled",
+            )
+        except Exception as exc:  # pragma: no cover - defensive guard
+            failures.append(exc)
+
+    thread_a = threading.Thread(target=worker)
+    thread_b = threading.Thread(target=worker)
+    thread_a.start()
+    thread_b.start()
+    start.set()
+    thread_a.join()
+    thread_b.join()
+
+    assert not failures
+    assert backend.max_active_ensures == 1
 
 
 @pytest.mark.unit
