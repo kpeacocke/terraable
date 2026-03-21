@@ -55,7 +55,7 @@ jobs:
           poetry install --no-interaction --no-ansi --no-root
 
       - name: Run tests
-        run: poetry run pytest
+        run: poetry run pytest -p no:pytest_terraform.plugin
 
   terraform-fmt:
     name: Terraform fmt

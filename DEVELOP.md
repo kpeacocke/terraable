@@ -208,7 +208,6 @@ Do not commit real hostnames or credentials.
 Verify `AWX_HOST`, `AWX_USERNAME`, and `AWX_PASSWORD` are set in `.env` and that the AWX instance
 is reachable. Check TLS certificate validity with `curl -v $AWX_HOST`.
 
-
 ## Security notes
 
 - Never commit secrets. Use environment variables (for local development, use an untracked `.env` file or your shell environment).
