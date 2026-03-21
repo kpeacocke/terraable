@@ -111,7 +111,16 @@ shellcheck scripts/*.sh
 
 ```bash
 terraform fmt -check -recursive terraform/
-terraform validate
+
+# Validate the local lab integration Terraform
+( cd integration/local_lab/terraform && terraform validate )
+
+# Optionally validate individual reusable modules
+for dir in terraform/modules/*; do
+  if [ -d "$dir" ]; then
+    ( cd "$dir" && terraform validate )
+  fi
+done
 ```
 
 ### Integration tests

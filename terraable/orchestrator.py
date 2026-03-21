@@ -94,6 +94,15 @@ class DemoOrchestrator:
         self._evidence.append(record)
         return record
 
+    def inject_service_drift(self) -> EvidenceRecord:
+        record = EvidenceRecord(
+            action=ActionName.INJECT_SERVICE_DRIFT,
+            status=ActionStatus.SUCCEEDED,
+            detail="Service drift injected: portal service stopped.",
+        )
+        self._evidence.append(record)
+        return record
+
     def run_remediation(self) -> EvidenceRecord:
         record = EvidenceRecord(
             action=ActionName.RUN_REMEDIATION,
