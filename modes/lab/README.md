@@ -8,14 +8,14 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 - CI pipelines validating Ansible content against AWX
 - Fork-and-run contributors testing the full workflow path without cloud infra
 
-## Supported targets
+## Target status
 
 | Target | Notes |
 |--------|-------|
-| `local-lab` | Recommended first target. Runs against localhost or a local VM. |
-| `okd` | OpenShift community edition. Requires OKD cluster access. |
-| `aws` | Requires AWS credentials and appropriate IAM permissions. |
-| `azure` | Requires Azure credentials and resource group. |
+| `local-lab` | Recommended first target. Runs against localhost or a local VM and is the only end-to-end executable backend in this branch. |
+| `okd` | Contract and module scaffolding only. Provider-specific execution path is not wired yet. |
+| `aws` | Terraform module groundwork only. Control-plane execution path is not wired yet. |
+| `azure` | Terraform module groundwork only. Control-plane execution path is not wired yet. |
 
 ## AWX setup
 

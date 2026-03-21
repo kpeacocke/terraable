@@ -47,10 +47,10 @@ ssh-add ~/.ssh/id_ed25519  # or your preferred key
 | Python | 3.11 | <https://python.org> |
 | Poetry | 1.8 | `curl -sSL https://install.python-poetry.org \| python3 -` |
 | Terraform CLI | 1.9 | <https://developer.hashicorp.com/terraform/install> |
-| Ansible | 2.15 (ansible-core) | `pip install ansible` |
+| Ansible | 10.0 | `pip install ansible` |
 | ansible-rulebook | 1.0 | `pip install ansible-rulebook` |
 | shellcheck | 0.9 | `apt install shellcheck` or `brew install shellcheck` |
-| markdownlint-cli2 | 0.13 | `npm install -g markdownlint-cli2` |
+| markdownlint-cli2 | 0.14 | `npm install -g markdownlint-cli2` |
 | yamllint | 1.35 | `pip install yamllint` |
 | Git | 2.40 | System package manager |
 

@@ -6,7 +6,7 @@ It covers selector setup, baseline and compliance actions, controlled drift inje
 It applies to showcase, lab, and offline/mock execution paths used by contributors and presenters.
 
 ## Prerequisites
-- Python 3.11+, Terraform 1.5+, and Ansible 10 are available.
+- Python 3.11+, Terraform 1.9+, and Ansible 10 are available.
 - Repository checks pass locally.
 - Target credentials are configured through environment variables.
 
@@ -45,10 +45,13 @@ Mark each row as `Ready` or `N/A` for the selected target path.
 - No-Go: any required row remains `TODO` or failed validation.
 
 ## Procedure Inputs
-- Target selector: `openshift`, `aws`, or `local-lab`
+- Target selector surface: `local-lab`, `openshift`, `aws`, `azure`, or `okd`
+- Executable MVP target path: `local-lab`
 - Portal selector: `rhdh` or `backstage`
 - Security profile: `baseline` or `strict`
 - EDA toggle: `enabled` or `disabled` (MVP: informational/UI-only, does not change the Terraform-to-Ansible handoff or Python runtime models; used to narrate the future EDA path planned for Phase 2)
+
+For the current MVP execution path, use `local-lab + backstage`. The additional target selectors remain contract and module scaffolding for later provider-specific execution paths.
 
 ## Procedure
 1. Start with control-plane selectors and create environment request.
