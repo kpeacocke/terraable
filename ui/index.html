@@ -521,25 +521,6 @@
       });
     }
 
-    function requiredFieldsByTarget(target) {
-      if (target === "aws") {
-        return ["HCP_TERRAFORM_TOKEN", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
-      }
-      if (target === "azure") {
-        return [
-          "HCP_TERRAFORM_TOKEN",
-          "ARM_CLIENT_ID",
-          "ARM_CLIENT_SECRET",
-          "ARM_TENANT_ID",
-          "ARM_SUBSCRIPTION_ID",
-        ];
-      }
-      if (target === "openshift" || target === "okd") {
-        return ["HCP_TERRAFORM_TOKEN", "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"];
-      }
-      return ["HCP_TERRAFORM_TOKEN"];
-    }
-
     function updateActionButtons() {
       const hasCurrentEnvironment = Boolean(latestState.current);
       const baseReady = authState.ready && !pendingAction;
@@ -555,7 +536,8 @@
     function renderAuthStatus() {
       const selectedTarget = selected("target");
       const selectedPortal = selected("portal");
-      const required = requiredFieldsByTarget(selectedTarget);
+      const required = authState.required_credentials || [];
+      const missing = authState.missing_credentials || [];
       const sources = authState.credential_sources || {};
       const sourceSummary = Object.entries(sources)
         .map(([key, source]) => `${key}=${source}`)
@@ -570,7 +552,9 @@
 
       const blockers = (authState.blockers || []).join("; ");
       authStatusEl.className = "auth-status fail";
-      authStatusEl.textContent = `Blocked. Required: ${required.join(", ")}. ${blockers}`;
+      const requiredText = required.length ? required.join(", ") : "none";
+      const missingText = missing.length ? ` Missing: ${missing.join(", ")}.` : "";
+      authStatusEl.textContent = `Blocked. Required: ${requiredText}.${missingText} ${blockers}`.trim();
     }
 
     function renderState(state) {
@@ -632,12 +616,23 @@
     }
 
     async function refreshAuthStatus() {
-      const query = new URLSearchParams({
-        target: selected("target"),
-        portal: selected("portal"),
-      });
-      const data = await api(`/api/auth/status?${query.toString()}`);
-      authState = data.auth;
+      try {
+        const query = new URLSearchParams({
+          target: selected("target"),
+          portal: selected("portal"),
+        });
+        const data = await api(`/api/auth/status?${query.toString()}`);
+        authState = data.auth;
+      } catch (error) {
+        authState = {
+          authenticated: false,
+          ready: false,
+          required_credentials: [],
+          missing_credentials: [],
+          credential_sources: {},
+          blockers: [String(error)],
+        };
+      }
       renderAuthStatus();
       updateActionButtons();
     }

@@ -498,6 +498,32 @@ def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_local_lab_rhdh_portal_not_marked_ready(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
+
+    auth = backend.get_auth_status(target="local-lab", portal="rhdh")
+
+    assert auth["authenticated"] is True
+    assert auth["ready"] is False
+
+
+@pytest.mark.unit
+def test_unknown_target_uses_hostname_tf_token_requirement(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "app.terraform.io")
+    monkeypatch.setenv("TF_TOKEN_app_terraform_io", "token")
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    auth = backend.get_auth_status(target="future-target", portal="backstage")
+
+    assert "TF_TOKEN_app_terraform_io" in auth["required_credentials"]
+    assert "TF_TOKEN_app_terraform_io" not in auth["missing_credentials"]
+
+
+@pytest.mark.unit
 def test_bootstrap_prefers_environment_over_dotenv(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

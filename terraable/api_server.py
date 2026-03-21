@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 from collections.abc import Callable
 from http import HTTPStatus
@@ -45,6 +46,8 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self) -> None:
+        if not self._require_safe_post_request():
+            return
         parsed = urlparse(self.path)
         if parsed.path == "/api/auth/configure":
             self._handle_auth_configure()
@@ -93,6 +96,32 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             }
         if response is not None:
             self._send_json(response)
+
+    def _require_safe_post_request(self) -> bool:
+        client_host = self.client_address[0] if self.client_address else ""
+        if not self._is_loopback_host(client_host):
+            self.send_error(HTTPStatus.FORBIDDEN, "POST access restricted to localhost")
+            return False
+
+        origin = self.headers.get("Origin") or self.headers.get("Referer")
+        if origin:
+            parsed_origin = urlparse(origin)
+            origin_host = parsed_origin.hostname or ""
+            if origin_host and not self._is_loopback_host(origin_host):
+                self.send_error(HTTPStatus.FORBIDDEN, "POST origin must be localhost")
+                return False
+
+        return True
+
+    @staticmethod
+    def _is_loopback_host(hostname: str) -> bool:
+        if hostname in {"localhost", ""}:
+            return True
+
+        try:
+            return ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            return False
 
     def _dispatch_action(
         self,

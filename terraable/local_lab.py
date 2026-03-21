@@ -104,6 +104,7 @@ class LocalLabBackend:
         self._clock = clock or time.time
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
         self._state_lock = threading.RLock()
+        self._credentials_lock = threading.RLock()
         self._credentials = self._bootstrap_credentials()
 
     def get_state(self) -> dict[str, Any]:
@@ -132,15 +133,16 @@ class LocalLabBackend:
     ) -> dict[str, Any]:
         """Merge credentials from the UI and report current auth status for target/portal."""
 
-        for key, value in credentials.items():
-            if key not in CREDENTIAL_KEYS:
-                continue
-            trimmed = value.strip()
-            if trimmed:
-                self._credentials[key] = {"value": trimmed, "source": "ui"}
-            elif key in self._credentials and self._credentials[key]["source"] == "ui":
-                # Clearing a UI field should remove only user-entered values.
-                self._credentials.pop(key)
+        with self._credentials_lock:
+            for key, value in credentials.items():
+                if key not in CREDENTIAL_KEYS:
+                    continue
+                trimmed = value.strip()
+                if trimmed:
+                    self._credentials[key] = {"value": trimmed, "source": "ui"}
+                elif key in self._credentials and self._credentials[key]["source"] == "ui":
+                    # Clearing a UI field should remove only user-entered values.
+                    self._credentials.pop(key)
 
         return self.get_auth_status(target=target, portal=portal)
 
@@ -157,13 +159,21 @@ class LocalLabBackend:
                 "blockers": [],
             }
 
-        requirements = TARGET_CREDENTIAL_REQUIREMENTS.get(target, ("HCP_TERRAFORM_TOKEN",))
+        requirements = TARGET_CREDENTIAL_REQUIREMENTS.get(target, (HCP_TOKEN_REQUIREMENT,))
         missing = [key for key in requirements if not self._credential_value(key)]
         authenticated = not missing
         source = self._auth_source(requirements)
 
         target_ready = target == SUPPORTED_EXECUTION_TARGET
-        portal_ready = portal in {"backstage", "rhdh"}
+        portal_ready = (
+            portal == "backstage"
+            if target == SUPPORTED_EXECUTION_TARGET
+            else portal
+            in {
+                "backstage",
+                "rhdh",
+            }
+        )
         ready = authenticated and target_ready and portal_ready
 
         blockers: list[str] = []
@@ -603,7 +613,7 @@ class LocalLabBackend:
         vars_path.parent.mkdir(parents=True, exist_ok=True)
         vars_path.write_text(json.dumps(extra_vars), encoding="utf-8")
         env = os.environ.copy()
-        env.setdefault("ANSIBLE_CONFIG", str(self.ansible_root / "ansible.cfg"))
+        env["ANSIBLE_CONFIG"] = str(self.ansible_root / "ansible.cfg")
         inventory_path = Path(str(extra_vars["inventory_path"]))
         try:
             self._run(
@@ -772,37 +782,39 @@ class LocalLabBackend:
         return loaded
 
     def _credential_value(self, key: str) -> str:
-        if key == HCP_TOKEN_REQUIREMENT:
-            tf_key = self._tf_token_env_var()
-            tf_item = self._credentials.get(tf_key)
-            if tf_item and tf_item["value"]:
-                return tf_item["value"]
-            alias_item = self._credentials.get("HCP_TERRAFORM_TOKEN")
-            return alias_item["value"] if alias_item else ""
-
-        item = self._credentials.get(key)
-        if not item:
-            return ""
-        return item["value"]
-
-    def _auth_source(self, requirements: tuple[str, ...]) -> dict[str, str]:
-        sources: dict[str, str] = {}
-        for key in requirements:
-            display_key = self._display_requirement_key(key)
+        with self._credentials_lock:
             if key == HCP_TOKEN_REQUIREMENT:
                 tf_key = self._tf_token_env_var()
                 tf_item = self._credentials.get(tf_key)
-                if tf_item:
-                    sources[display_key] = tf_item["source"]
-                    continue
+                if tf_item and tf_item["value"]:
+                    return tf_item["value"]
                 alias_item = self._credentials.get("HCP_TERRAFORM_TOKEN")
-                if alias_item:
-                    sources[display_key] = f"{alias_item['source']} (from HCP_TERRAFORM_TOKEN)"
-                continue
+                return alias_item["value"] if alias_item else ""
 
             item = self._credentials.get(key)
-            if item:
-                sources[display_key] = item["source"]
+            if not item:
+                return ""
+            return item["value"]
+
+    def _auth_source(self, requirements: tuple[str, ...]) -> dict[str, str]:
+        sources: dict[str, str] = {}
+        with self._credentials_lock:
+            for key in requirements:
+                display_key = self._display_requirement_key(key)
+                if key == HCP_TOKEN_REQUIREMENT:
+                    tf_key = self._tf_token_env_var()
+                    tf_item = self._credentials.get(tf_key)
+                    if tf_item:
+                        sources[display_key] = tf_item["source"]
+                        continue
+                    alias_item = self._credentials.get("HCP_TERRAFORM_TOKEN")
+                    if alias_item:
+                        sources[display_key] = f"{alias_item['source']} (from HCP_TERRAFORM_TOKEN)"
+                    continue
+
+                item = self._credentials.get(key)
+                if item:
+                    sources[display_key] = item["source"]
         return sources
 
     def _display_requirement_key(self, key: str) -> str:

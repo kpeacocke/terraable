@@ -188,38 +188,38 @@ def test_handler_returns_fail_payload_for_runtime_error_and_404(
         thread.join(timeout=2)
 
 
-    @pytest.mark.unit
-    def test_handler_configure_auth_accepts_non_object_json_payload(
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path,
-    ) -> None:
-        monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
-        ui_dir = tmp_path / "ui"
-        ui_dir.mkdir()
-        (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
-        handler = api_server.make_handler(tmp_path)
-        server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
+@pytest.mark.unit
+def test_handler_configure_auth_accepts_non_object_json_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
 
-        try:
-            base = f"http://127.0.0.1:{server.server_port}"
-            request = Request(
-                f"{base}/api/auth/configure?target=local-lab&portal=backstage",
-                data=b"[]",
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            payload = json.loads(urlopen(request).read().decode("utf-8"))
-            assert payload["authenticated"] is False
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        request = Request(
+            f"{base}/api/auth/configure?target=local-lab&portal=backstage",
+            data=b"[]",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        payload = json.loads(urlopen(request).read().decode("utf-8"))
+        assert payload["auth"]["authenticated"] is False
 
-            backend = handler.backend
-            assert isinstance(backend, _FakeBackend)
-            assert backend.auth_configured == {}
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join(timeout=2)
+        backend = handler.backend
+        assert isinstance(backend, _FakeBackend)
+        assert backend.auth_configured == {}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 @pytest.mark.unit
@@ -282,6 +282,32 @@ def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
     payload = handler._read_json_payload()
 
     assert payload == {}
+
+
+@pytest.mark.unit
+def test_loopback_host_helper_accepts_localhost_and_loopback_ip() -> None:
+    assert api_server.TerraableRequestHandler._is_loopback_host("localhost")
+    assert api_server.TerraableRequestHandler._is_loopback_host("127.0.0.1")
+    assert api_server.TerraableRequestHandler._is_loopback_host("::1")
+    assert not api_server.TerraableRequestHandler._is_loopback_host("example.com")
+
+
+@pytest.mark.unit
+def test_safe_post_request_rejects_non_loopback_client() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("10.0.0.2", 12345)
+    handler.headers = {}
+    called: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        called.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    allowed = handler._require_safe_post_request()
+
+    assert allowed is False
+    assert called == [(403, "POST access restricted to localhost")]
 
 
 @pytest.mark.unit
@@ -368,6 +394,41 @@ def test_handler_returns_400_for_malformed_json(
         error_payload = json.loads(urlopen(action_request).read().decode("utf-8"))
         assert error_payload["status"] == "failed"
         assert "Invalid JSON" in error_payload["detail"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_post_rejects_non_local_origin(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(
+                Request(
+                    f"{base}/api/actions/create_environment",
+                    data=b"{}",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Origin": "https://evil.example",
+                    },
+                    method="POST",
+                )
+            )
+        assert excinfo.value.code == 403
     finally:
         server.shutdown()
         server.server_close()
