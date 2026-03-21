@@ -1,7 +1,3 @@
-provider "aws" {
-  region = var.aws_region
-}
-
 locals {
   environment_name = var.environment_name
 }
