@@ -757,7 +757,11 @@ class LocalLabBackend:
                 raw_state = json.loads(self.state_file.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 return self._default_state()
-            return cast(dict[str, Any], raw_state) if isinstance(raw_state, dict) else self._default_state()
+            return (
+                cast(dict[str, Any], raw_state)
+                if isinstance(raw_state, dict)
+                else self._default_state()
+            )
 
     def _save_state(self, state: dict[str, Any]) -> None:
         with self._state_lock:
@@ -922,7 +926,5 @@ class LocalLabBackend:
         raw = _as_str_any_dict(state.get("controls"))
         return {
             "ssh_root_login": bool(raw.get("ssh_root_login", ssh_root_login)),
-            "portal_service_health": bool(
-                raw.get("portal_service_health", portal_service_health)
-            ),
+            "portal_service_health": bool(raw.get("portal_service_health", portal_service_health)),
         }
