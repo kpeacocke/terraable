@@ -3,12 +3,6 @@ variable "environment_name" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "AWS region for substrate resources"
-  type        = string
-  default     = "ap-southeast-2"
-}
-
 variable "vpc_cidr" {
   description = "CIDR block for the substrate VPC"
   type        = string

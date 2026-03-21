@@ -129,11 +129,30 @@ class LocalLabBackend:
                 if key not in CREDENTIAL_KEYS:
                     continue
                 trimmed = value.strip()
+                existing = self._credentials.get(key)
                 if trimmed:
-                    self._credentials[key] = {"value": trimmed, "source": "ui"}
-                elif key in self._credentials and self._credentials[key]["source"] == "ui":
+                    next_item = {"value": trimmed, "source": "ui"}
+                    if existing and existing.get("source") != "ui":
+                        next_item["fallback_value"] = existing.get("value", "")
+                        next_item["fallback_source"] = existing.get("source", "")
+                    elif existing and existing.get("source") == "ui":
+                        fallback_value = existing.get("fallback_value", "")
+                        fallback_source = existing.get("fallback_source", "")
+                        if fallback_value and fallback_source:
+                            next_item["fallback_value"] = fallback_value
+                            next_item["fallback_source"] = fallback_source
+                    self._credentials[key] = next_item
+                elif existing and existing.get("source") == "ui":
                     # Clearing a UI field should remove only user-entered values.
-                    self._credentials.pop(key)
+                    fallback_value = existing.get("fallback_value", "").strip()
+                    fallback_source = existing.get("fallback_source", "").strip()
+                    if fallback_value and fallback_source:
+                        self._credentials[key] = {
+                            "value": fallback_value,
+                            "source": fallback_source,
+                        }
+                    else:
+                        self._credentials.pop(key)
 
         return self.get_auth_status(target=target, portal=portal)
 

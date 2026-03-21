@@ -518,6 +518,43 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
 
 
 @pytest.mark.unit
+def test_configure_credentials_clear_restores_dotenv_value(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=from-dotenv\n", encoding="utf-8")
+    backend = _InspectableLocalLabBackend(tmp_path)
+    tf_token_key = backend._tf_token_env_var()
+
+    auth_after_ui = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+    assert auth_after_ui["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
+
+    auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "})
+
+    assert auth_after_clear["authenticated"] is True
+    assert auth_after_clear["ready"] is True
+    assert auth_after_clear["credential_sources"] == {
+        tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"
+    }
+
+
+@pytest.mark.unit
+def test_configure_credentials_clear_restores_dotenv_after_ui_update(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=from-dotenv\n", encoding="utf-8")
+    backend = _InspectableLocalLabBackend(tmp_path)
+    tf_token_key = backend._tf_token_env_var()
+
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-1"})
+    auth_after_second_ui = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-2"})
+    assert auth_after_second_ui["credential_sources"] == {
+        tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"
+    }
+
+    auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": ""})
+
+    assert auth_after_clear["credential_sources"] == {
+        tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"
+    }
+
+
+@pytest.mark.unit
 def test_configure_credentials_returns_auth_for_requested_target(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
