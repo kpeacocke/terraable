@@ -220,6 +220,21 @@ class LocalLabBackend:
 
         if self._mock_mode:
             environment_name = f"mock-demo-{int(self._clock())}"
+            env_dir = self._ensure_environment(environment_name)
+            runtime_vars = {
+                "environment_name": environment_name,
+                "terraform_run_id": f"mock-{environment_name}",
+                "target_platform": target,
+                "portal_impl": portal,
+                "security_profile": profile,
+                "connection": {
+                    "ansible_inventory_group": "local_lab",
+                    "ssh_user": "localhost",
+                    "ssh_port": 22,
+                    "api_endpoint": "https://127.0.0.1",
+                },
+                "metadata": {"mode": "offline-mock", "runtime_dir": str(env_dir)},
+            }
             state = self._load_state()
             state["current"] = {
                 "environment_name": environment_name,
@@ -227,6 +242,8 @@ class LocalLabBackend:
                 "portal": portal,
                 "profile": profile,
                 "eda": eda,
+                "runtime_dir": str(env_dir),
+                "runtime_vars": runtime_vars,
             }
             state["controls"] = {"ssh_root_login": True, "portal_service_health": True}
             state["eda_enabled"] = eda == "enabled"
@@ -561,6 +578,14 @@ class LocalLabBackend:
         current = state.get("current")
         if not isinstance(current, dict):
             raise RuntimeError("No environment has been created yet.")
+        required_keys = ("runtime_dir", "runtime_vars")
+        missing = [key for key in required_keys if key not in current]
+        if missing:
+            missing_joined = ", ".join(missing)
+            raise RuntimeError(
+                f"Current environment is missing runtime context ({missing_joined}). "
+                "Recreate the environment."
+            )
         return current
 
     def _terraform_apply(

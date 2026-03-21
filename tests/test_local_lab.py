@@ -718,7 +718,10 @@ def test_mock_mode_full_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     )
     assert result["status"] == "succeeded"
     assert "mock" in result["detail"]
-    assert backend.get_state()["current"] is not None
+    current = backend.get_state()["current"]
+    assert current is not None
+    assert "runtime_dir" in current
+    assert "runtime_vars" in current
 
     result = backend.apply_baseline()
     assert result["status"] == "succeeded"
@@ -773,3 +776,22 @@ def test_mock_mode_eda_events_on_drift_and_remediation(
     assert "state" in result
     state = backend.get_state()
     assert any("remediation complete" in e["message"] for e in state["eda_history"])
+
+
+@pytest.mark.unit
+def test_current_environment_requires_runtime_context(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.save_state_for_test(
+        {
+            "current": {
+                "environment_name": "broken",
+                "target": "local-lab",
+                "portal": "backstage",
+                "profile": "baseline",
+                "eda": "disabled",
+            }
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="missing runtime context"):
+        backend.current_environment_for_test()

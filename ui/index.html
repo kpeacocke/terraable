@@ -661,13 +661,9 @@
         OPENSHIFT_TOKEN: document.getElementById("openshift-token").value,
       };
 
-      const credentials = {};
-      for (const [key, value] of Object.entries(credentialInputs)) {
-        const trimmed = value.trim();
-        if (trimmed) {
-          credentials[key] = trimmed;
-        }
-      }
+      const credentials = Object.fromEntries(
+        Object.entries(credentialInputs).map(([key, value]) => [key, value.trim()])
+      );
 
       const payload = {
         credentials,
