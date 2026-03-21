@@ -13,9 +13,13 @@
 #
 # Usage in a rulebook sources block:
 #   - ansible.eda.webhook:
-#       host: 0.0.0.0
+#       host: "{{ eda_webhook_host | default('127.0.0.1') }}"
 #       port: "{{ eda_webhook_port | default(5000) }}"
+#
+# To intentionally expose this webhook beyond localhost in a controlled
+# environment, set `eda_webhook_host` explicitly to `0.0.0.0` and apply
+# network controls around the listener.
 
 plugin: ansible.eda.webhook
-host: 0.0.0.0
+host: "{{ eda_webhook_host | default('127.0.0.1') }}"
 port: "{{ eda_webhook_port | default(5000) }}"

@@ -16,7 +16,7 @@
   hosts: all
   sources:
     - ansible.eda.webhook:
-        host: 0.0.0.0
+        host: "{{ eda_webhook_host | default('127.0.0.1') }}"
         port: "{{ eda_webhook_port | default(5000) }}"
 
   rules:

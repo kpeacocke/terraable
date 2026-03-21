@@ -282,6 +282,29 @@ def test_load_state_returns_default_for_non_object_json(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_record_action_persists_evidence_entry(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    result = backend._record_action("unit_action", "succeeded", "unit detail", "ok")
+
+    assert result["status"] == "succeeded"
+    state = backend.get_state()
+    assert state["evidence"]
+    assert state["evidence"][0]["message"] == "unit detail"
+
+
+@pytest.mark.unit
+def test_append_eda_event_persists_history_entry(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    backend._append_eda_event("eda event detail", "warn")
+
+    state = backend.get_state()
+    assert state["eda_history"]
+    assert state["eda_history"][0]["message"] == "eda event detail"
+
+
+@pytest.mark.unit
 def test_run_wraps_called_process_error(tmp_path: Path) -> None:
     def boom(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
         del argv, cwd, env

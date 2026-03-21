@@ -57,6 +57,7 @@ class CommandResult:
 
 
 CommandRunner = Callable[[list[str], Path | None, dict[str, str] | None], CommandResult]
+StateMutator = Callable[[dict[str, Any]], None]
 
 
 def default_runner(
@@ -674,11 +675,12 @@ class LocalLabBackend:
         *,
         controls: dict[str, bool] | None = None,
     ) -> dict[str, Any]:
-        state = self._load_state()
-        state.setdefault("evidence", []).insert(0, {"message": detail, "tone": tone})
-        if controls is not None:
-            state["controls"] = controls
-        self._save_state(state)
+        def mutate(state: dict[str, Any]) -> None:
+            state.setdefault("evidence", []).insert(0, {"message": detail, "tone": tone})
+            if controls is not None:
+                state["controls"] = controls
+
+        self._mutate_state(mutate)
         return {
             "action": action,
             "status": status,
@@ -688,9 +690,10 @@ class LocalLabBackend:
         }
 
     def _append_eda_event(self, detail: str, tone: str) -> None:
-        state = self._load_state()
-        state.setdefault("eda_history", []).insert(0, {"message": detail, "tone": tone})
-        self._save_state(state)
+        def mutate(state: dict[str, Any]) -> None:
+            state.setdefault("eda_history", []).insert(0, {"message": detail, "tone": tone})
+
+        self._mutate_state(mutate)
 
     def _score_pct(self, controls: dict[str, bool]) -> int:
         total = len(controls)
@@ -724,6 +727,15 @@ class LocalLabBackend:
 
     def _save_state(self, state: dict[str, Any]) -> None:
         with self._state_lock:
+            self.runtime_root.mkdir(parents=True, exist_ok=True)
+            temp_path = self.runtime_root / f"state-{threading.get_ident()}-{time.time_ns()}.json"
+            temp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            temp_path.replace(self.state_file)
+
+    def _mutate_state(self, mutator: StateMutator) -> None:
+        with self._state_lock:
+            state = self._load_state()
+            mutator(state)
             self.runtime_root.mkdir(parents=True, exist_ok=True)
             temp_path = self.runtime_root / f"state-{threading.get_ident()}-{time.time_ns()}.json"
             temp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
