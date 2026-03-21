@@ -285,6 +285,37 @@ def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
 
 
 @pytest.mark.unit
+def test_read_json_payload_rejects_invalid_content_length() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "abc"}
+    handler.rfile = io.BytesIO(b"{}")
+
+    with pytest.raises(ValueError, match="Invalid Content-Length"):
+        handler._read_json_payload()
+
+
+@pytest.mark.unit
+def test_read_json_payload_defaults_missing_content_length_to_empty_object() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {}
+    handler.rfile = io.BytesIO(b"")
+
+    payload = handler._read_json_payload()
+
+    assert payload == {}
+
+
+@pytest.mark.unit
+def test_read_json_payload_rejects_negative_content_length() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = {"Content-Length": "-1"}
+    handler.rfile = io.BytesIO(b"{}")
+
+    with pytest.raises(ValueError, match="Invalid Content-Length"):
+        handler._read_json_payload()
+
+
+@pytest.mark.unit
 def test_loopback_host_helper_accepts_localhost_and_loopback_ip() -> None:
     assert api_server.TerraableRequestHandler._is_loopback_host("localhost")
     assert api_server.TerraableRequestHandler._is_loopback_host("127.0.0.1")

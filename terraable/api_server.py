@@ -149,7 +149,16 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         return None
 
     def _read_json_payload(self) -> dict[str, Any]:
-        length = int(self.headers.get("Content-Length", "0"))
+        header_value = self.headers.get("Content-Length")
+        if header_value is None:
+            length = 0
+        else:
+            try:
+                length = int(header_value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Invalid Content-Length") from exc
+            if length < 0:
+                raise ValueError("Invalid Content-Length")
         try:
             raw_payload = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError as exc:

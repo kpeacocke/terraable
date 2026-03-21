@@ -9,7 +9,7 @@ This guide walks you through forking the repository and running the Terraable de
 | Git | 2.40 | Clone and branch management |
 | Python | 3.11 | `terraable` package and tests |
 | Terraform CLI | 1.9 | Substrate module validation |
-| Ansible | 2.15 | Playbook and role execution |
+| Ansible | 10.0 | Playbook and role execution |
 | Docker or Podman | latest | Optional: local container target |
 
 Not all tools are required for every demo path. See [Choosing a lab mode](#choosing-a-lab-mode) below.
