@@ -16,8 +16,8 @@ import pytest
 from terraable import api_server
 
 
-def _headers(values: dict[str, str]) -> Message[str, str]:
-    headers: Message[str, str] = Message()
+def _headers(values: dict[str, str]) -> Message:
+    headers: Message = Message()
     for key, value in values.items():
         headers[key] = value
     return headers
