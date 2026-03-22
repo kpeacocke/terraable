@@ -8,6 +8,7 @@ from .contract import (
     validate_target_combination,
 )
 from .hcp_terraform import HcpTerraformClient, HcpTerraformConfig
+from .local_detect import detect_local_target
 from .local_lab import LocalLabBackend
 from .orchestrator import ActionName, ActionStatus, DemoOrchestrator, EvidenceRecord
 
@@ -23,6 +24,7 @@ __all__ = [
     "HcpTerraformClient",
     "HcpTerraformConfig",
     "LocalLabBackend",
+    "detect_local_target",
     "PortalImplementation",
     "SecurityProfile",
     "TargetPlatform",

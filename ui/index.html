@@ -302,7 +302,11 @@
             <option value="openshift">openshift</option>
             <option value="aws">aws</option>
             <option value="azure">azure</option>
+            <option value="gcp">gcp</option>
             <option value="okd">okd</option>
+            <option value="vmware">vmware</option>
+            <option value="parallels">parallels</option>
+            <option value="hyper-v">hyper-v</option>
             <option value="local-lab">local-lab</option>
           </select>
         </div>
@@ -333,8 +337,10 @@
           <button class="secondary" id="scan">Run compliance scan</button>
           <button class="secondary" id="drift">Inject SSH drift</button>
           <button class="secondary" id="drift-svc">Inject service drift</button>
+          <button class="secondary" id="incident">Inject synthetic incident</button>
           <button class="secondary" id="remediate">Run remediation</button>
         </div>
+        <div class="hint" id="target-suggestion">Detecting local target suggestion...</div>
       </article>
 
       <article class="panel">
@@ -374,6 +380,13 @@
           <div class="field">
             <label for="arm-subscription-id">Azure subscription ID</label>
             <input id="arm-subscription-id" type="text" autocomplete="off" placeholder="Required for target=azure" />
+          </div>
+        </details>
+        <details class="cred-group" id="creds-gcp">
+          <summary>GCP</summary>
+          <div class="field">
+            <label for="gcp-creds">Google credentials file path</label>
+            <input id="gcp-creds" type="text" autocomplete="off" placeholder="Required for target=gcp" />
           </div>
         </details>
         <details class="cred-group" id="creds-openshift">
@@ -417,10 +430,35 @@
       </article>
 
       <article class="panel">
+        <h2>Compliance Controls</h2>
+        <ul id="compliance-controls" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
+      </article>
+
+    </section>
+
+    <section class="grid-3">
+
+      <article class="panel">
+        <h2>Portal Feature Catalogue</h2>
+        <ul id="portal-catalog"></ul>
+      </article>
+
+      <article class="panel">
         <h2>EDA Event History
           <span class="eda-badge inactive" id="eda-badge">disabled</span>
         </h2>
         <ul id="eda-history" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
+      </article>
+
+      <article class="panel">
+        <h2>Synthetic Incident Feed</h2>
+        <ul id="incident-feed" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
+      </article>
+
+      <article class="panel">
+        <h2>Observability Dashboard</h2>
+        <div id="observability-summary" class="hint"></div>
+        <ul id="observability-stages" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
       </article>
     </section>
   </main>
@@ -429,13 +467,19 @@
     const evidence = document.getElementById("evidence");
     const runtimeStatusEl = document.getElementById("runtime-status");
     const edaHistory = document.getElementById("eda-history");
+    const incidentFeed = document.getElementById("incident-feed");
+    const observabilitySummary = document.getElementById("observability-summary");
+    const observabilityStages = document.getElementById("observability-stages");
     const controlStatusEl = document.getElementById("control-status");
+    const complianceControlsEl = document.getElementById("compliance-controls");
+    const portalCatalogEl = document.getElementById("portal-catalog");
     const trendListEl = document.getElementById("trend-list");
     const scorePctEl = document.getElementById("score-pct");
     const scoreBarFill = document.getElementById("score-bar-fill");
     const edaBadge = document.getElementById("eda-badge");
     const runtimeBadge = document.getElementById("runtime-badge");
     const authStatusEl = document.getElementById("auth-status");
+    const targetSuggestionEl = document.getElementById("target-suggestion");
     const actionButtons = Array.from(document.querySelectorAll(".actions button"));
 
     const controls = {
@@ -484,6 +528,10 @@
       trendListEl.innerHTML = "";
       evidence.innerHTML = "";
       edaHistory.innerHTML = "";
+      incidentFeed.innerHTML = "";
+      observabilityStages.innerHTML = "";
+      complianceControlsEl.innerHTML = "";
+      targetSuggestionEl.textContent = "Target suggestion unavailable while API is offline.";
     }
 
     function renderTrend(trend) {
@@ -533,6 +581,60 @@
       runtimeStatusEl.appendChild(jobItem);
     }
 
+    function renderComplianceControls(controlsState) {
+      complianceControlsEl.innerHTML = "";
+      for (const [name, pass] of Object.entries(controlsState || {})) {
+        const item = document.createElement("li");
+        item.className = pass ? "ok" : "fail";
+        item.textContent = `${name}: ${pass ? "pass" : "FAIL"}`;
+        complianceControlsEl.appendChild(item);
+      }
+    }
+
+    function renderPortalCatalog() {
+      portalCatalogEl.innerHTML = "";
+      const items = [
+        "Template catalog: Golden path app bootstrap",
+        "Ownership: Service owner and support contact",
+        "Docs: Environment runbook and control references",
+      ];
+      for (const text of items) {
+        const item = document.createElement("li");
+        item.textContent = text;
+        portalCatalogEl.appendChild(item);
+      }
+    }
+
+    function renderIncidents(incidents) {
+      incidentFeed.innerHTML = "";
+      for (const incident of incidents || []) {
+        const item = document.createElement("li");
+        item.className = "warn";
+        item.textContent = `[${incident.severity}] ${incident.component}: ${incident.message}`;
+        incidentFeed.appendChild(item);
+      }
+    }
+
+    function renderObservability(observability) {
+      observabilitySummary.textContent = "";
+      observabilityStages.innerHTML = "";
+      const summary = observability?.summary || {};
+      observabilitySummary.textContent = `Last stage: ${summary.last_stage || "n/a"} (${summary.last_status || "n/a"})`;
+      for (const stage of observability?.stages || []) {
+        const item = document.createElement("li");
+        let stageClass = "warn";
+        if (stage.status === "succeeded" || stage.status === "applied") {
+          stageClass = "ok";
+        } else if (stage.status === "failed") {
+          stageClass = "fail";
+        }
+        item.className = stageClass;
+        const deps = (stage.depends_on || []).join(", ") || "none";
+        item.textContent = `${stage.stage}: ${stage.status} | depends_on=${deps}`;
+        observabilityStages.appendChild(item);
+      }
+    }
+
     function renderLog(targetEl, entries) {
       targetEl.innerHTML = "";
       for (const entry of entries || []) {
@@ -559,11 +661,12 @@
       const relevant = {
         aws: ["creds-aws"],
         azure: ["creds-azure"],
+        gcp: ["creds-gcp"],
         openshift: ["creds-openshift"],
         okd: ["creds-openshift"],
       };
       const open = new Set(relevant[target] || []);
-      ["creds-aws", "creds-azure", "creds-openshift"].forEach((id) => {
+      ["creds-aws", "creds-azure", "creds-gcp", "creds-openshift"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.open = open.has(id);
       });
@@ -613,8 +716,16 @@
       updateComplianceScore();
       renderRuntimeStatus(state);
       renderTrend(state.trend || []);
+      renderComplianceControls(state.compliance_controls || {});
       renderLog(evidence, state.evidence || []);
       renderLog(edaHistory, state.eda_history || []);
+      renderIncidents(state.incidents || []);
+      renderObservability(state.observability || {});
+      renderPortalCatalog();
+
+      if (state.target_suggestion) {
+        targetSuggestionEl.textContent = `Suggested local target: ${state.target_suggestion.target} (${state.target_suggestion.confidence}) - ${state.target_suggestion.reason}`;
+      }
 
       const edaEnabled = Boolean(state.eda_enabled);
       edaBadge.textContent = edaEnabled ? "enabled" : "disabled";
@@ -707,6 +818,7 @@
         ARM_CLIENT_SECRET: document.getElementById("arm-client-secret").value,
         ARM_TENANT_ID: document.getElementById("arm-tenant-id").value,
         ARM_SUBSCRIPTION_ID: document.getElementById("arm-subscription-id").value,
+        GOOGLE_APPLICATION_CREDENTIALS: document.getElementById("gcp-creds").value,
         OPENSHIFT_API_URL: document.getElementById("openshift-api").value,
         OPENSHIFT_TOKEN: document.getElementById("openshift-token").value,
       };
@@ -772,6 +884,10 @@
 
     document.getElementById("drift-svc").addEventListener("click", function() {
       runAction(this, "Injecting...", "inject_service_drift", {});
+    });
+
+    document.getElementById("incident").addEventListener("click", function() {
+      runAction(this, "Injecting...", "inject_synthetic_incident", {});
     });
 
     document.getElementById("remediate").addEventListener("click", function() {

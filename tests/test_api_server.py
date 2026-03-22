@@ -62,6 +62,15 @@ class _FakeBackend:
             "state": self.get_state(),
         }
 
+    def inject_synthetic_incident(self) -> dict[str, object]:
+        return {
+            "action": "inject_synthetic_incident",
+            "status": "succeeded",
+            "detail": "ok",
+            "tone": "warn",
+            "state": self.get_state(),
+        }
+
     def run_remediation(self) -> dict[str, object]:
         return {
             "action": "run_remediation",
@@ -293,6 +302,7 @@ def test_handler_serves_healthz_and_other_actions(
             "run_compliance_scan",
             "inject_ssh_drift",
             "inject_service_drift",
+            "inject_synthetic_incident",
             "run_remediation",
         ):
             request = Request(

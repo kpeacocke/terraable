@@ -13,7 +13,7 @@ The payload is represented by `terraable.contract.HandoffPayload`.
 Required fields:
 - `environment_name`: Friendly environment identifier.
 - `terraform_run_id`: Source Terraform run identifier.
-- `target_platform`: One of `openshift`, `aws`, `azure`, `okd`, or `local-lab`.
+- `target_platform`: One of `openshift`, `aws`, `azure`, `gcp`, `okd`, `vmware`, `parallels`, `hyper-v`, or `local-lab`.
 - `portal_impl`: One of `rhdh` or `backstage`.
 - `security_profile`: One of `baseline` or `strict`.
 - `connection`: Connection details object:

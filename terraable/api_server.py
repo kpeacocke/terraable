@@ -159,6 +159,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             "run_compliance_scan": self.backend.run_compliance_scan,
             "inject_ssh_drift": self.backend.inject_ssh_drift,
             "inject_service_drift": self.backend.inject_service_drift,
+            "inject_synthetic_incident": self.backend.inject_synthetic_incident,
             "run_remediation": self.backend.run_remediation,
         }
         handler = simple.get(action)

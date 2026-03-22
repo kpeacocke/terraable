@@ -281,6 +281,10 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
         "ssh_root_login": True,
         "portal_service_health": True,
     }
+    assert baseline["state"]["compliance_controls"] == {
+        "ssh_root_login": True,
+        "ssh_password_authentication": True,
+    }
     assert clean_scan["status"] == "succeeded"
     assert clean_scan["state"]["trend"][0] == {"pct": 100, "label": "Scan #1"}
     assert (
@@ -314,7 +318,23 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
     )
 
     assert result["status"] == "failed"
-    assert "only local-lab is wired end-to-end" in result["detail"]
+    assert "supported local targets" in result["detail"]
+
+
+@pytest.mark.unit
+def test_local_virtualisation_targets_are_executable(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+
+    result = backend.create_environment(
+        target="vmware",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["state"]["current"]["target"] == "vmware"
 
 
 @pytest.mark.unit
@@ -592,6 +612,8 @@ def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
 
     assert "auth" in state
     assert state["auth"]["ready"] is False
+    assert "target_suggestion" in state
+    assert "observability" in state
 
 
 @pytest.mark.unit
@@ -857,6 +879,7 @@ def test_mock_mode_full_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     state = backend.get_state()
     assert state["controls"]["ssh_root_login"] is True
     assert state["controls"]["portal_service_health"] is True
+    assert state["compliance_controls"]["ssh_root_login"] is True
 
 
 @pytest.mark.unit
@@ -886,6 +909,19 @@ def test_mock_mode_eda_events_on_drift_and_remediation(
     assert "state" in result
     state = backend.get_state()
     assert any("remediation complete" in e["message"] for e in state["eda_history"])
+
+
+@pytest.mark.unit
+def test_inject_synthetic_incident_updates_feed_and_evidence(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    result = backend.inject_synthetic_incident()
+
+    assert result["status"] == "succeeded"
+    state = backend.get_state()
+    assert state["incidents"]
+    assert state["incidents"][0]["id"].startswith("incident-")
+    assert any("synthetic incident" in item["message"] for item in state["evidence"])
 
 
 @pytest.mark.unit
