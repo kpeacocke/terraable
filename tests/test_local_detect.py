@@ -113,3 +113,41 @@ def test_detect_local_target_from_kernel_wsl_marker(
 
     assert detected["target"] == "hyper-v"
     assert detected["confidence"] == "medium"
+
+
+@pytest.mark.unit
+def test_detect_local_target_handles_osrelease_read_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test fallback when osrelease read fails with exception."""
+    monkeypatch.delenv("VMWARE_VERSION", raising=False)
+    monkeypatch.delenv("PARALLELS_VM_NAME", raising=False)
+    monkeypatch.delenv("WSL_DISTRO_NAME", raising=False)
+
+    original_exists = Path.exists
+
+    def fake_exists(path: Path) -> bool:
+        if str(path) in {
+            "/usr/bin/vmrun",
+            "/usr/local/bin/vmrun",
+            "/usr/bin/prlctl",
+            "/usr/local/bin/prlctl",
+        }:
+            return False
+        if str(path) == "/proc/sys/kernel/osrelease":
+            return True
+        return original_exists(path)
+
+    def fake_read_text(path: Path, encoding: str = "utf-8") -> str:
+        if str(path) == "/proc/sys/kernel/osrelease":
+            raise OSError("permission denied")
+        return original_exists(path)
+
+    monkeypatch.setattr(Path, "exists", fake_exists)
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+
+    detected = detect_local_target()
+
+    assert detected["target"] == "local-lab"
+    assert detected["confidence"] == "low"
+    assert "no local hypervisor markers found" in detected["reason"]

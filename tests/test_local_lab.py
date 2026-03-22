@@ -37,11 +37,12 @@ class _FakeLocalLabBackend(LocalLabBackend):
         environment_name: str,
         portal: str,
         profile: str,
+        target: str = "local-lab",
     ) -> dict[str, Any]:
         assert env_dir.exists()
         return {
             "environment_name": environment_name,
-            "target_platform": "local-lab",
+            "target_platform": target,
             "portal_impl": portal,
             "security_profile": profile,
             "connection": {
@@ -100,13 +101,15 @@ class _FakeLocalLabBackend(LocalLabBackend):
 
     def _handle_ssh_scan(self, env_dir: Path, extra_vars: dict[str, Any]) -> None:
         ssh_text = (env_dir / "sshd_config").read_text(encoding="utf-8")
-        status = "pass" if "PermitRootLogin no" in ssh_text else "fail"
+        root_login_status = "pass" if "PermitRootLogin no" in ssh_text else "fail"
+        password_auth_status = "pass" if "PasswordAuthentication no" in ssh_text else "fail"
         Path(str(extra_vars["scan_output_path"])).write_text(
             json.dumps(
                 {
                     "control": "ssh_root_login",
-                    "status": status,
+                    "status": root_login_status,
                     "evidence": "fake ssh scan",
+                    "ssh_password_authentication": password_auth_status,
                 }
             ),
             encoding="utf-8",
@@ -159,12 +162,14 @@ class _InspectableLocalLabBackend(LocalLabBackend):
         environment_name: str,
         portal: str,
         profile: str,
+        target: str = "local-lab",
     ) -> dict[str, Any]:
         return self._terraform_apply(
             env_dir,
             environment_name=environment_name,
             portal=portal,
             profile=profile,
+            target=target,
         )
 
     def ensure_environment_for_test(self, environment_name: str) -> Path:
@@ -293,7 +298,7 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
     )
     assert svc_drift["state"]["controls"]["portal_service_health"] is False
     assert scan["status"] == "failed"
-    assert scan["state"]["trend"][0] == {"pct": 0, "label": "Scan #2"}
+    assert scan["state"]["trend"][0] == {"pct": 33, "label": "Scan #2"}
     assert (
         scan["state"]["eda_history"][0]["message"]
         == "compliance_drift event emitted for ssh_root_login, portal_service_health"
@@ -335,6 +340,7 @@ def test_local_virtualisation_targets_are_executable(tmp_path: Path) -> None:
 
     assert result["status"] == "succeeded"
     assert result["state"]["current"]["target"] == "vmware"
+    assert result["state"]["terraform"]["status"] == "applied"
 
 
 @pytest.mark.unit
