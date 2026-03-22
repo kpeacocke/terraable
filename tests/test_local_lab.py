@@ -1020,9 +1020,7 @@ def test_invalid_execution_mode_defaults_to_direct(
 
 
 @pytest.mark.unit
-def test_awx_run_rejects_unmapped_playbook(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_rejects_unmapped_playbook(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1031,9 +1029,7 @@ def test_awx_run_rejects_unmapped_playbook(
 
 
 @pytest.mark.unit
-def test_awx_run_requires_awx_credentials(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_requires_awx_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1042,9 +1038,7 @@ def test_awx_run_requires_awx_credentials(
 
 
 @pytest.mark.unit
-def test_awx_run_requires_https_host(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_requires_https_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "http://awx.example.invalid")
     monkeypatch.setenv("AWX_USERNAME", "admin")
@@ -1108,9 +1102,7 @@ def test_awx_run_raises_when_launch_missing_job_id(
 
 
 @pytest.mark.unit
-def test_awx_run_raises_when_job_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_raises_when_job_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
     monkeypatch.setenv("AWX_USERNAME", "admin")
@@ -1190,9 +1182,7 @@ def test_awx_request_wraps_url_errors(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 @pytest.mark.unit
-def test_awx_run_raises_when_job_times_out(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_raises_when_job_times_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
     monkeypatch.setenv("AWX_USERNAME", "admin")

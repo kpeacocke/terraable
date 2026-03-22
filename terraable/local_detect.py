@@ -38,14 +38,19 @@ def detect_local_target() -> dict[str, str]:
                 "reason": f"detected host binary for {target}",
             }
 
-    if Path("/proc/sys/kernel/osrelease").exists():
-        osrelease = Path("/proc/sys/kernel/osrelease").read_text(encoding="utf-8").lower()
-        if "microsoft" in osrelease:
-            return {
-                "target": "hyper-v",
-                "confidence": "medium",
-                "reason": "kernel indicates WSL/Hyper-V substrate",
-            }
+    osrelease_path = Path("/proc/sys/kernel/osrelease")
+    try:
+        if osrelease_path.exists():
+            osrelease = osrelease_path.read_text(encoding="utf-8").lower()
+            if "microsoft" in osrelease:
+                return {
+                    "target": "hyper-v",
+                    "confidence": "medium",
+                    "reason": "kernel indicates WSL/Hyper-V substrate",
+                }
+    except (OSError, UnicodeDecodeError):
+        # Best-effort detection: on failure, fall back to the default suggestion below.
+        pass
 
     return {
         "target": "local-lab",

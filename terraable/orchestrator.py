@@ -16,6 +16,7 @@ class ActionName(StrEnum):
     RUN_COMPLIANCE_SCAN = "run_compliance_scan"
     INJECT_SSH_DRIFT = "inject_ssh_drift"
     INJECT_SERVICE_DRIFT = "inject_service_drift"
+    INJECT_SYNTHETIC_INCIDENT = "inject_synthetic_incident"
     RUN_REMEDIATION = "run_remediation"
 
 
