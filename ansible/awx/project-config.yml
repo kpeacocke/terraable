@@ -30,6 +30,11 @@ job_templates:
     playbook: ansible/playbooks/compliance_scan.yml
     ask_variables_on_launch: true
 
+  - name: terraable-drift-ssh-root
+    description: Inject SSH root login drift
+    playbook: ansible/playbooks/drift_ssh_root.yml
+    ask_variables_on_launch: true
+
   - name: terraable-remediate-ssh
     description: Remediate SSH root login drift
     playbook: ansible/playbooks/remediate_ssh_root.yml

@@ -39,12 +39,11 @@ def test_build_handoff_payload_to_runtime_vars() -> None:
 
 
 @pytest.mark.unit
-def test_invalid_target_portal_combination_rejected() -> None:
-    with pytest.raises(ValueError, match="Unsupported combination"):
-        validate_target_combination(
-            TargetPlatform.LOCAL_LAB,
-            PortalImplementation.RHDH,
-        )
+def test_local_lab_rhdh_combination_is_allowed() -> None:
+    validate_target_combination(
+        TargetPlatform.LOCAL_LAB,
+        PortalImplementation.RHDH,
+    )
 
 
 @pytest.mark.unit

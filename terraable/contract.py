@@ -67,16 +67,12 @@ def validate_target_combination(
     target_platform: TargetPlatform,
     portal_impl: PortalImplementation,
 ) -> None:
-    """Validate the target and portal combination for the MVP matrix."""
+    """Validate target and portal combinations when a matrix rule is defined.
 
-    unsupported: dict[TargetPlatform, set[PortalImplementation]] = {
-        TargetPlatform.LOCAL_LAB: {PortalImplementation.RHDH},
-    }
-
-    if portal_impl in unsupported.get(target_platform, set()):
-        raise ValueError(
-            f"Unsupported combination: target={target_platform.value} portal={portal_impl.value}"
-        )
+    Currently all enum combinations are accepted. The helper is retained so
+    target-specific restrictions can be reintroduced without changing callers.
+    """
+    del target_platform, portal_impl
 
 
 def build_handoff_payload(

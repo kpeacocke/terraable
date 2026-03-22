@@ -394,6 +394,8 @@
 
       <article class="panel">
         <h2>Evidence and Status</h2>
+        <div style="margin-bottom:10px; font-size:0.8rem; color:var(--ink-muted);">Runtime status</div>
+        <output id="runtime-status" aria-live="polite" aria-relevant="additions text" aria-atomic="false" style="display:block; margin-bottom:10px;"></output>
         <ul id="evidence" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
       </article>
     </section>
@@ -425,6 +427,7 @@
 
   <script type="module">
     const evidence = document.getElementById("evidence");
+    const runtimeStatusEl = document.getElementById("runtime-status");
     const edaHistory = document.getElementById("eda-history");
     const controlStatusEl = document.getElementById("control-status");
     const trendListEl = document.getElementById("trend-list");
@@ -497,6 +500,37 @@
         row.appendChild(span);
         trendListEl.appendChild(row);
       }
+    }
+
+    function renderRuntimeStatus(state) {
+      runtimeStatusEl.innerHTML = "";
+
+      const terraform = state.terraform || {};
+      const jobs = state.jobs || {};
+
+      const terraformItem = document.createElement("div");
+      const tfStatus = terraform.status || "unknown";
+      let terraformClass = "warn";
+      if (tfStatus === "applied") {
+        terraformClass = "ok";
+      } else if (tfStatus === "failed") {
+        terraformClass = "fail";
+      }
+      terraformItem.className = terraformClass;
+      terraformItem.textContent = `terraform: status=${tfStatus} run=${terraform.run_id || "n/a"}`;
+      runtimeStatusEl.appendChild(terraformItem);
+
+      const jobItem = document.createElement("div");
+      const jobStatus = jobs.last_status || "idle";
+      let jobClass = "warn";
+      if (jobStatus === "succeeded") {
+        jobClass = "ok";
+      } else if (jobStatus === "failed") {
+        jobClass = "fail";
+      }
+      jobItem.className = jobClass;
+      jobItem.textContent = `workflow: action=${jobs.last_action || "n/a"} status=${jobStatus} backend=${jobs.last_backend || "n/a"} job=${jobs.last_job_id || "n/a"}`;
+      runtimeStatusEl.appendChild(jobItem);
     }
 
     function renderLog(targetEl, entries) {
@@ -577,6 +611,7 @@
       controls.ssh_root_login = Boolean(stateControls.ssh_root_login);
       controls.portal_service_health = Boolean(stateControls.portal_service_health);
       updateComplianceScore();
+      renderRuntimeStatus(state);
       renderTrend(state.trend || []);
       renderLog(evidence, state.evidence || []);
       renderLog(edaHistory, state.eda_history || []);

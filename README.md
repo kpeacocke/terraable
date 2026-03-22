@@ -55,6 +55,7 @@ Credential authentication:
 Current executable scope:
 
 - `local-lab + backstage` is wired end-to-end.
+- `local-lab + rhdh` is wired end-to-end.
 - Other target selectors remain contract scaffolding and return an explicit failure from the API until provider-specific execution paths are implemented.
 - AWS module assets in this branch are implementation groundwork only; AWS is not yet executable end-to-end from the control plane.
 
