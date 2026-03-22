@@ -213,6 +213,9 @@ class LocalLabBackend:
                     "awx execution mode requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD"
                 )
                 ready = False
+            elif not awx_host.startswith("https://"):
+                blockers.append("AWX_HOST must use an https:// URL")
+                ready = False
 
         return {
             "authenticated": authenticated,
@@ -556,13 +559,22 @@ class LocalLabBackend:
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
-        job = self._run_playbook("playbooks/drift_ssh_root.yml", self._ansible_vars(env_dir))
-        self._set_job_status(
-            action=ActionName.INJECT_SSH_DRIFT.value,
-            status="succeeded",
-            detail="ssh drift injection completed",
-            job=job,
-        )
+        try:
+            job = self._run_playbook("playbooks/drift_ssh_root.yml", self._ansible_vars(env_dir))
+            self._set_job_status(
+                action=ActionName.INJECT_SSH_DRIFT.value,
+                status="succeeded",
+                detail="ssh drift injection completed",
+                job=job,
+            )
+        except Exception as exc:
+            self._set_job_status(
+                action=ActionName.INJECT_SSH_DRIFT.value,
+                status="failed",
+                detail=f"ssh drift injection failed: {exc}",
+                job={"backend": self._execution_mode, "job_id": ""},
+            )
+            raise
         controls = self._read_controls(env_dir)
         response = self._record_action(
             ActionName.INJECT_SSH_DRIFT.value,
@@ -611,13 +623,22 @@ class LocalLabBackend:
         env_dir = Path(str(current["runtime_dir"]))
         extra_vars = self._ansible_vars(env_dir)
         extra_vars.update({"drift_action": "inject", "portal_service": str(current["portal"])})
-        job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, extra_vars)
-        self._set_job_status(
-            action=ActionName.INJECT_SERVICE_DRIFT.value,
-            status="succeeded",
-            detail="service drift injection completed",
-            job=job,
-        )
+        try:
+            job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, extra_vars)
+            self._set_job_status(
+                action=ActionName.INJECT_SERVICE_DRIFT.value,
+                status="succeeded",
+                detail="service drift injection completed",
+                job=job,
+            )
+        except Exception as exc:
+            self._set_job_status(
+                action=ActionName.INJECT_SERVICE_DRIFT.value,
+                status="failed",
+                detail=f"service drift injection failed: {exc}",
+                job={"backend": self._execution_mode, "job_id": ""},
+            )
+            raise
         controls = self._read_controls(env_dir)
         response = self._record_action(
             ActionName.INJECT_SERVICE_DRIFT.value,
@@ -656,20 +677,29 @@ class LocalLabBackend:
 
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
-        ssh_job = self._run_playbook("playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir))
-        svc_vars = self._ansible_vars(env_dir)
-        svc_vars.update({"drift_action": "remediate", "portal_service": str(current["portal"])})
-        svc_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
-        self._set_job_status(
-            action=ActionName.RUN_REMEDIATION.value,
-            status="succeeded",
-            detail="remediation workflow completed",
-            job={
-                "backend": svc_job.get("backend", ssh_job.get("backend", "direct")),
-                "job_id": svc_job.get("job_id", ssh_job.get("job_id", "")),
-                "jobs": [ssh_job, svc_job],
-            },
-        )
+        try:
+            ssh_job = self._run_playbook("playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir))
+            svc_vars = self._ansible_vars(env_dir)
+            svc_vars.update({"drift_action": "remediate", "portal_service": str(current["portal"])})
+            svc_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
+            self._set_job_status(
+                action=ActionName.RUN_REMEDIATION.value,
+                status="succeeded",
+                detail="remediation workflow completed",
+                job={
+                    "backend": svc_job.get("backend", ssh_job.get("backend", "direct")),
+                    "job_id": svc_job.get("job_id", ssh_job.get("job_id", "")),
+                    "jobs": [ssh_job, svc_job],
+                },
+            )
+        except Exception as exc:
+            self._set_job_status(
+                action=ActionName.RUN_REMEDIATION.value,
+                status="failed",
+                detail=f"remediation workflow failed: {exc}",
+                job={"backend": self._execution_mode, "job_id": ""},
+            )
+            raise
         controls = self._read_controls(env_dir)
         response = self._record_action(
             ActionName.RUN_REMEDIATION.value,

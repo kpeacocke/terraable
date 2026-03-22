@@ -904,6 +904,23 @@ def test_awx_execution_mode_requires_awx_connection_env(
 
 
 @pytest.mark.unit
+def test_awx_execution_mode_requires_https_host_for_ready_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
+    monkeypatch.setenv("AWX_HOST", "http://awx.example.invalid")
+    monkeypatch.setenv("AWX_USERNAME", "admin")
+    monkeypatch.setenv("AWX_PASSWORD", "password")
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
+
+    auth = backend.get_auth_status(target="local-lab", portal="backstage")
+
+    assert auth["ready"] is False
+    assert "AWX_HOST must use an https:// URL" in auth["blockers"]
+
+
+@pytest.mark.unit
 def test_run_playbook_awx_mode_launches_template(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1267,6 +1284,81 @@ def test_run_compliance_scan_marks_failed_job_status_on_exception(tmp_path: Path
 
     state = backend.get_state()
     assert state["jobs"]["last_action"] == "run_compliance_scan"
+    assert state["jobs"]["last_status"] == "failed"
+
+
+@pytest.mark.unit
+def test_inject_ssh_drift_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+    backend.create_environment(
+        target="local-lab",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    def failing_run_playbook(playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        del playbook, extra_vars
+        raise RuntimeError("ssh drift playbook failed")
+
+    backend._run_playbook = failing_run_playbook  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="ssh drift playbook failed"):
+        backend.inject_ssh_drift()
+
+    state = backend.get_state()
+    assert state["jobs"]["last_action"] == "inject_ssh_drift"
+    assert state["jobs"]["last_status"] == "failed"
+
+
+@pytest.mark.unit
+def test_inject_service_drift_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+    backend.create_environment(
+        target="local-lab",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    def failing_run_playbook(playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        del playbook, extra_vars
+        raise RuntimeError("service drift playbook failed")
+
+    backend._run_playbook = failing_run_playbook  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="service drift playbook failed"):
+        backend.inject_service_drift()
+
+    state = backend.get_state()
+    assert state["jobs"]["last_action"] == "inject_service_drift"
+    assert state["jobs"]["last_status"] == "failed"
+
+
+@pytest.mark.unit
+def test_run_remediation_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+    backend.create_environment(
+        target="local-lab",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    def failing_run_playbook(playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
+        del playbook, extra_vars
+        raise RuntimeError("remediation playbook failed")
+
+    backend._run_playbook = failing_run_playbook  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="remediation playbook failed"):
+        backend.run_remediation()
+
+    state = backend.get_state()
+    assert state["jobs"]["last_action"] == "run_remediation"
     assert state["jobs"]["last_status"] == "failed"
 
 
