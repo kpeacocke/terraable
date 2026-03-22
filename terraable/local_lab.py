@@ -567,8 +567,17 @@ class LocalLabBackend:
         state["controls"] = controls
         state["compliance_controls"] = compliance_controls
         state["scan_count"] = int(state.get("scan_count", 0)) + 1
-        # Score on union of all controls so trend is consistent with pass/fail determination
-        all_controls: dict[str, bool] = {**controls, **compliance_controls}
+        # Score on union of all controls so trend is consistent with pass/fail determination.
+        # For shared keys (e.g. ssh_root_login), AND logic: control only passes if it passes in all sources.
+        all_control_names = set(controls.keys()) | set(compliance_controls.keys())
+        all_controls: dict[str, bool] = {}
+        for name in all_control_names:
+            passed = True
+            if name in controls:
+                passed = passed and controls[name]
+            if name in compliance_controls:
+                passed = passed and compliance_controls[name]
+            all_controls[name] = passed
         pct = self._score_pct(all_controls)
         trend = state.setdefault("trend", [])
         trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
@@ -812,12 +821,21 @@ class LocalLabBackend:
             del incidents[STATE_LOG_LIMIT:]
 
         self._mutate_state(mutate)
-        self._append_eda_event("synthetic incident emitted", "warn")
+        state = self._load_state()
+        if state.get("eda_enabled"):
+            self._append_eda_event("synthetic incident emitted", "warn")
+            return self._record_action(
+                ActionName.INJECT_SYNTHETIC_INCIDENT.value,
+                ActionStatus.SUCCEEDED.value,
+                "synthetic incident injected: demo incident added to feed",
+                "warn",
+                state=state,
+            )
         return self._record_action(
             ActionName.INJECT_SYNTHETIC_INCIDENT.value,
             ActionStatus.SUCCEEDED.value,
             "synthetic incident injected: demo incident added to feed",
-            "warn",
+            "ok",
         )
 
     def _current_environment(self) -> dict[str, Any]:

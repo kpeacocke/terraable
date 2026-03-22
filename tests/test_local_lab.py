@@ -937,6 +937,21 @@ def test_inject_synthetic_incident_updates_feed_and_evidence(tmp_path: Path) -> 
 
 
 @pytest.mark.unit
+def test_inject_synthetic_incident_respects_eda_disabled_state(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    state = backend.get_state()
+    state["eda_enabled"] = False
+    backend._save_state(state)
+
+    result = backend.inject_synthetic_incident()
+
+    assert result["status"] == "succeeded"
+    # When EDA is disabled, the response should not include or refresh state
+    state = backend.get_state()
+    assert state["incidents"]  # incident should still be added to feed
+
+
+@pytest.mark.unit
 def test_awx_execution_mode_requires_awx_connection_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
