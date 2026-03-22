@@ -1,3 +1,8 @@
+# Scaffold contract module: captures inputs and emits the Terraform-to-Ansible handoff outputs.
+# This module does not provision GCP Compute Engine resources directly.
+# Phase 2 will add the google provider and compute resource definitions.
+# See docs/handoff-contract.md for the contract schema.
+
 locals {
   environment_name = var.environment_name
   api_endpoint     = "https://${var.environment_name}.${var.region}.gcp.local"

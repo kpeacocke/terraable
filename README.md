@@ -16,7 +16,7 @@ Local-lab now has an executable end-to-end path: UI -> Python API -> Terraform c
 - SSH root login hardening control with validation and remediation flow.
 - Control-plane MVP UI with action and evidence panels.
 
-## Phase 3 Delivery In This Branch
+## Phase 3 Additions
 
 - Added substrate modules for `gcp`, `vmware`, `parallels`, and `hyper-v`.
 - Added local target auto-detection helper and UI suggestion rendering.

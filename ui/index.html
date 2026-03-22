@@ -532,6 +532,9 @@
       observabilityStages.innerHTML = "";
       complianceControlsEl.innerHTML = "";
       targetSuggestionEl.textContent = "Target suggestion unavailable while API is offline.";
+      if (observabilitySummary) {
+        observabilitySummary.textContent = "Observability summary unavailable while API is offline.";
+      }
     }
 
     function renderTrend(trend) {
@@ -725,6 +728,8 @@
 
       if (state.target_suggestion) {
         targetSuggestionEl.textContent = `Suggested local target: ${state.target_suggestion.target} (${state.target_suggestion.confidence}) - ${state.target_suggestion.reason}`;
+      } else {
+        targetSuggestionEl.textContent = "No target suggestion available yet. Enter a target or run discovery.";
       }
 
       const edaEnabled = Boolean(state.eda_enabled);

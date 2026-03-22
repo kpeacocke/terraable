@@ -333,11 +333,14 @@ class LocalLabBackend:
                 environment_name=environment_name,
                 portal=portal,
                 profile=profile,
+                target=target,
             )
+            # Use the Terraform output target to ensure payload matches the actual provisioned infrastructure
+            tf_target = str(outputs.get("target_platform", target))
             payload = build_handoff_payload(
                 environment_name=str(outputs["environment_name"]),
                 terraform_run_id=run_id,
-                target_platform=target,
+                target_platform=tf_target,
                 portal_impl=str(outputs["portal_impl"]),
                 security_profile=str(outputs["security_profile"]),
                 connection=dict(outputs["connection"]),
@@ -455,8 +458,11 @@ class LocalLabBackend:
             "portal_service_health": bool(raw.get("portal_service_health", True)),
         }
         compliance_controls: dict[str, bool] = {
-            "ssh_root_login": bool(raw_compliance.get("ssh_root_login", True)),
-            "ssh_password_authentication": bool(raw_compliance.get("ssh_password_authentication", True)),
+            # Mirror ssh_root_login from primary controls so drift/remediation stays in sync
+            "ssh_root_login": bool(raw.get("ssh_root_login", True)),
+            "ssh_password_authentication": bool(
+                raw_compliance.get("ssh_password_authentication", True)
+            ),
         }
         all_failing = list(
             dict.fromkeys(
@@ -466,7 +472,17 @@ class LocalLabBackend:
         )
 
         state["scan_count"] = int(state.get("scan_count", 0)) + 1
-        pct = self._score_pct(controls)
+        # Score on the union of controls and compliance_controls; shared keys require both to pass
+        all_control_names = set(controls.keys()) | set(compliance_controls.keys())
+        all_controls: dict[str, bool] = {}
+        for name in all_control_names:
+            passed = True
+            if name in controls:
+                passed = passed and controls[name]
+            if name in compliance_controls:
+                passed = passed and compliance_controls[name]
+            all_controls[name] = passed
+        pct = self._score_pct(all_controls)
         trend = state.setdefault("trend", [])
         trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
         del trend[8:]
@@ -553,7 +569,9 @@ class LocalLabBackend:
         state["controls"] = controls
         state["compliance_controls"] = compliance_controls
         state["scan_count"] = int(state.get("scan_count", 0)) + 1
-        pct = self._score_pct(controls)
+        # Score on union of all controls so trend is consistent with pass/fail determination
+        all_controls: dict[str, bool] = {**controls, **compliance_controls}
+        pct = self._score_pct(all_controls)
         trend = state.setdefault("trend", [])
         trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
         del trend[8:]
@@ -720,12 +738,17 @@ class LocalLabBackend:
                 "ssh_root_login": True,
                 "portal_service_health": True,
             }
+            rem_compliance: dict[str, bool] = {
+                "ssh_root_login": True,
+                "ssh_password_authentication": True,
+            }
             response = self._record_action(
                 ActionName.RUN_REMEDIATION.value,
                 ActionStatus.SUCCEEDED.value,
                 "run_remediation succeeded (mock): all controls restored",
                 "ok",
                 controls=rem_controls,
+                compliance_controls=rem_compliance,
             )
             if self._load_state().get("eda_enabled"):
                 self._append_eda_event("remediation complete - all drift cleared", "ok")
@@ -735,7 +758,9 @@ class LocalLabBackend:
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
         try:
-            ssh_job = self._run_playbook("playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir))
+            ssh_job = self._run_playbook(
+                "playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir)
+            )
             svc_vars = self._ansible_vars(env_dir)
             svc_vars.update({"drift_action": "remediate", "portal_service": str(current["portal"])})
             svc_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
@@ -790,7 +815,7 @@ class LocalLabBackend:
         self._mutate_state(mutate)
         self._append_eda_event("synthetic incident emitted", "warn")
         return self._record_action(
-            "inject_synthetic_incident",
+            ActionName.INJECT_SYNTHETIC_INCIDENT.value,
             ActionStatus.SUCCEEDED.value,
             "synthetic incident injected: demo incident added to feed",
             "warn",
@@ -818,6 +843,7 @@ class LocalLabBackend:
         environment_name: str,
         portal: str,
         profile: str,
+        target: str = "local-lab",
     ) -> dict[str, Any]:
         self._run(
             [
@@ -916,9 +942,7 @@ class LocalLabBackend:
         awx_username = os.getenv("AWX_USERNAME", "").strip()
         awx_password = os.getenv("AWX_PASSWORD", "").strip()
         if not awx_host or not awx_username or not awx_password:
-            raise RuntimeError(
-                "AWX execution requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD"
-            )
+            raise RuntimeError("AWX execution requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD")
         if not awx_host.startswith("https://"):
             raise RuntimeError("AWX_HOST must use an https:// URL")
 
