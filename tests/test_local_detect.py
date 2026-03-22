@@ -125,6 +125,7 @@ def test_detect_local_target_handles_osrelease_read_error(
     monkeypatch.delenv("WSL_DISTRO_NAME", raising=False)
 
     original_exists = Path.exists
+    original_read_text = Path.read_text
 
     def fake_exists(path: Path) -> bool:
         if str(path) in {
@@ -141,7 +142,7 @@ def test_detect_local_target_handles_osrelease_read_error(
     def fake_read_text(path: Path, encoding: str = "utf-8") -> str:
         if str(path) == "/proc/sys/kernel/osrelease":
             raise OSError("permission denied")
-        return original_exists(path)
+        return original_read_text(path, encoding=encoding)
 
     monkeypatch.setattr(Path, "exists", fake_exists)
     monkeypatch.setattr(Path, "read_text", fake_read_text)
