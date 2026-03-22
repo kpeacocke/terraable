@@ -790,12 +790,14 @@ class LocalLabBackend:
             )
             raise
         controls = self._read_controls(env_dir)
+        compliance_controls = self._read_compliance_controls(env_dir)
         response = self._record_action(
             ActionName.RUN_REMEDIATION.value,
             ActionStatus.SUCCEEDED.value,
             "run_remediation succeeded: restored PermitRootLogin no and portal service running",
             "ok",
             controls=controls,
+            compliance_controls=compliance_controls,
         )
         if self._load_state().get("eda_enabled"):
             self._append_eda_event("remediation complete - all drift cleared", "ok")

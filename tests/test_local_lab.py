@@ -307,6 +307,10 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
         "ssh_root_login": True,
         "portal_service_health": True,
     }
+    assert remediation["state"]["compliance_controls"] == {
+        "ssh_root_login": True,
+        "ssh_password_authentication": True,
+    }
     assert remediation["state"]["jobs"]["last_action"] == "run_remediation"
     assert remediation["state"]["jobs"]["last_status"] == "succeeded"
 
