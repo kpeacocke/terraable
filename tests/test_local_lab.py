@@ -949,9 +949,26 @@ def test_inject_synthetic_incident_respects_eda_disabled_state(tmp_path: Path) -
     result = backend.inject_synthetic_incident()
 
     assert result["status"] == "succeeded"
-    # When EDA is disabled, the response should not include or refresh state
+    assert result["tone"] == "ok"
     state = backend.get_state()
     assert state["incidents"]  # incident should still be added to feed
+    assert state["eda_history"] == []
+
+
+@pytest.mark.unit
+def test_inject_synthetic_incident_emits_eda_event_when_enabled(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    state = backend.get_state()
+    state["eda_enabled"] = True
+    backend._save_state(state)
+
+    result = backend.inject_synthetic_incident()
+
+    assert result["status"] == "succeeded"
+    assert result["tone"] == "warn"
+    state = backend.get_state()
+    assert state["incidents"]
+    assert any("synthetic incident emitted" in item["message"] for item in state["eda_history"])
 
 
 @pytest.mark.unit
@@ -1173,7 +1190,7 @@ def test_awx_request_raises_on_non_object_response(
         def read(self) -> bytes:
             return json.dumps(["not-an-object"]).encode("utf-8")
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
 
     with pytest.raises(RuntimeError, match="not a JSON object"):
         backend._awx_request(
@@ -1232,7 +1249,7 @@ def test_awx_run_raises_when_job_times_out(tmp_path: Path, monkeypatch: pytest.M
         raise AssertionError(f"Unexpected path {path}")
 
     monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
-    monkeypatch.setattr("terraable.local_lab.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("terraable.local_lab.time.sleep", lambda _seconds: None)
 
     with pytest.raises(RuntimeError, match="timed out"):
         backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
@@ -1252,7 +1269,7 @@ def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.Mon
         def read(self) -> bytes:
             return json.dumps({"status": "ok"}).encode("utf-8")
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
 
     payload = backend._awx_request(
         "https://awx.example.invalid",
@@ -1281,7 +1298,7 @@ def test_awx_request_raises_on_json_decode_error(
         def read(self) -> bytes:
             return b"{invalid-json"
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
 
     with pytest.raises(RuntimeError, match="AWX API response parse failed"):
         backend._awx_request(

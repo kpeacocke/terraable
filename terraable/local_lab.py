@@ -970,7 +970,9 @@ class LocalLabBackend:
             method="GET",
         )
         results = template_response.get("results", [])
-        first_result = cast(dict[str, Any], results[0] if isinstance(results, list) and results else {})
+        first_result = cast(
+            dict[str, Any], results[0] if isinstance(results, list) and results else {}
+        )
         template_id = int(first_result.get("id", 0))
         if not template_id:
             raise RuntimeError(f"AWX template not found: {template_name}")

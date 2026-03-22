@@ -24,11 +24,11 @@ __all__ = [
     "HcpTerraformClient",
     "HcpTerraformConfig",
     "LocalLabBackend",
-    "detect_local_target",
     "PortalImplementation",
     "SecurityProfile",
     "TargetPlatform",
     "__version__",
     "build_handoff_payload",
+    "detect_local_target",
     "validate_target_combination",
 ]
