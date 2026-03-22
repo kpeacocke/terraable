@@ -496,9 +496,20 @@
     let latestState = {};
 
     function updateComplianceScore() {
-      const total = Object.keys(controls).length;
-      const passing = Object.values(controls).filter(Boolean).length;
-      const pct = Math.round((passing / total) * 100);
+      // Merge controls and compliance_controls using AND-logic for shared keys,
+      // matching the backend scoring so UI percentage matches the trend score.
+      const allControls = Object.assign({}, controls);
+      const complianceControls = latestState.compliance_controls || {};
+      for (const [name, pass] of Object.entries(complianceControls)) {
+        if (name in allControls) {
+          allControls[name] = allControls[name] && Boolean(pass);
+        } else {
+          allControls[name] = Boolean(pass);
+        }
+      }
+      const total = Object.keys(allControls).length;
+      const passing = Object.values(allControls).filter(Boolean).length;
+      const pct = total > 0 ? Math.round((passing / total) * 100) : 0;
       scorePctEl.textContent = `${pct}%`;
       scoreBarFill.style.width = `${pct}%`;
       let scoreTone = "";
@@ -508,7 +519,7 @@
       scoreBarFill.className = `score-bar-fill${scoreTone}`;
 
       controlStatusEl.innerHTML = "";
-      for (const [name, pass] of Object.entries(controls)) {
+      for (const [name, pass] of Object.entries(allControls)) {
         const li = document.createElement("li");
         li.className = pass ? "ok" : "fail";
         li.textContent = `${name}: ${pass ? "pass" : "FAIL"}`;

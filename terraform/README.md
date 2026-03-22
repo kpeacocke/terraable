@@ -16,6 +16,8 @@ Terraform content for substrate provisioning and HCP Terraform handoff outputs.
 | `modules/substrate_parallels` | Parallels local substrate | Phase 3 local target scaffold |
 | `modules/substrate_hyperv` | Hyper-V local substrate | Phase 3 local target scaffold |
 
+> **Lock files**: Terraform provider lock files (`.terraform.lock.hcl`) are not committed for the Phase 3 scaffold modules (`substrate_gcp`, `substrate_vmware`, `substrate_parallels`, `substrate_hyperv`) because they do not yet define provider blocks. Lock files will be added in Phase 2 when provider and resource definitions are wired in.
+
 ## Contract outputs
 
 All modules emit a consistent set of outputs consumed by the Terraform-to-Ansible handoff contract. See [`docs/handoff-contract.md`](../docs/handoff-contract.md) for the full schema.

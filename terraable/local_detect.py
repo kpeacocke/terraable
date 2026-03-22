@@ -9,8 +9,15 @@ from pathlib import Path
 def detect_local_target() -> dict[str, str]:
     """Return a best-effort local target suggestion and rationale.
 
-    The helper intentionally favours deterministic checks that work in
-    containers and CI: explicit environment markers first, then host binaries.
+    Detection order (highest confidence first):
+    1. Environment variables: ``VMWARE_VERSION``, ``PARALLELS_VM_NAME``, ``WSL_DISTRO_NAME``.
+    2. Host binaries: ``vmrun`` (VMware), ``prlctl`` (Parallels).
+    3. Kernel osrelease: ``microsoft`` in ``/proc/sys/kernel/osrelease`` → Hyper-V/WSL.
+    4. Default fallback: ``local-lab``.
+
+    Docker and KVM detection are not implemented here; those environments map to
+    the ``local-lab`` default target and are not given a dedicated substrate module
+    in the current phase.
     """
 
     env_markers = {

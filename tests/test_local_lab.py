@@ -323,13 +323,20 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
     )
 
     assert result["status"] == "failed"
-    assert "supported local targets" in result["detail"]
+    assert "supported live targets" in result["detail"]
 
 
 @pytest.mark.unit
-def test_local_virtualisation_targets_are_executable(tmp_path: Path) -> None:
-    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
-    backend = _FakeLocalLabBackend(tmp_path)
+def test_local_virtualisation_targets_are_executable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """vmware/parallels/hyper-v targets are executable in mock mode.
+
+    In live mode these targets are not yet wired to a Terraform config;
+    use TERRAABLE_MOCK_MODE=true to exercise the full lifecycle.
+    """
+    monkeypatch.setenv("TERRAABLE_MOCK_MODE", "true")
+    backend = LocalLabBackend(tmp_path, clock=lambda: 1_700_000_000.0)
 
     result = backend.create_environment(
         target="vmware",
@@ -340,7 +347,6 @@ def test_local_virtualisation_targets_are_executable(tmp_path: Path) -> None:
 
     assert result["status"] == "succeeded"
     assert result["state"]["current"]["target"] == "vmware"
-    assert result["state"]["terraform"]["status"] == "applied"
 
 
 @pytest.mark.unit
@@ -581,7 +587,7 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
     ]
-    assert "target=aws is not executable yet; select local-lab" in auth["blockers"]
+    assert "target=aws is not executable in live mode; supported live targets: local-lab" in auth["blockers"]
 
 
 @pytest.mark.unit

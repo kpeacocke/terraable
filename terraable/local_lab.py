@@ -33,6 +33,10 @@ SUPPORTED_EXECUTION_TARGETS = {
     "parallels",
     "hyper-v",
 }
+# Targets wired to a live Terraform config. vmware/parallels/hyper-v substrate
+# modules are scaffolded (contract outputs only) and not yet connected to
+# _terraform_apply(); they run correctly in mock mode only.
+LIVE_EXECUTION_TARGETS = {"local-lab"}
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
 STATE_LOG_LIMIT = 50
 CREDENTIAL_KEYS = (
@@ -194,16 +198,8 @@ class LocalLabBackend:
         authenticated = not missing
         source = self._auth_source(requirements)
 
-        target_ready = target in SUPPORTED_EXECUTION_TARGETS
-        portal_ready = (
-            portal in {"backstage", "rhdh"}
-            if target in SUPPORTED_EXECUTION_TARGETS
-            else portal
-            in {
-                "backstage",
-                "rhdh",
-            }
-        )
+        target_ready = target in LIVE_EXECUTION_TARGETS
+        portal_ready = portal in {"backstage", "rhdh"}
         ready = authenticated and target_ready and portal_ready
 
         display_requirements = [self._display_requirement_key(key) for key in requirements]
@@ -213,8 +209,9 @@ class LocalLabBackend:
         if missing:
             blockers.append(f"missing credentials: {', '.join(display_missing)}")
         if not target_ready:
+            supported = ", ".join(sorted(LIVE_EXECUTION_TARGETS))
             blockers.append(
-                f"target={target} is not executable yet; select {SUPPORTED_EXECUTION_TARGET}"
+                f"target={target} is not executable in live mode; supported live targets: {supported}"
             )
         if not portal_ready:
             blockers.append(f"portal={portal} is not supported")
@@ -298,13 +295,14 @@ class LocalLabBackend:
                 "ok",
             )
 
-        if target not in SUPPORTED_EXECUTION_TARGETS:
+        if target not in LIVE_EXECUTION_TARGETS:
             return self._record_action(
                 ActionName.CREATE_ENVIRONMENT.value,
                 ActionStatus.FAILED.value,
                 (
-                    f"target={target} is not executable yet; supported local targets are "
-                    f"{', '.join(sorted(SUPPORTED_EXECUTION_TARGETS))}."
+                    f"target={target} is not wired to a live Terraform config; "
+                    f"supported live targets: {', '.join(sorted(LIVE_EXECUTION_TARGETS))}. "
+                    "Use mock mode (TERRAABLE_MOCK_MODE=true) to exercise other targets."
                 ),
                 "fail",
             )
@@ -799,12 +797,13 @@ class LocalLabBackend:
     def inject_synthetic_incident(self) -> dict[str, Any]:
         """Emit a synthetic incident event for demo storytelling."""
 
+        timestamp = int(self._clock())
         incident = {
-            "id": f"incident-{int(self._clock())}",
+            "id": f"incident-{timestamp}",
             "severity": "high",
             "component": "control-plane",
             "message": "Synthetic incident emitted for demo narrative control.",
-            "created_at": int(self._clock()),
+            "created_at": timestamp,
         }
 
         def mutate(state: dict[str, Any]) -> None:
@@ -1228,8 +1227,8 @@ class LocalLabBackend:
         return {
             "stages": traces,
             "summary": {
-                "last_stage": str(jobs.get("last_action", "terraform")),
-                "last_status": str(jobs.get("last_status", terraform.get("status", "idle"))),
+                "last_stage": str(jobs.get("last_action") or "terraform"),
+                "last_status": str(jobs.get("last_status") or terraform.get("status", "idle")),
             },
         }
 
