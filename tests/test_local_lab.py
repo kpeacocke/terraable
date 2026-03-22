@@ -587,7 +587,10 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
     ]
-    assert "target=aws is not executable in live mode; supported live targets: local-lab" in auth["blockers"]
+    assert (
+        "target=aws is not executable in live mode; supported live targets: local-lab"
+        in auth["blockers"]
+    )
 
 
 @pytest.mark.unit

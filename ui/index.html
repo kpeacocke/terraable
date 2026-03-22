@@ -498,7 +498,7 @@
     function updateComplianceScore() {
       // Merge controls and compliance_controls using AND-logic for shared keys,
       // matching the backend scoring so UI percentage matches the trend score.
-      const allControls = Object.assign({}, controls);
+      const allControls = { ...controls };
       const complianceControls = latestState.compliance_controls || {};
       for (const [name, pass] of Object.entries(complianceControls)) {
         if (name in allControls) {

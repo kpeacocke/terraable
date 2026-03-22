@@ -807,7 +807,7 @@ class LocalLabBackend:
         """Emit a synthetic incident event for demo storytelling."""
 
         timestamp = int(self._clock())
-        incident = {
+        incident: dict[str, Any] = {
             "id": f"incident-{timestamp}",
             "severity": "high",
             "component": "control-plane",
@@ -829,7 +829,6 @@ class LocalLabBackend:
                 ActionStatus.SUCCEEDED.value,
                 "synthetic incident injected: demo incident added to feed",
                 "warn",
-                state=state,
             )
         return self._record_action(
             ActionName.INJECT_SYNTHETIC_INCIDENT.value,
@@ -860,7 +859,7 @@ class LocalLabBackend:
         environment_name: str,
         portal: str,
         profile: str,
-        target: str = "local-lab",
+        target: str = "local-lab",  # noqa: ARG002  # NOSONAR
     ) -> dict[str, Any]:
         self._run(
             [
@@ -971,7 +970,7 @@ class LocalLabBackend:
             method="GET",
         )
         results = template_response.get("results", [])
-        first_result = results[0] if isinstance(results, list) and results else {}
+        first_result = cast(dict[str, Any], results[0] if isinstance(results, list) and results else {})
         template_id = int(first_result.get("id", 0))
         if not template_id:
             raise RuntimeError(f"AWX template not found: {template_name}")
@@ -1025,7 +1024,7 @@ class LocalLabBackend:
         method: str,
         body: bytes | None = None,
     ) -> dict[str, Any]:
-        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+        token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
         request = Request(
             url=f"{host}{path}",
             method=method,
@@ -1155,7 +1154,7 @@ class LocalLabBackend:
         def mutate(state: dict[str, Any]) -> None:
             jobs = _as_str_any_dict(state.get("jobs"))
             history = cast(list[dict[str, Any]], jobs.get("history", []))
-            record = {
+            record: dict[str, Any] = {
                 "action": action,
                 "status": status,
                 "detail": detail,
