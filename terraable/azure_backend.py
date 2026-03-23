@@ -98,7 +98,7 @@ class AzureBackend(LocalLabBackend):
 
         if self._mock_mode:
             environment_name = f"mock-azure-{int(self._clock())}"
-            run_id = f"mock-azure-{environment_name}"
+            run_id = environment_name
             self._set_terraform_status(
                 status="applied",
                 detail=f"mock terraform apply completed for {environment_name}",
@@ -156,7 +156,7 @@ class AzureBackend(LocalLabBackend):
             )
 
         environment_name = f"azure-{int(self._clock())}"
-        run_id = f"azure-{environment_name}"
+        run_id = environment_name
         env_dir = self._ensure_environment(
             environment_name,
             ansible_inventory_group="azure_vms",

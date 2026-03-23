@@ -871,8 +871,8 @@
 
     async function runAction(btn, pendingLabel, action, payload) {
       const scopedPayload = {
-        target: selected("target"),
         ...payload,
+        target: selected("target"),
       };
       await withPending(btn, pendingLabel, async () => {
         try {
