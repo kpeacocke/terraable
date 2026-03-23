@@ -240,6 +240,37 @@
     }
     .auth-status.ok { color: #5ba352; }
     .auth-status.fail { color: #f56d63; }
+    .metric-grid {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .metric-card {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 8px;
+      background: #1a1c1f;
+    }
+    .metric-card.ok { border-color: var(--ok); }
+    .metric-card.warn { border-color: var(--warn); }
+    .metric-card.fail { border-color: var(--fail); }
+    .metric-label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      display: block;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      line-height: 1.2;
+      word-break: break-word;
+    }
     .hint {
       margin-top: 8px;
       font-size: 0.76rem;
@@ -458,6 +489,7 @@
       <article class="panel">
         <h2>Observability Dashboard</h2>
         <div id="observability-summary" class="hint"></div>
+        <div id="observability-metrics" class="metric-grid"></div>
         <ul id="observability-stages" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false"></ul>
       </article>
     </section>
@@ -469,6 +501,7 @@
     const edaHistory = document.getElementById("eda-history");
     const incidentFeed = document.getElementById("incident-feed");
     const observabilitySummary = document.getElementById("observability-summary");
+    const observabilityMetrics = document.getElementById("observability-metrics");
     const observabilityStages = document.getElementById("observability-stages");
     const controlStatusEl = document.getElementById("control-status");
     const complianceControlsEl = document.getElementById("compliance-controls");
@@ -540,6 +573,7 @@
       evidence.innerHTML = "";
       edaHistory.innerHTML = "";
       incidentFeed.innerHTML = "";
+      observabilityMetrics.innerHTML = "";
       observabilityStages.innerHTML = "";
       complianceControlsEl.innerHTML = "";
       targetSuggestionEl.textContent = "Target suggestion unavailable while API is offline.";
@@ -629,23 +663,111 @@
       }
     }
 
+    function formatTimestamp(unixSeconds) {
+      const at = Number(unixSeconds || 0);
+      if (!at) {
+        return "n/a";
+      }
+      return new Date(at * 1000).toLocaleString("en-AU", { hour12: false });
+    }
+
+    function statusTone(status, okStatuses = []) {
+      if (status === "failed") {
+        return "fail";
+      }
+      if (okStatuses.includes(status)) {
+        return "ok";
+      }
+      return "warn";
+    }
+
+    function renderMetricCard(tile) {
+      const card = document.createElement("div");
+      card.className = `metric-card ${tile.tone}`;
+
+      const label = document.createElement("span");
+      label.className = "metric-label";
+      label.textContent = tile.label;
+
+      const value = document.createElement("span");
+      value.className = "metric-value";
+      value.textContent = tile.value;
+
+      card.appendChild(label);
+      card.appendChild(value);
+      observabilityMetrics.appendChild(card);
+    }
+
+    function buildMetricTiles(observability) {
+      const reliability = observability?.metrics?.reliability || {};
+      const tfMetrics = observability?.metrics?.terraform || {};
+      const workflowMetrics = observability?.metrics?.workflow || {};
+      const signals = observability?.metrics?.signal_counts || {};
+
+      const tfStatus = tfMetrics.status || "idle";
+      const tfRunSuffix = tfMetrics.run_id ? ` (${tfMetrics.run_id})` : "";
+      const tfTone = statusTone(tfStatus, ["applied"]);
+
+      const workflowStatus = workflowMetrics.last_status || "idle";
+      const workflowTone = statusTone(workflowStatus, ["succeeded"]);
+
+      const failedStages = Number(reliability.failed_stages || 0);
+      const reliabilityTone = failedStages > 0 ? "fail" : "ok";
+      const incidentsCount = Number(signals.incidents || 0);
+      const signalsTone = incidentsCount > 0 ? "warn" : "ok";
+
+      return [
+        {
+          label: "Terraform",
+          value: `${tfStatus}${tfRunSuffix}`,
+          tone: tfTone,
+        },
+        {
+          label: "Workflow",
+          value: `${workflowMetrics.last_action || "n/a"} (${workflowStatus})`,
+          tone: workflowTone,
+        },
+        {
+          label: "Reliability",
+          value: `${reliability.success_rate_pct ?? 0}% (${reliability.successful_stages ?? 0}/${reliability.total_stages ?? 0})`,
+          tone: reliabilityTone,
+        },
+        {
+          label: "Signals",
+          value: `evidence ${signals.evidence ?? 0} | eda ${signals.eda_events ?? 0} | incidents ${signals.incidents ?? 0}`,
+          tone: signalsTone,
+        },
+      ];
+    }
+
+    function renderObservabilityStage(stage) {
+      const item = document.createElement("li");
+      item.className = statusTone(stage.status, ["succeeded", "applied"]);
+      const deps = (stage.depends_on || []).join(", ") || "none";
+      const atText = formatTimestamp(stage.at);
+      const detail = stage.detail ? ` | detail=${stage.detail}` : "";
+      item.textContent = `${stage.stage}: ${stage.status} | at=${atText} | depends_on=${deps}${detail}`;
+      observabilityStages.appendChild(item);
+    }
+
     function renderObservability(observability) {
       observabilitySummary.textContent = "";
+      observabilityMetrics.innerHTML = "";
       observabilityStages.innerHTML = "";
       const summary = observability?.summary || {};
-      observabilitySummary.textContent = `Last stage: ${summary.last_stage || "n/a"} (${summary.last_status || "n/a"})`;
+
+      const reliability = observability?.metrics?.reliability || {};
+      const summaryRate = Number(summary.success_rate_pct ?? reliability.success_rate_pct ?? 0);
+      const summaryUpdatedText = formatTimestamp(summary.last_updated_at);
+      observabilitySummary.textContent = `Last stage: ${summary.last_stage || "n/a"} (${summary.last_status || "n/a"}) | Success rate: ${summaryRate}% | Updated: ${summaryUpdatedText}`;
+
+      const metricTiles = buildMetricTiles(observability);
+      for (const tile of metricTiles) {
+        renderMetricCard(tile);
+      }
+
       for (const stage of observability?.stages || []) {
-        const item = document.createElement("li");
-        let stageClass = "warn";
-        if (stage.status === "succeeded" || stage.status === "applied") {
-          stageClass = "ok";
-        } else if (stage.status === "failed") {
-          stageClass = "fail";
-        }
-        item.className = stageClass;
-        const deps = (stage.depends_on || []).join(", ") || "none";
-        item.textContent = `${stage.stage}: ${stage.status} | depends_on=${deps}`;
-        observabilityStages.appendChild(item);
+        renderObservabilityStage(stage);
       }
     }
 
