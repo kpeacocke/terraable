@@ -17,10 +17,10 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 | `vmware` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Uses Terraform contract scaffold. |
 | `parallels` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to localhost management host. |
 | `hyper-v` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to localhost Hyper-V host. |
-| `aws` | Live-executable via dedicated backend (`AWSBackend`). Requires AWS IAM credentials. |
-| `azure` | Live-executable via dedicated backend (`AzureBackend`). Requires ARM service principal. |
-| `okd` | Live-executable via dedicated backend (`OKDBackend`). Requires OpenShift API token. |
-| `openshift` | Contract and module scaffolding only. Provider execution path pending Phase 2. |
+| `aws` | Live-executable via dedicated backend (`AWSBackend`). Requires AWS IAM credentials and `HCP_TERRAFORM_TOKEN`. |
+| `azure` | Live-executable via dedicated backend (`AzureBackend`). Requires ARM service principal and `HCP_TERRAFORM_TOKEN`. |
+| `okd` | Live-executable via dedicated backend (`OKDBackend`). Requires OpenShift API token and `HCP_TERRAFORM_TOKEN`. |
+| `openshift` | Contract and module scaffolding only. Appears in the contract docs, but current control-plane API target routing does not provide an OpenShift backend path yet (planned Phase 2). |
 
 ## AWX setup
 

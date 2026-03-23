@@ -15,7 +15,7 @@ New contributors can get a fully offline demo running in under five minutes:
 2. Copy the sample environment file and start the control plane in offline mode:
 
   ```bash
-  cp .env.example .env   # TERRAABLE_MOCK_MODE=true is already set
+  cp .env.example .env   # credential template only
   python3 -m venv .venv && source .venv/bin/activate
   pip install poetry && poetry install
   TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000

@@ -4,7 +4,7 @@
 
 ```bash
 git clone https://github.com/<your-username>/terraable.git && cd terraable
-cp .env.example .env          # safe defaults — TERRAABLE_MOCK_MODE=true pre-enabled
+cp .env.example .env          # credential template only
 python3 -m venv .venv && source .venv/bin/activate
 pip install poetry && poetry install
 TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
@@ -24,10 +24,10 @@ Continue reading this guide to verify the setup, choose a mode, and advance to l
 | `vmware` | Yes | HCP Terraform token | Uses local Terraform data resource |
 | `parallels` | Yes | HCP Terraform token | Defaults to localhost management host |
 | `hyper-v` | Yes | HCP Terraform token | Defaults to localhost Hyper-V host |
-| `aws` | Yes (dedicated backend) | AWS IAM credentials | `substrate_aws` module |
-| `azure` | Yes (dedicated backend) | ARM service principal | `substrate_azure` module |
-| `okd` | Yes (dedicated backend) | OpenShift token | `substrate_okd` module |
-| `openshift` | Contract scaffold only | — | Phase 2 resource wiring pending |
+| `aws` | Yes (dedicated backend) | HCP Terraform token + AWS IAM credentials | `substrate_aws` module |
+| `azure` | Yes (dedicated backend) | HCP Terraform token + ARM service principal | `substrate_azure` module |
+| `okd` | Yes (dedicated backend) | HCP Terraform token + OpenShift token | `substrate_okd` module |
+| `openshift` | No (not selectable via current control-plane UI/API) | — | Contract scaffold only; Phase 2 resource wiring pending |
 
 For credential details and minimum-scope guidance, see [credentials-matrix.md](credentials-matrix.md).
 
@@ -156,7 +156,6 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 | Tests fail on import | Missing dependencies | Re-run `poetry install` |
 | AWX bootstrap fails auth | Wrong credentials | Check `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD` in `.env` |
 | EDA webhook not firing | EDA mode disabled | Set EDA mode to `enabled` in the UI |
-| `local-lab + rhdh` rejected | Unsupported combination | Use `backstage` portal with `local-lab` target |
 | `gcp` target auth blocked | Missing credentials | Set `GOOGLE_APPLICATION_CREDENTIALS` and `HCP_TERRAFORM_TOKEN` in `.env`; `TERRAABLE_MOCK_MODE=true` bypasses this |
 | `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP token | Set `HCP_TERRAFORM_TOKEN` in `.env`; `TERRAABLE_MOCK_MODE=true` bypasses this |
 | UI stuck on `live-local-lab` after switching target | Stale backend cache | Reload the page; all local targets share one backend instance |
