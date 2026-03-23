@@ -134,6 +134,9 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             payload = self._read_json_payload()
             raw_credentials = payload.get("credentials")
             target = str(payload.get("target", "local-lab"))
+            normalized_target = (
+                target if target in self.supported_targets else "local-lab"
+            )
             portal = str(payload.get("portal", "backstage"))
             credentials: dict[str, str] = {}
             if isinstance(raw_credentials, dict):
@@ -142,10 +145,20 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 for key, value in credential_items:
                     if isinstance(key, str) and isinstance(value, str):
                         credentials[key] = value
-            backend = self.get_active_backend(target)
-            self._send_json(
-                {"auth": backend.configure_credentials(credentials, target=target, portal=portal)}
-            )
+
+            auth_by_target: dict[str, dict[str, Any]] = {}
+            for supported_target in sorted(self.supported_targets):
+                backend = self.get_active_backend(supported_target)
+                auth_by_target[supported_target] = cast(
+                    dict[str, Any],
+                    backend.configure_credentials(
+                        credentials,
+                        target=supported_target,
+                        portal=portal,
+                    ),
+                )
+
+            self._send_json({"auth": auth_by_target[normalized_target]})
         except Exception as exc:
             self.send_error(HTTPStatus.BAD_REQUEST, str(exc))
 

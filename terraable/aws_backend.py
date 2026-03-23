@@ -72,6 +72,12 @@ class AWSBackend(LocalLabBackend):
             status["ready"] = bool(status.get("authenticated")) and not status["blockers"]
         return status
 
+    def get_state(self) -> dict[str, Any]:
+        """Return persisted UI state with AWS-specific execution mode label."""
+        state = super().get_state()
+        state["mode"] = "offline-mock" if self._mock_mode else "live-aws"
+        return state
+
     @_serialize_backend_action
     def create_environment(
         self,

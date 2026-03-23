@@ -665,7 +665,7 @@ def test_handler_configure_passes_target_and_portal(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    captured: dict[str, str] = {}
+    captured_calls: list[tuple[str, str]] = []
 
     class _CapturingBackend(_FakeBackend):
         def configure_credentials(
@@ -675,8 +675,7 @@ def test_handler_configure_passes_target_and_portal(
             target: str = "local-lab",
             portal: str = "backstage",
         ) -> dict[str, object]:
-            captured["target"] = target
-            captured["portal"] = portal
+            captured_calls.append((target, portal))
             return super().configure_credentials(credentials, target=target, portal=portal)
 
     monkeypatch.setattr(api_server, "LocalLabBackend", _CapturingBackend)
@@ -702,8 +701,10 @@ def test_handler_configure_passes_target_and_portal(
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        urlopen(request)
-        assert captured == {"target": "aws", "portal": "rhdh"}
+        payload = json.loads(urlopen(request).read().decode("utf-8"))
+        assert payload["auth"]["ready"] is True
+        assert {target for target, _ in captured_calls} == {"local-lab", "aws", "azure", "okd"}
+        assert {portal for _, portal in captured_calls} == {"rhdh"}
     finally:
         server.shutdown()
         server.server_close()

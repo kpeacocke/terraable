@@ -245,6 +245,43 @@ def test_cloud_backends_get_auth_status_rejects_wrong_target(tmp_path: Path) -> 
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("backend_cls", "expected_mode"),
+    [
+        (AWSBackend, "live-aws"),
+        (AzureBackend, "live-azure"),
+        (OKDBackend, "live-okd"),
+    ],
+)
+def test_cloud_backends_report_target_specific_live_mode(
+    backend_cls: type[LocalLabBackend], expected_mode: str, tmp_path: Path
+) -> None:
+    backend = backend_cls(tmp_path)
+
+    state = backend.get_state()
+
+    assert state["mode"] == expected_mode
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "backend_cls",
+    [AWSBackend, AzureBackend, OKDBackend],
+)
+def test_cloud_backends_preserve_offline_mock_mode_label(
+    backend_cls: type[LocalLabBackend],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
+    backend = backend_cls(tmp_path)
+
+    state = backend.get_state()
+
+    assert state["mode"] == "offline-mock"
+
+
+@pytest.mark.unit
 def test_aws_create_environment_live_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

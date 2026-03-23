@@ -870,9 +870,13 @@
     }
 
     async function runAction(btn, pendingLabel, action, payload) {
+      const scopedPayload = {
+        target: selected("target"),
+        ...payload,
+      };
       await withPending(btn, pendingLabel, async () => {
         try {
-          const response = await api(`/api/actions/${action}`, payload);
+          const response = await api(`/api/actions/${action}`, scopedPayload);
           renderState(response.state);
         } catch (error) {
           setRuntimeBadge("API offline", String(error), true);
