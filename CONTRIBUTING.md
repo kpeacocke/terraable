@@ -8,18 +8,18 @@ New contributors can get a fully offline demo running in under five minutes:
 
 1. Fork this repository on GitHub and clone your fork:
 
-  ```bash
-  git clone https://github.com/<your-username>/terraable.git && cd terraable
-  ```
+    ```bash
+    git clone https://github.com/<your-username>/terraable.git && cd terraable
+    ```
 
 2. Copy the sample environment file and start the control plane in offline mode:
 
-  ```bash
-  cp .env.example .env   # credential template only
-  python3 -m venv .venv && source .venv/bin/activate
-  pip install poetry && poetry install
-  TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
-  ```
+    ```bash
+    cp .env.example .env   # credential template only
+    python3 -m venv .venv && source .venv/bin/activate
+    pip install poetry && poetry install
+    TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
+    ```
 
 3. Open `http://127.0.0.1:8000`. All UI actions return pre-seeded responses — no live credentials required.
 
