@@ -29,16 +29,26 @@ PORTAL_SERVICE_STATE_FILE = "portal_service.state"
 SUPPORTED_EXECUTION_TARGET = "local-lab"
 SUPPORTED_EXECUTION_TARGETS = {
     "local-lab",
+    "gcp",
     "vmware",
     "parallels",
     "hyper-v",
 }
-# Targets that this local-lab backend treats as wired to a live Terraform config.
-# vmware/parallels/hyper-v substrate modules are scaffolded (contract outputs only)
-# and not yet connected to _terraform_apply(); they run correctly in mock mode only.
-# AWS, Azure, and OKD are handled via their own backend classes and API-dispatch
-# paths, not via LIVE_EXECUTION_TARGETS in this module.
-LIVE_EXECUTION_TARGETS = {"local-lab"}
+# Targets wired to executable Terraform configs through module-level contract outputs.
+LIVE_EXECUTION_TARGETS = {
+    "local-lab",
+    "gcp",
+    "vmware",
+    "parallels",
+    "hyper-v",
+}
+TARGET_INVENTORY_GROUPS: dict[str, str] = {
+    "local-lab": "local_lab",
+    "gcp": "gcp_hosts",
+    "vmware": "vmware_hosts",
+    "parallels": "parallels_hosts",
+    "hyper-v": "hyperv_hosts",
+}
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
 STATE_LOG_LIMIT = 50
 CREDENTIAL_KEYS = (
@@ -161,15 +171,32 @@ class LocalLabBackend:
         self._credentials_lock = threading.RLock()
         self._credentials = self._bootstrap_credentials()
 
+    def _terraform_root_for_target(self, target: str) -> Path:
+        module_roots: dict[str, Path] = {
+            "local-lab": self.workspace_root / "integration" / "local_lab" / "terraform",
+            "gcp": self.workspace_root / "terraform" / "modules" / "substrate_gcp",
+            "vmware": self.workspace_root / "terraform" / "modules" / "substrate_vmware",
+            "parallels": self.workspace_root / "terraform" / "modules" / "substrate_parallels",
+            "hyper-v": self.workspace_root / "terraform" / "modules" / "substrate_hyperv",
+        }
+        return module_roots.get(target, self.terraform_root)
+
+    def _inventory_group_for_target(self, target: str) -> str:
+        return TARGET_INVENTORY_GROUPS.get(target, "local_lab")
+
     def get_state(self) -> dict[str, Any]:
         """Return persisted UI state."""
 
         state = self._load_state()
-        state["mode"] = "offline-mock" if self._mock_mode else "live-local-lab"
+        current = _as_str_any_dict(state.get("current"))
+        current_target = str(current.get("target", SUPPORTED_EXECUTION_TARGET))
+        if self._mock_mode:
+            state["mode"] = "offline-mock"
+        else:
+            state["mode"] = f"live-{current_target}"
         state["controller_mode"] = self._execution_mode
         state["target_suggestion"] = detect_local_target()
         state["observability"] = self._build_observability(state)
-        current = _as_str_any_dict(state.get("current"))
         target = str(current.get("target", SUPPORTED_EXECUTION_TARGET))
         portal = str(current.get("portal", "backstage"))
         state["auth"] = self.get_auth_status(target=target, portal=portal)
@@ -331,9 +358,12 @@ class LocalLabBackend:
                 "fail",
             )
 
-        environment_name = f"local-lab-{int(self._clock())}"
-        run_id = f"local-{environment_name}"
-        env_dir = self._ensure_environment(environment_name)
+        environment_name = f"{target}-{int(self._clock())}"
+        run_id = environment_name
+        env_dir = self._ensure_environment(
+            environment_name,
+            ansible_inventory_group=self._inventory_group_for_target(target),
+        )
         self._set_terraform_status(
             status="running",
             detail=f"terraform apply started for {environment_name}",
@@ -357,7 +387,7 @@ class LocalLabBackend:
                 portal_impl=str(outputs["portal_impl"]),
                 security_profile=str(outputs["security_profile"]),
                 connection=dict(outputs["connection"]),
-                metadata={"mode": "local-lab", "runtime_dir": str(env_dir)},
+                metadata={"mode": f"live-{target}", "runtime_dir": str(env_dir)},
             )
         except Exception as exc:  # pragma: no cover - exercised via tests with fakes
             self._set_terraform_status(
@@ -876,12 +906,13 @@ class LocalLabBackend:
         environment_name: str,
         portal: str,
         profile: str,
-        target: str = "local-lab",  # noqa: ARG002  # NOSONAR
+        target: str = "local-lab",
     ) -> dict[str, Any]:
+        terraform_root = self._terraform_root_for_target(target)
         self._run(
             [
                 "terraform",
-                f"-chdir={self.terraform_root}",
+                f"-chdir={terraform_root}",
                 "init",
                 "-input=false",
                 "-no-color",
@@ -893,7 +924,7 @@ class LocalLabBackend:
         self._run(
             [
                 "terraform",
-                f"-chdir={self.terraform_root}",
+                f"-chdir={terraform_root}",
                 "apply",
                 "-auto-approve",
                 "-input=false",
@@ -912,7 +943,7 @@ class LocalLabBackend:
         output = self._run(
             [
                 "terraform",
-                f"-chdir={self.terraform_root}",
+                f"-chdir={terraform_root}",
                 "output",
                 "-json",
                 f"-state={state_path}",

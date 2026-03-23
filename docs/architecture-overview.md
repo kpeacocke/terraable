@@ -28,6 +28,7 @@ Terraform provisions infrastructure. Ansible operationalises and enforces contro
 - Local target suggestion helper for `vmware`, `parallels`, and `hyper-v` with safe fallback to `local-lab`.
 - Synthetic incident feed generation for demo storytelling and EDA timeline visibility.
 - Observability dashboard view over Terraform and workflow stage status metadata.
+- Live execution wiring for `gcp`, `vmware`, `parallels`, and `hyper-v` via target-specific Terraform contract modules.
 
 ## Component Boundaries
 - Terraform content: substrate provisioning and outputs.

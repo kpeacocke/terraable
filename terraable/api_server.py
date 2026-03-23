@@ -56,7 +56,16 @@ def get_backend(workspace_root: Path, target: str) -> Any:
 
 
 class TerraableRequestHandler(BaseHTTPRequestHandler):
-    supported_targets: ClassVar[set[str]] = {"local-lab", "aws", "azure", "okd"}
+    supported_targets: ClassVar[set[str]] = {
+        "local-lab",
+        "aws",
+        "azure",
+        "okd",
+        "gcp",
+        "vmware",
+        "parallels",
+        "hyper-v",
+    }
     backends: ClassVar[dict[str, Any]] = {}
     backends_lock: ClassVar[threading.RLock] = threading.RLock()
     workspace_root: ClassVar[Path]
