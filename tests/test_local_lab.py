@@ -37,11 +37,12 @@ class _FakeLocalLabBackend(LocalLabBackend):
         environment_name: str,
         portal: str,
         profile: str,
+        target: str = "local-lab",
     ) -> dict[str, Any]:
         assert env_dir.exists()
         return {
             "environment_name": environment_name,
-            "target_platform": "local-lab",
+            "target_platform": target,
             "portal_impl": portal,
             "security_profile": profile,
             "connection": {
@@ -100,13 +101,15 @@ class _FakeLocalLabBackend(LocalLabBackend):
 
     def _handle_ssh_scan(self, env_dir: Path, extra_vars: dict[str, Any]) -> None:
         ssh_text = (env_dir / "sshd_config").read_text(encoding="utf-8")
-        status = "pass" if "PermitRootLogin no" in ssh_text else "fail"
+        root_login_status = "pass" if "PermitRootLogin no" in ssh_text else "fail"
+        password_auth_status = "pass" if "PasswordAuthentication no" in ssh_text else "fail"
         Path(str(extra_vars["scan_output_path"])).write_text(
             json.dumps(
                 {
                     "control": "ssh_root_login",
-                    "status": status,
+                    "status": root_login_status,
                     "evidence": "fake ssh scan",
+                    "ssh_password_authentication": password_auth_status,
                 }
             ),
             encoding="utf-8",
@@ -159,12 +162,14 @@ class _InspectableLocalLabBackend(LocalLabBackend):
         environment_name: str,
         portal: str,
         profile: str,
+        target: str = "local-lab",
     ) -> dict[str, Any]:
         return self._terraform_apply(
             env_dir,
             environment_name=environment_name,
             portal=portal,
             profile=profile,
+            target=target,
         )
 
     def ensure_environment_for_test(self, environment_name: str) -> Path:
@@ -281,6 +286,10 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
         "ssh_root_login": True,
         "portal_service_health": True,
     }
+    assert baseline["state"]["compliance_controls"] == {
+        "ssh_root_login": True,
+        "ssh_password_authentication": True,
+    }
     assert clean_scan["status"] == "succeeded"
     assert clean_scan["state"]["trend"][0] == {"pct": 100, "label": "Scan #1"}
     assert (
@@ -289,7 +298,7 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
     )
     assert svc_drift["state"]["controls"]["portal_service_health"] is False
     assert scan["status"] == "failed"
-    assert scan["state"]["trend"][0] == {"pct": 0, "label": "Scan #2"}
+    assert scan["state"]["trend"][0] == {"pct": 33, "label": "Scan #2"}
     assert (
         scan["state"]["eda_history"][0]["message"]
         == "compliance_drift event emitted for ssh_root_login, portal_service_health"
@@ -297,6 +306,10 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
     assert remediation["state"]["controls"] == {
         "ssh_root_login": True,
         "portal_service_health": True,
+    }
+    assert remediation["state"]["compliance_controls"] == {
+        "ssh_root_login": True,
+        "ssh_password_authentication": True,
     }
     assert remediation["state"]["jobs"]["last_action"] == "run_remediation"
     assert remediation["state"]["jobs"]["last_status"] == "succeeded"
@@ -314,7 +327,30 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
     )
 
     assert result["status"] == "failed"
-    assert "only local-lab is wired end-to-end" in result["detail"]
+    assert "supported live targets" in result["detail"]
+
+
+@pytest.mark.unit
+def test_local_virtualisation_targets_are_executable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """vmware/parallels/hyper-v targets are executable in mock mode.
+
+    In live mode these targets are not yet wired to a Terraform config;
+    use TERRAABLE_MOCK_MODE=true to exercise the full lifecycle.
+    """
+    monkeypatch.setenv("TERRAABLE_MOCK_MODE", "true")
+    backend = LocalLabBackend(tmp_path, clock=lambda: 1_700_000_000.0)
+
+    result = backend.create_environment(
+        target="vmware",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["state"]["current"]["target"] == "vmware"
 
 
 @pytest.mark.unit
@@ -555,7 +591,10 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
     ]
-    assert "target=aws is not executable yet; select local-lab" in auth["blockers"]
+    assert (
+        "target=aws is not executable in live mode; supported live targets: local-lab"
+        in auth["blockers"]
+    )
 
 
 @pytest.mark.unit
@@ -592,6 +631,8 @@ def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
 
     assert "auth" in state
     assert state["auth"]["ready"] is False
+    assert "target_suggestion" in state
+    assert "observability" in state
 
 
 @pytest.mark.unit
@@ -857,6 +898,7 @@ def test_mock_mode_full_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     state = backend.get_state()
     assert state["controls"]["ssh_root_login"] is True
     assert state["controls"]["portal_service_health"] is True
+    assert state["compliance_controls"]["ssh_root_login"] is True
 
 
 @pytest.mark.unit
@@ -886,6 +928,51 @@ def test_mock_mode_eda_events_on_drift_and_remediation(
     assert "state" in result
     state = backend.get_state()
     assert any("remediation complete" in e["message"] for e in state["eda_history"])
+
+
+@pytest.mark.unit
+def test_inject_synthetic_incident_updates_feed_and_evidence(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    result = backend.inject_synthetic_incident()
+
+    assert result["status"] == "succeeded"
+    state = backend.get_state()
+    assert state["incidents"]
+    assert state["incidents"][0]["id"].startswith("incident-")
+    assert any("synthetic incident" in item["message"] for item in state["evidence"])
+
+
+@pytest.mark.unit
+def test_inject_synthetic_incident_respects_eda_disabled_state(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    state = backend.get_state()
+    state["eda_enabled"] = False
+    backend._save_state(state)
+
+    result = backend.inject_synthetic_incident()
+
+    assert result["status"] == "succeeded"
+    assert result["tone"] == "ok"
+    state = backend.get_state()
+    assert state["incidents"]  # incident should still be added to feed
+    assert state["eda_history"] == []
+
+
+@pytest.mark.unit
+def test_inject_synthetic_incident_emits_eda_event_when_enabled(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    state = backend.get_state()
+    state["eda_enabled"] = True
+    backend._save_state(state)
+
+    result = backend.inject_synthetic_incident()
+
+    assert result["status"] == "succeeded"
+    assert result["tone"] == "warn"
+    state = backend.get_state()
+    assert state["incidents"]
+    assert any("synthetic incident emitted" in item["message"] for item in state["eda_history"])
 
 
 @pytest.mark.unit
@@ -978,9 +1065,7 @@ def test_invalid_execution_mode_defaults_to_direct(
 
 
 @pytest.mark.unit
-def test_awx_run_rejects_unmapped_playbook(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_rejects_unmapped_playbook(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -989,9 +1074,7 @@ def test_awx_run_rejects_unmapped_playbook(
 
 
 @pytest.mark.unit
-def test_awx_run_requires_awx_credentials(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_requires_awx_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1000,9 +1083,7 @@ def test_awx_run_requires_awx_credentials(
 
 
 @pytest.mark.unit
-def test_awx_run_requires_https_host(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_requires_https_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "http://awx.example.invalid")
     monkeypatch.setenv("AWX_USERNAME", "admin")
@@ -1066,9 +1147,7 @@ def test_awx_run_raises_when_launch_missing_job_id(
 
 
 @pytest.mark.unit
-def test_awx_run_raises_when_job_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_raises_when_job_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
     monkeypatch.setenv("AWX_USERNAME", "admin")
@@ -1115,7 +1194,7 @@ def test_awx_request_raises_on_non_object_response(
         def read(self) -> bytes:
             return json.dumps(["not-an-object"]).encode("utf-8")
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
 
     with pytest.raises(RuntimeError, match="not a JSON object"):
         backend._awx_request(
@@ -1148,9 +1227,7 @@ def test_awx_request_wraps_url_errors(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 @pytest.mark.unit
-def test_awx_run_raises_when_job_times_out(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_awx_run_raises_when_job_times_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
     monkeypatch.setenv("AWX_USERNAME", "admin")
@@ -1176,7 +1253,7 @@ def test_awx_run_raises_when_job_times_out(
         raise AssertionError(f"Unexpected path {path}")
 
     monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
-    monkeypatch.setattr("terraable.local_lab.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("terraable.local_lab.time.sleep", lambda _seconds: None)
 
     with pytest.raises(RuntimeError, match="timed out"):
         backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
@@ -1196,7 +1273,7 @@ def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.Mon
         def read(self) -> bytes:
             return json.dumps({"status": "ok"}).encode("utf-8")
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
 
     payload = backend._awx_request(
         "https://awx.example.invalid",
@@ -1225,7 +1302,7 @@ def test_awx_request_raises_on_json_decode_error(
         def read(self) -> bytes:
             return b"{invalid-json"
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda req, timeout=30: _Response())
+    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
 
     with pytest.raises(RuntimeError, match="AWX API response parse failed"):
         backend._awx_request(

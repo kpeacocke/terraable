@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
-import socket
 from collections.abc import Callable
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -159,6 +158,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             "run_compliance_scan": self.backend.run_compliance_scan,
             "inject_ssh_drift": self.backend.inject_ssh_drift,
             "inject_service_drift": self.backend.inject_service_drift,
+            "inject_synthetic_incident": self.backend.inject_synthetic_incident,
             "run_remediation": self.backend.run_remediation,
         }
         handler = simple.get(action)
@@ -212,7 +212,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         try:
             connection.settimeout(self.json_read_timeout_seconds)
             return self.rfile.read(length)
-        except (TimeoutError, socket.timeout) as exc:
+        except TimeoutError as exc:
             raise ValueError("Timed out while reading JSON payload") from exc
         finally:
             connection.settimeout(original_timeout)

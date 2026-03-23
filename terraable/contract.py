@@ -13,7 +13,11 @@ class TargetPlatform(StrEnum):
     OPENSHIFT = "openshift"
     AWS = "aws"
     AZURE = "azure"
+    GCP = "gcp"
     OKD = "okd"
+    VMWARE = "vmware"
+    PARALLELS = "parallels"
+    HYPER_V = "hyper-v"
     LOCAL_LAB = "local-lab"
 
 

@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 
 from .contract import build_handoff_payload
 from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, hostname_to_token_env_var
+from .local_detect import detect_local_target
 from .orchestrator import ActionName, ActionStatus
 
 DRIFT_SERVICE_PLAYBOOK = "playbooks/drift_service_health.yml"
@@ -26,6 +27,16 @@ MOCK_MODE_ENV_VAR = "TERRAABLE_MOCK_MODE"
 EXECUTION_MODE_ENV_VAR = "TERRAABLE_EXECUTION_MODE"
 PORTAL_SERVICE_STATE_FILE = "portal_service.state"
 SUPPORTED_EXECUTION_TARGET = "local-lab"
+SUPPORTED_EXECUTION_TARGETS = {
+    "local-lab",
+    "vmware",
+    "parallels",
+    "hyper-v",
+}
+# Targets wired to a live Terraform config. vmware/parallels/hyper-v substrate
+# modules are scaffolded (contract outputs only) and not yet connected to
+# _terraform_apply(); they run correctly in mock mode only.
+LIVE_EXECUTION_TARGETS = {"local-lab"}
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
 STATE_LOG_LIMIT = 50
 CREDENTIAL_KEYS = (
@@ -36,6 +47,7 @@ CREDENTIAL_KEYS = (
     "ARM_CLIENT_SECRET",
     "ARM_TENANT_ID",
     "ARM_SUBSCRIPTION_ID",
+    "GOOGLE_APPLICATION_CREDENTIALS",
     "OPENSHIFT_API_URL",
     "OPENSHIFT_TOKEN",
 )
@@ -54,6 +66,10 @@ TARGET_CREDENTIAL_REQUIREMENTS: dict[str, CredentialRequirements] = {
         "ARM_TENANT_ID",
         "ARM_SUBSCRIPTION_ID",
     ),
+    "gcp": (HCP_TOKEN_REQUIREMENT, "GOOGLE_APPLICATION_CREDENTIALS"),
+    "vmware": (HCP_TOKEN_REQUIREMENT,),
+    "parallels": (HCP_TOKEN_REQUIREMENT,),
+    "hyper-v": (HCP_TOKEN_REQUIREMENT,),
 }
 
 
@@ -136,6 +152,8 @@ class LocalLabBackend:
         state = self._load_state()
         state["mode"] = "offline-mock" if self._mock_mode else "live-local-lab"
         state["controller_mode"] = self._execution_mode
+        state["target_suggestion"] = detect_local_target()
+        state["observability"] = self._build_observability(state)
         current = _as_str_any_dict(state.get("current"))
         target = str(current.get("target", SUPPORTED_EXECUTION_TARGET))
         portal = str(current.get("portal", "backstage"))
@@ -180,16 +198,8 @@ class LocalLabBackend:
         authenticated = not missing
         source = self._auth_source(requirements)
 
-        target_ready = target == SUPPORTED_EXECUTION_TARGET
-        portal_ready = (
-            portal in {"backstage", "rhdh"}
-            if target == SUPPORTED_EXECUTION_TARGET
-            else portal
-            in {
-                "backstage",
-                "rhdh",
-            }
-        )
+        target_ready = target in LIVE_EXECUTION_TARGETS
+        portal_ready = portal in {"backstage", "rhdh"}
         ready = authenticated and target_ready and portal_ready
 
         display_requirements = [self._display_requirement_key(key) for key in requirements]
@@ -199,8 +209,9 @@ class LocalLabBackend:
         if missing:
             blockers.append(f"missing credentials: {', '.join(display_missing)}")
         if not target_ready:
+            supported = ", ".join(sorted(LIVE_EXECUTION_TARGETS))
             blockers.append(
-                f"target={target} is not executable yet; select {SUPPORTED_EXECUTION_TARGET}"
+                f"target={target} is not executable in live mode; supported live targets: {supported}"
             )
         if not portal_ready:
             blockers.append(f"portal={portal} is not supported")
@@ -271,6 +282,10 @@ class LocalLabBackend:
                 "runtime_vars": runtime_vars,
             }
             state["controls"] = {"ssh_root_login": True, "portal_service_health": True}
+            state["compliance_controls"] = {
+                "ssh_root_login": True,
+                "ssh_password_authentication": True,
+            }
             state["eda_enabled"] = eda == "enabled"
             self._save_state(state)
             return self._record_action(
@@ -280,11 +295,15 @@ class LocalLabBackend:
                 "ok",
             )
 
-        if target != SUPPORTED_EXECUTION_TARGET:
+        if target not in LIVE_EXECUTION_TARGETS:
             return self._record_action(
                 ActionName.CREATE_ENVIRONMENT.value,
                 ActionStatus.FAILED.value,
-                f"target={target} is not executable yet; only local-lab is wired end-to-end.",
+                (
+                    f"target={target} is not wired to a live Terraform config; "
+                    f"supported live targets: {', '.join(sorted(LIVE_EXECUTION_TARGETS))}. "
+                    "Use mock mode (TERRAABLE_MOCK_MODE=true) to exercise other targets."
+                ),
                 "fail",
             )
 
@@ -312,11 +331,14 @@ class LocalLabBackend:
                 environment_name=environment_name,
                 portal=portal,
                 profile=profile,
+                target=target,
             )
+            # Use the Terraform output target to ensure payload matches the actual provisioned infrastructure
+            tf_target = str(outputs.get("target_platform", target))
             payload = build_handoff_payload(
                 environment_name=str(outputs["environment_name"]),
                 terraform_run_id=run_id,
-                target_platform=str(outputs["target_platform"]),
+                target_platform=tf_target,
                 portal_impl=str(outputs["portal_impl"]),
                 security_profile=str(outputs["security_profile"]),
                 connection=dict(outputs["connection"]),
@@ -353,6 +375,7 @@ class LocalLabBackend:
         }
         state["eda_enabled"] = eda == "enabled"
         state["controls"] = self._read_controls(env_dir)
+        state["compliance_controls"] = self._read_compliance_controls(env_dir)
         self._save_state(state)
 
         return self._record_action(
@@ -394,12 +417,14 @@ class LocalLabBackend:
                 job=job,
             )
             controls = self._read_controls(env_dir)
+            compliance_controls = self._read_compliance_controls(env_dir)
             return self._record_action(
                 ActionName.APPLY_BASELINE.value,
                 ActionStatus.SUCCEEDED.value,
                 f"apply_baseline succeeded: operational workflow applied to {current['environment_name']}",
                 "ok",
                 controls=controls,
+                compliance_controls=compliance_controls,
             )
         except Exception as exc:
             self._set_job_status(
@@ -415,39 +440,75 @@ class LocalLabBackend:
         """Run executable compliance checks against the active local lab."""
 
         if self._mock_mode:
-            state = self._load_state()
-            raw = state.get("controls") or {"ssh_root_login": True, "portal_service_health": True}
-            mock_controls: dict[str, bool] = {
-                "ssh_root_login": bool(raw.get("ssh_root_login", True)),
-                "portal_service_health": bool(raw.get("portal_service_health", True)),
-            }
-            failing = [name for name, passed in mock_controls.items() if not passed]
-            state["scan_count"] = int(state.get("scan_count", 0)) + 1
-            pct = self._score_pct(mock_controls)
-            trend = state.setdefault("trend", [])
-            trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
-            del trend[8:]
-            self._save_state(state)
-            detail = (
-                f"run_compliance_scan detected drift: {', '.join(failing)}"
-                if failing
-                else "run_compliance_scan succeeded (mock): all controls compliant"
-            )
-            response = self._record_action(
-                ActionName.RUN_COMPLIANCE_SCAN.value,
-                ActionStatus.FAILED.value if failing else ActionStatus.SUCCEEDED.value,
-                detail,
-                "fail" if failing else "ok",
-                controls=mock_controls,
-            )
-            if state.get("eda_enabled") and failing:
-                self._append_eda_event(
-                    f"compliance_drift event emitted for {', '.join(failing)}",
-                    "warn",
-                )
-                response["state"] = self.get_state()
-            return response
+            return self._run_compliance_scan_mock()
 
+        return self._run_compliance_scan_live()
+
+    def _run_compliance_scan_mock(self) -> dict[str, Any]:
+        state = self._load_state()
+        raw = state.get("controls") or {"ssh_root_login": True, "portal_service_health": True}
+        raw_compliance = state.get("compliance_controls") or {
+            "ssh_root_login": True,
+            "ssh_password_authentication": True,
+        }
+        controls: dict[str, bool] = {
+            "ssh_root_login": bool(raw.get("ssh_root_login", True)),
+            "portal_service_health": bool(raw.get("portal_service_health", True)),
+        }
+        compliance_controls: dict[str, bool] = {
+            # Mirror ssh_root_login from primary controls so drift/remediation stays in sync
+            "ssh_root_login": bool(raw.get("ssh_root_login", True)),
+            "ssh_password_authentication": bool(
+                raw_compliance.get("ssh_password_authentication", True)
+            ),
+        }
+        all_failing = list(
+            dict.fromkeys(
+                [name for name, passed in controls.items() if not passed]
+                + [name for name, passed in compliance_controls.items() if not passed]
+            )
+        )
+
+        state["scan_count"] = int(state.get("scan_count", 0)) + 1
+        # Score on the union of controls and compliance_controls; shared keys require both to pass
+        all_control_names = set(controls.keys()) | set(compliance_controls.keys())
+        all_controls: dict[str, bool] = {}
+        for name in all_control_names:
+            passed = True
+            if name in controls:
+                passed = passed and controls[name]
+            if name in compliance_controls:
+                passed = passed and compliance_controls[name]
+            all_controls[name] = passed
+        pct = self._score_pct(all_controls)
+        trend = state.setdefault("trend", [])
+        trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
+        del trend[8:]
+        state["compliance_controls"] = compliance_controls
+        self._save_state(state)
+
+        detail = (
+            f"run_compliance_scan detected drift: {', '.join(all_failing)}"
+            if all_failing
+            else "run_compliance_scan succeeded (mock): all controls compliant"
+        )
+        response = self._record_action(
+            ActionName.RUN_COMPLIANCE_SCAN.value,
+            ActionStatus.FAILED.value if all_failing else ActionStatus.SUCCEEDED.value,
+            detail,
+            "fail" if all_failing else "ok",
+            controls=controls,
+            compliance_controls=compliance_controls,
+        )
+        if state.get("eda_enabled") and all_failing:
+            self._append_eda_event(
+                f"compliance_drift event emitted for {', '.join(all_failing)}",
+                "warn",
+            )
+            response["state"] = self.get_state()
+        return response
+
+    def _run_compliance_scan_live(self) -> dict[str, Any]:
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
         ssh_scan_path = env_dir / "ssh_scan.json"
@@ -494,27 +555,47 @@ class LocalLabBackend:
             "ssh_root_login": ssh_scan.get("status") == "pass",
             "portal_service_health": service_scan.get("status") == "pass",
         }
-        failing = [name for name, passed in controls.items() if not passed]
+        compliance_controls = self._read_compliance_controls(env_dir)
+        all_failing = list(
+            dict.fromkeys(
+                [name for name, passed in controls.items() if not passed]
+                + [name for name, passed in compliance_controls.items() if not passed]
+            )
+        )
+
         state = self._load_state()
         state["controls"] = controls
+        state["compliance_controls"] = compliance_controls
         state["scan_count"] = int(state.get("scan_count", 0)) + 1
-        pct = self._score_pct(controls)
+        # Score on union of all controls so trend is consistent with pass/fail determination.
+        # For shared keys (e.g. ssh_root_login), AND logic: control only passes if it passes in all sources.
+        all_control_names = set(controls.keys()) | set(compliance_controls.keys())
+        all_controls: dict[str, bool] = {}
+        for name in all_control_names:
+            passed = True
+            if name in controls:
+                passed = passed and controls[name]
+            if name in compliance_controls:
+                passed = passed and compliance_controls[name]
+            all_controls[name] = passed
+        pct = self._score_pct(all_controls)
         trend = state.setdefault("trend", [])
         trend.insert(0, {"pct": pct, "label": f"Scan #{state['scan_count']}"})
         del trend[8:]
         self._save_state(state)
 
-        if failing:
+        if all_failing:
             response = self._record_action(
                 ActionName.RUN_COMPLIANCE_SCAN.value,
                 ActionStatus.FAILED.value,
-                f"run_compliance_scan failed: drift detected on {', '.join(failing)}",
+                f"run_compliance_scan failed: drift detected on {', '.join(all_failing)}",
                 "fail",
                 controls=controls,
+                compliance_controls=compliance_controls,
             )
             if state.get("eda_enabled"):
                 self._append_eda_event(
-                    f"compliance_drift event emitted for {', '.join(failing)}",
+                    f"compliance_drift event emitted for {', '.join(all_failing)}",
                     "warn",
                 )
                 response["state"] = self.get_state()
@@ -526,6 +607,7 @@ class LocalLabBackend:
             "run_compliance_scan succeeded: all baseline controls compliant",
             "ok",
             controls=controls,
+            compliance_controls=compliance_controls,
         )
 
     @_serialize_action
@@ -663,12 +745,17 @@ class LocalLabBackend:
                 "ssh_root_login": True,
                 "portal_service_health": True,
             }
+            rem_compliance: dict[str, bool] = {
+                "ssh_root_login": True,
+                "ssh_password_authentication": True,
+            }
             response = self._record_action(
                 ActionName.RUN_REMEDIATION.value,
                 ActionStatus.SUCCEEDED.value,
                 "run_remediation succeeded (mock): all controls restored",
                 "ok",
                 controls=rem_controls,
+                compliance_controls=rem_compliance,
             )
             if self._load_state().get("eda_enabled"):
                 self._append_eda_event("remediation complete - all drift cleared", "ok")
@@ -678,7 +765,9 @@ class LocalLabBackend:
         current = self._current_environment()
         env_dir = Path(str(current["runtime_dir"]))
         try:
-            ssh_job = self._run_playbook("playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir))
+            ssh_job = self._run_playbook(
+                "playbooks/remediate_ssh_root.yml", self._ansible_vars(env_dir)
+            )
             svc_vars = self._ansible_vars(env_dir)
             svc_vars.update({"drift_action": "remediate", "portal_service": str(current["portal"])})
             svc_job = self._run_playbook(DRIFT_SERVICE_PLAYBOOK, svc_vars)
@@ -701,17 +790,54 @@ class LocalLabBackend:
             )
             raise
         controls = self._read_controls(env_dir)
+        compliance_controls = self._read_compliance_controls(env_dir)
         response = self._record_action(
             ActionName.RUN_REMEDIATION.value,
             ActionStatus.SUCCEEDED.value,
             "run_remediation succeeded: restored PermitRootLogin no and portal service running",
             "ok",
             controls=controls,
+            compliance_controls=compliance_controls,
         )
         if self._load_state().get("eda_enabled"):
             self._append_eda_event("remediation complete - all drift cleared", "ok")
             response["state"] = self.get_state()
         return response
+
+    @_serialize_action
+    def inject_synthetic_incident(self) -> dict[str, Any]:
+        """Emit a synthetic incident event for demo storytelling."""
+
+        timestamp = int(self._clock())
+        incident: dict[str, Any] = {
+            "id": f"incident-{timestamp}",
+            "severity": "high",
+            "component": "control-plane",
+            "message": "Synthetic incident emitted for demo narrative control.",
+            "created_at": timestamp,
+        }
+
+        def mutate(state: dict[str, Any]) -> None:
+            incidents = state.setdefault("incidents", [])
+            incidents.insert(0, incident)
+            del incidents[STATE_LOG_LIMIT:]
+
+        self._mutate_state(mutate)
+        state = self._load_state()
+        if state.get("eda_enabled"):
+            self._append_eda_event("synthetic incident emitted", "warn")
+            return self._record_action(
+                ActionName.INJECT_SYNTHETIC_INCIDENT.value,
+                ActionStatus.SUCCEEDED.value,
+                "synthetic incident injected: demo incident added to feed",
+                "warn",
+            )
+        return self._record_action(
+            ActionName.INJECT_SYNTHETIC_INCIDENT.value,
+            ActionStatus.SUCCEEDED.value,
+            "synthetic incident injected: demo incident added to feed",
+            "ok",
+        )
 
     def _current_environment(self) -> dict[str, Any]:
         state = self._load_state()
@@ -735,6 +861,7 @@ class LocalLabBackend:
         environment_name: str,
         portal: str,
         profile: str,
+        target: str = "local-lab",  # noqa: ARG002  # NOSONAR
     ) -> dict[str, Any]:
         self._run(
             [
@@ -833,9 +960,7 @@ class LocalLabBackend:
         awx_username = os.getenv("AWX_USERNAME", "").strip()
         awx_password = os.getenv("AWX_PASSWORD", "").strip()
         if not awx_host or not awx_username or not awx_password:
-            raise RuntimeError(
-                "AWX execution requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD"
-            )
+            raise RuntimeError("AWX execution requires AWX_HOST, AWX_USERNAME, and AWX_PASSWORD")
         if not awx_host.startswith("https://"):
             raise RuntimeError("AWX_HOST must use an https:// URL")
 
@@ -847,7 +972,9 @@ class LocalLabBackend:
             method="GET",
         )
         results = template_response.get("results", [])
-        first_result = results[0] if isinstance(results, list) and results else {}
+        first_result = cast(
+            dict[str, Any], results[0] if isinstance(results, list) and results else {}
+        )
         template_id = int(first_result.get("id", 0))
         if not template_id:
             raise RuntimeError(f"AWX template not found: {template_name}")
@@ -901,7 +1028,7 @@ class LocalLabBackend:
         method: str,
         body: bytes | None = None,
     ) -> dict[str, Any]:
-        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+        token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
         request = Request(
             url=f"{host}{path}",
             method=method,
@@ -946,6 +1073,13 @@ class LocalLabBackend:
             "portal_service_health": service_text == "active",
         }
 
+    def _read_compliance_controls(self, env_dir: Path) -> dict[str, bool]:
+        ssh_text = (env_dir / "sshd_config").read_text(encoding="utf-8")
+        return {
+            "ssh_root_login": "PermitRootLogin no" in ssh_text,
+            "ssh_password_authentication": "PasswordAuthentication no" in ssh_text,
+        }
+
     def _ensure_environment(self, environment_name: str) -> Path:
         env_dir = self.runtime_root / environment_name
         env_dir.mkdir(parents=True, exist_ok=True)
@@ -974,6 +1108,7 @@ class LocalLabBackend:
         tone: str,
         *,
         controls: dict[str, bool] | None = None,
+        compliance_controls: dict[str, bool] | None = None,
     ) -> dict[str, Any]:
         def mutate(state: dict[str, Any]) -> None:
             evidence = state.setdefault("evidence", [])
@@ -981,6 +1116,8 @@ class LocalLabBackend:
             del evidence[STATE_LOG_LIMIT:]
             if controls is not None:
                 state["controls"] = controls
+            if compliance_controls is not None:
+                state["compliance_controls"] = compliance_controls
 
         self._mutate_state(mutate)
         return {
@@ -1021,7 +1158,7 @@ class LocalLabBackend:
         def mutate(state: dict[str, Any]) -> None:
             jobs = _as_str_any_dict(state.get("jobs"))
             history = cast(list[dict[str, Any]], jobs.get("history", []))
-            record = {
+            record: dict[str, Any] = {
                 "action": action,
                 "status": status,
                 "detail": detail,
@@ -1055,6 +1192,10 @@ class LocalLabBackend:
                 "ssh_root_login": False,
                 "portal_service_health": False,
             },
+            "compliance_controls": {
+                "ssh_root_login": False,
+                "ssh_password_authentication": False,
+            },
             "terraform": {
                 "run_id": None,
                 "status": "idle",
@@ -1071,9 +1212,45 @@ class LocalLabBackend:
             },
             "evidence": [],
             "eda_history": [],
+            "incidents": [],
             "trend": [],
             "scan_count": 0,
             "eda_enabled": False,
+        }
+
+    def _build_observability(self, state: dict[str, Any]) -> dict[str, Any]:
+        terraform = _as_str_any_dict(state.get("terraform"))
+        jobs = _as_str_any_dict(state.get("jobs"))
+        job_history = cast(list[dict[str, Any]], jobs.get("history", []))
+
+        traces: list[dict[str, Any]] = []
+        terraform_updated_at = int(terraform.get("updated_at", 0) or 0)
+        if terraform_updated_at:
+            traces.append(
+                {
+                    "stage": "terraform",
+                    "status": str(terraform.get("status", "unknown")),
+                    "at": terraform_updated_at,
+                    "depends_on": [],
+                }
+            )
+
+        for job in job_history[:8]:
+            traces.append(
+                {
+                    "stage": str(job.get("action", "workflow")),
+                    "status": str(job.get("status", "unknown")),
+                    "at": int(job.get("updated_at", 0) or 0),
+                    "depends_on": ["terraform"],
+                }
+            )
+
+        return {
+            "stages": traces,
+            "summary": {
+                "last_stage": str(jobs.get("last_action") or "terraform"),
+                "last_status": str(jobs.get("last_status") or terraform.get("status", "idle")),
+            },
         }
 
     def _load_state(self) -> dict[str, Any]:

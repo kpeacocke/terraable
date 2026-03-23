@@ -19,10 +19,15 @@ Terraform provisions infrastructure. Ansible operationalises and enforces contro
 - Offline/mock mode: Simulated evidence for rehearsals.
 
 ## Selectors
-- `target_platform`: `openshift`, `aws`, `azure`, `okd`, `local-lab`
+- `target_platform`: `openshift`, `aws`, `azure`, `gcp`, `okd`, `vmware`, `parallels`, `hyper-v`, `local-lab`
 - `portal_impl`: `rhdh`, `backstage`
 - `security_profile`: `baseline`, `strict`
 - `eda`: UI-only selector for future event-driven path (`enabled` / `disabled`, Phase 2, not present in MVP handoff contract)
+
+## Phase 3 Additions
+- Local target suggestion helper for `vmware`, `parallels`, and `hyper-v` with safe fallback to `local-lab`.
+- Synthetic incident feed generation for demo storytelling and EDA timeline visibility.
+- Observability dashboard view over Terraform and workflow stage status metadata.
 
 ## Component Boundaries
 - Terraform content: substrate provisioning and outputs.

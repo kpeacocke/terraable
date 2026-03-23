@@ -8,6 +8,7 @@ from .contract import (
     validate_target_combination,
 )
 from .hcp_terraform import HcpTerraformClient, HcpTerraformConfig
+from .local_detect import detect_local_target
 from .local_lab import LocalLabBackend
 from .orchestrator import ActionName, ActionStatus, DemoOrchestrator, EvidenceRecord
 
@@ -28,5 +29,6 @@ __all__ = [
     "TargetPlatform",
     "__version__",
     "build_handoff_payload",
+    "detect_local_target",
     "validate_target_combination",
 ]

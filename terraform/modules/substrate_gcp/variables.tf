@@ -3,14 +3,20 @@ variable "environment_name" {
   type        = string
 }
 
-variable "local_host" {
-  description = "Hostname or IP address of the local workshop target"
+variable "project_id" {
+  description = "GCP project identifier"
   type        = string
-  default     = "localhost"
+  default     = "demo-project"
+}
+
+variable "region" {
+  description = "GCP region"
+  type        = string
+  default     = "australia-southeast1"
 }
 
 variable "portal_impl" {
-  description = "Portal implementation selector."
+  description = "Portal implementation selector"
   type        = string
   validation {
     condition     = contains(["rhdh", "backstage"], var.portal_impl)
@@ -30,13 +36,13 @@ variable "security_profile" {
 variable "ansible_inventory_group" {
   description = "Ansible inventory group for post-provision actions"
   type        = string
-  default     = "local_lab"
+  default     = "gcp_hosts"
 }
 
 variable "ssh_user" {
   description = "SSH user for operational workflows"
   type        = string
-  default     = "lab"
+  default     = "gcp-user"
 }
 
 variable "ssh_port" {

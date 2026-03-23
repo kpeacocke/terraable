@@ -4,15 +4,23 @@ from __future__ import annotations
 
 import io
 import json
-import socket
 import threading
+from email.message import Message
 from pathlib import Path
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
 
 from terraable import api_server
+
+
+def _headers(values: dict[str, str]) -> Message:
+    headers: Message = Message()
+    for key, value in values.items():
+        headers[key] = value
+    return headers
 
 
 class _FakeBackend:
@@ -56,6 +64,15 @@ class _FakeBackend:
     def inject_service_drift(self) -> dict[str, object]:
         return {
             "action": "inject_service_drift",
+            "status": "succeeded",
+            "detail": "ok",
+            "tone": "warn",
+            "state": self.get_state(),
+        }
+
+    def inject_synthetic_incident(self) -> dict[str, object]:
+        return {
+            "action": "inject_synthetic_incident",
             "status": "succeeded",
             "detail": "ok",
             "tone": "warn",
@@ -261,7 +278,7 @@ def test_handler_configure_auth_accepts_non_object_json_payload(
         payload = json.loads(urlopen(request).read().decode("utf-8"))
         assert payload["auth"]["authenticated"] is False
 
-        backend = handler.backend
+        backend = cast(Any, handler).backend
         assert isinstance(backend, _FakeBackend)
         assert backend.auth_configured == {}
     finally:
@@ -293,6 +310,7 @@ def test_handler_serves_healthz_and_other_actions(
             "run_compliance_scan",
             "inject_ssh_drift",
             "inject_service_drift",
+            "inject_synthetic_incident",
             "run_remediation",
         ):
             request = Request(
@@ -324,7 +342,7 @@ def test_handler_serves_healthz_and_other_actions(
 @pytest.mark.unit
 def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "2"}
+    handler.headers = _headers({"Content-Length": "2"})
     handler.rfile = io.BytesIO(b"[]")
 
     payload = handler._read_json_payload()
@@ -335,7 +353,7 @@ def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
 @pytest.mark.unit
 def test_read_json_payload_rejects_invalid_content_length() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "abc"}
+    handler.headers = _headers({"Content-Length": "abc"})
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Invalid Content-Length"):
@@ -345,7 +363,7 @@ def test_read_json_payload_rejects_invalid_content_length() -> None:
 @pytest.mark.unit
 def test_read_json_payload_defaults_missing_content_length_to_empty_object() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {}
+    handler.headers = _headers({})
     handler.rfile = io.BytesIO(b"")
 
     payload = handler._read_json_payload()
@@ -356,7 +374,7 @@ def test_read_json_payload_defaults_missing_content_length_to_empty_object() -> 
 @pytest.mark.unit
 def test_read_json_payload_rejects_negative_content_length() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "-1"}
+    handler.headers = _headers({"Content-Length": "-1"})
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Invalid Content-Length"):
@@ -367,7 +385,7 @@ def test_read_json_payload_rejects_negative_content_length() -> None:
 def test_read_json_payload_rejects_oversized_content_length() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     too_large = api_server.TerraableRequestHandler.max_json_payload_bytes + 1
-    handler.headers = {"Content-Length": str(too_large)}
+    handler.headers = _headers({"Content-Length": str(too_large)})
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Content-Length exceeds maximum allowed size"):
@@ -392,13 +410,13 @@ class _TimeoutReader:
 
 class _SocketTimeoutReader:
     def read(self, _length: int) -> bytes:
-        raise socket.timeout("timed out")
+        raise TimeoutError("timed out")
 
 
 @pytest.mark.unit
 def test_read_json_payload_rejects_incomplete_body() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "10"}
+    handler.headers = _headers({"Content-Length": "10"})
     handler.rfile = io.BytesIO(b"{}")
     handler.connection = _FakeConnection()
 
@@ -409,7 +427,7 @@ def test_read_json_payload_rejects_incomplete_body() -> None:
 @pytest.mark.unit
 def test_read_json_payload_restores_socket_timeout_after_read() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "2"}
+    handler.headers = _headers({"Content-Length": "2"})
     handler.rfile = io.BytesIO(b"{}")
     fake_connection = _FakeConnection()
     fake_connection.settimeout(30.0)
@@ -424,8 +442,8 @@ def test_read_json_payload_restores_socket_timeout_after_read() -> None:
 @pytest.mark.unit
 def test_read_json_payload_reports_timeout_and_restores_socket_timeout() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "2"}
-    handler.rfile = _TimeoutReader()
+    handler.headers = _headers({"Content-Length": "2"})
+    handler.rfile = cast(Any, _TimeoutReader())
     fake_connection = _FakeConnection()
     fake_connection.settimeout(15.0)
     handler.connection = fake_connection
@@ -439,8 +457,8 @@ def test_read_json_payload_reports_timeout_and_restores_socket_timeout() -> None
 @pytest.mark.unit
 def test_read_json_payload_reports_socket_timeout_and_restores_timeout() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
-    handler.headers = {"Content-Length": "2"}
-    handler.rfile = _SocketTimeoutReader()
+    handler.headers = _headers({"Content-Length": "2"})
+    handler.rfile = cast(Any, _SocketTimeoutReader())
     fake_connection = _FakeConnection()
     fake_connection.settimeout(20.0)
     handler.connection = fake_connection
@@ -463,7 +481,7 @@ def test_loopback_host_helper_accepts_localhost_and_loopback_ip() -> None:
 def test_safe_post_request_rejects_non_loopback_client() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("10.0.0.2", 12345)
-    handler.headers = {}
+    handler.headers = _headers({})
     called: list[tuple[int, str]] = []
 
     def fake_send_error(code: int, message: str = "") -> None:
@@ -481,7 +499,7 @@ def test_safe_post_request_rejects_non_loopback_client() -> None:
 def test_safe_post_request_rejects_null_origin() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
-    handler.headers = {"Origin": "null"}
+    handler.headers = _headers({"Origin": "null"})
     called: list[tuple[int, str]] = []
 
     def fake_send_error(code: int, message: str = "") -> None:
@@ -499,7 +517,7 @@ def test_safe_post_request_rejects_null_origin() -> None:
 def test_safe_post_request_rejects_hostname_less_origin() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
-    handler.headers = {"Origin": "file:///tmp/index.html"}
+    handler.headers = _headers({"Origin": "file:///tmp/index.html"})
     called: list[tuple[int, str]] = []
 
     def fake_send_error(code: int, message: str = "") -> None:

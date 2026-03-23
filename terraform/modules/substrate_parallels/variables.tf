@@ -3,14 +3,14 @@ variable "environment_name" {
   type        = string
 }
 
-variable "local_host" {
-  description = "Hostname or IP address of the local workshop target"
+variable "host_system" {
+  description = "Parallels host system identifier"
   type        = string
-  default     = "localhost"
+  default     = "parallels-host.local"
 }
 
 variable "portal_impl" {
-  description = "Portal implementation selector."
+  description = "Portal implementation selector"
   type        = string
   validation {
     condition     = contains(["rhdh", "backstage"], var.portal_impl)
@@ -30,7 +30,7 @@ variable "security_profile" {
 variable "ansible_inventory_group" {
   description = "Ansible inventory group for post-provision actions"
   type        = string
-  default     = "local_lab"
+  default     = "parallels_hosts"
 }
 
 variable "ssh_user" {
