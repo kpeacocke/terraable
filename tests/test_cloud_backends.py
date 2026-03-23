@@ -224,7 +224,7 @@ def test_aws_create_environment_live_success(
     backend = AWSBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
     monkeypatch.setattr(
-        backend, "_terraform_apply_aws", lambda *args, **kwargs: _terraform_outputs("aws")
+        backend, "_terraform_apply_aws", lambda *_, **__: _terraform_outputs("aws")
     )
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
@@ -321,7 +321,7 @@ def test_azure_create_environment_live_success(
     monkeypatch.setattr(
         backend,
         "_terraform_apply_azure",
-        lambda *args, **kwargs: _terraform_outputs("azure", portal="rhdh"),
+        lambda *_, **__: _terraform_outputs("azure", portal="rhdh"),
     )
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
@@ -422,7 +422,7 @@ def test_okd_create_environment_live_success(
     backend = OKDBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
     monkeypatch.setattr(
-        backend, "_terraform_apply_okd", lambda *args, **kwargs: _terraform_outputs("okd")
+        backend, "_terraform_apply_okd", lambda *_, **__: _terraform_outputs("okd")
     )
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
@@ -495,7 +495,7 @@ def test_aws_terraform_apply_rejects_invalid_json_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = AWSBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -516,7 +516,7 @@ def test_aws_terraform_apply_requires_ssh_public_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = AWSBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -537,7 +537,7 @@ def test_aws_terraform_apply_requires_allowed_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = AWSBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -560,7 +560,7 @@ def test_aws_terraform_apply_rejects_non_string_json_list(
     tmp_path: Path,
 ) -> None:
     backend = AWSBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -582,7 +582,7 @@ def test_aws_terraform_apply_rejects_empty_json_list(
     tmp_path: Path,
 ) -> None:
     backend = AWSBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -603,7 +603,7 @@ def test_azure_terraform_apply_requires_resource_group(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = AzureBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -624,7 +624,7 @@ def test_azure_terraform_apply_requires_ssh_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = AzureBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -647,7 +647,7 @@ def test_azure_terraform_apply_requires_allowed_source(
     tmp_path: Path,
 ) -> None:
     backend = AzureBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -715,7 +715,7 @@ def test_okd_terraform_apply_requires_cluster_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = OKDBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
@@ -736,7 +736,7 @@ def test_okd_terraform_apply_requires_base_domain(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = OKDBackend(
-        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
     )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)

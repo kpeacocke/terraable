@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import ParseResult, parse_qs, urlparse
 
-from .local_lab import LocalLabBackend  # noqa: F401 - kept for test monkeypatching
+from .local_lab import LocalLabBackend  # kept for test monkeypatching
 
 
 def get_backend(workspace_root: Path, target: str) -> Any:
@@ -60,6 +60,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     backends_lock: ClassVar[threading.RLock] = threading.RLock()
     workspace_root: ClassVar[Path]
     ui_path: ClassVar[Path]
+    backend: ClassVar[LocalLabBackend | None] = None
     max_json_payload_bytes: ClassVar[int] = 1024 * 1024
     json_read_timeout_seconds: ClassVar[float] = 5.0
 
@@ -206,11 +207,14 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     ) -> dict[str, Any] | None:
         backend = self.get_active_backend(target)
         if action == "create_environment":
-            return backend.create_environment(
-                target=str(payload.get("target", target)),
-                portal=str(payload.get("portal", "backstage")),
-                profile=str(payload.get("profile", "baseline")),
-                eda=str(payload.get("eda", "disabled")),
+            return cast(
+                dict[str, Any],
+                backend.create_environment(
+                    target=str(payload.get("target", target)),
+                    portal=str(payload.get("portal", "backstage")),
+                    profile=str(payload.get("profile", "baseline")),
+                    eda=str(payload.get("eda", "disabled")),
+                ),
             )
         simple: dict[str, Callable[[], dict[str, Any]]] = {
             "apply_baseline": backend.apply_baseline,
@@ -300,7 +304,14 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
 def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
     class Handler(TerraableRequestHandler):
         ui_path = workspace_root / "ui" / "index.html"
-        backend: LocalLabBackend | None = None
+        backend: ClassVar[LocalLabBackend | None] = None
+
+    Handler.workspace_root = workspace_root
+    Handler.backends = {}
+    Handler.backends_lock = threading.RLock()
+    Handler.backend = get_backend(workspace_root, "local-lab")
+    Handler.backends["local-lab"] = Handler.backend
+    return Handler
 
 
 def main() -> None:
