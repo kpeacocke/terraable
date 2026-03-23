@@ -2,6 +2,25 @@
 
 Reference demo showing HCP Terraform provisioning and Ansible Automation Platform operationalising, validating, and remediating environments.
 
+
+## Quick Start
+
+Get an offline demo running in under five minutes — no live credentials required:
+
+```bash
+git clone https://github.com/<your-username>/terraable.git && cd terraable
+cp .env.example .env          # Optional: sample credential template
+python3 -m venv .venv && source .venv/bin/activate
+pip install poetry && poetry install
+TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000`. All actions (create, baseline, scan, drift, remediate) return
+pre-seeded responses — no HCP Terraform or Ansible credentials required.
+
+For the full walkthrough, credential setup, and advancing to live execution, see
+[docs/lab-guide.md](docs/lab-guide.md).
+
 ## Status
 
 Local-lab now has an executable end-to-end path: UI -> Python API -> Terraform contract apply -> Ansible operational workflows against workspace-local lab files.

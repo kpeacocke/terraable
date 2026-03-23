@@ -81,6 +81,7 @@ ansible/inventory.local.yml
 # ──────────────────────────────────────────────
 .env
 .env.*
+!.env.example
 secrets/
 tmp/
 

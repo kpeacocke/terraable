@@ -169,9 +169,13 @@ and rotation targets for Dev, Test, Demo, and Prod before enabling live mode.
 │   └── modules/
 │       ├── substrate_aws/      # AWS substrate module
 │       ├── substrate_azure/    # Azure substrate module
+│       ├── substrate_gcp/      # GCP substrate module (Phase 3 — live-executable)
+│       ├── substrate_hyperv/   # Hyper-V substrate module (Phase 3 — live-executable)
 │       ├── substrate_local/    # Local lab substrate module
 │       ├── substrate_okd/      # OKD substrate module
-│       └── substrate_openshift/ # OpenShift substrate module
+│       ├── substrate_openshift/ # OpenShift substrate module
+│       ├── substrate_parallels/ # Parallels substrate module (Phase 3 — live-executable)
+│       └── substrate_vmware/   # VMware substrate module (Phase 3 — live-executable)
 ├── terraable/                  # Python package: contract, orchestrator, HCP Terraform client
 ├── tests/                      # Python tests (100% coverage gate)
 ├── ui/
