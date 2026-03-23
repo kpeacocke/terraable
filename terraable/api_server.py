@@ -56,6 +56,7 @@ def get_backend(workspace_root: Path, target: str) -> Any:
 
 
 class TerraableRequestHandler(BaseHTTPRequestHandler):
+    supported_targets: ClassVar[set[str]] = {"local-lab", "aws", "azure", "okd"}
     backends: ClassVar[dict[str, Any]] = {}
     backends_lock: ClassVar[threading.RLock] = threading.RLock()
     workspace_root: ClassVar[Path]
@@ -67,13 +68,14 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     @classmethod
     def get_active_backend(cls, target: str = "local-lab") -> Any:
         """Get or create backend instance for the given target."""
+        normalized_target = target if target in cls.supported_targets else "local-lab"
         with cls.backends_lock:
-            if target == "local-lab" and getattr(cls, "backend", None) is not None:
-                cls.backends[target] = cls.backend
-                return cls.backends[target]
-            if target not in cls.backends:
-                cls.backends[target] = get_backend(cls.workspace_root, target)
-            return cls.backends[target]
+            if normalized_target == "local-lab" and getattr(cls, "backend", None) is not None:
+                cls.backends[normalized_target] = cls.backend
+                return cls.backends[normalized_target]
+            if normalized_target not in cls.backends:
+                cls.backends[normalized_target] = get_backend(cls.workspace_root, normalized_target)
+            return cls.backends[normalized_target]
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)

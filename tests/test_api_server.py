@@ -801,6 +801,24 @@ def test_get_active_backend_prefers_handler_backend_for_local_target(
 
 
 @pytest.mark.unit
+def test_get_active_backend_normalises_unknown_targets_to_local_lab(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+
+    backend = cast(Any, handler).get_active_backend("foo123")
+
+    assert isinstance(backend, _FakeBackend)
+    assert backend is cast(Any, handler).backends["local-lab"]
+    assert "foo123" not in cast(Any, handler).backends
+
+
+@pytest.mark.unit
 def test_action_failure_uses_target_backend_state(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
