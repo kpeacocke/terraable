@@ -178,6 +178,46 @@ class _InspectableLocalLabBackend(LocalLabBackend):
     def save_state_for_test(self, state: dict[str, Any]) -> None:
         self._save_state(state)
 
+    def record_action_for_test(
+        self, action: str, status: str, detail: str, tone: str
+    ) -> dict[str, Any]:
+        return self._record_action(action, status, detail, tone)
+
+    def append_eda_event_for_test(self, message: str, tone: str) -> None:
+        self._append_eda_event(message, tone)
+
+    def tf_token_env_var_for_test(self) -> str:
+        return self._tf_token_env_var()
+
+    def default_state_for_test(self) -> dict[str, Any]:
+        return self._default_state()
+
+    def read_dotenv_for_test(self, path: Path) -> dict[str, str]:
+        return self._read_dotenv(path)
+
+    def credential_value_for_test(self, key: str) -> str:
+        return self._credential_value(key)
+
+    def auth_source_for_test(self, requirements: tuple[str, ...]) -> dict[str, str]:
+        return self._auth_source(requirements)
+
+    def run_awx_job_template_for_test(
+        self, playbook: str, extra_vars: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._run_awx_job_template(playbook, extra_vars)
+
+    def awx_request_for_test(
+        self,
+        host: str,
+        username: str,
+        password: str,
+        path: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        return self._awx_request(host, username, password, path, method=method, body=body)
+
     def run_playbook_for_test(self, playbook: str, extra_vars: dict[str, Any]) -> dict[str, Any]:
         return self._run_playbook(playbook, extra_vars)
 
@@ -192,14 +232,22 @@ class _ActionLockProbeBackend(LocalLabBackend):
         self._active_ensures = 0
         self.max_active_ensures = 0
 
-    def _ensure_environment(self, environment_name: str) -> Path:
+    def _ensure_environment(
+        self,
+        environment_name: str,
+        *,
+        ansible_inventory_group: str = "local_lab",
+    ) -> Path:
         with self._probe_lock:
             self._active_ensures += 1
             self.max_active_ensures = max(self.max_active_ensures, self._active_ensures)
 
         try:
             time.sleep(0.05)
-            return super()._ensure_environment(environment_name)
+            return super()._ensure_environment(
+                environment_name,
+                ansible_inventory_group=ansible_inventory_group,
+            )
         finally:
             with self._probe_lock:
                 self._active_ensures -= 1
@@ -389,7 +437,7 @@ def test_load_state_returns_default_for_non_object_json(tmp_path: Path) -> None:
 def test_record_action_persists_evidence_entry(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
-    result = backend._record_action("unit_action", "succeeded", "unit detail", "ok")
+    result = backend.record_action_for_test("unit_action", "succeeded", "unit detail", "ok")
 
     assert result["status"] == "succeeded"
     state = backend.get_state()
@@ -401,7 +449,7 @@ def test_record_action_persists_evidence_entry(tmp_path: Path) -> None:
 def test_append_eda_event_persists_history_entry(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
-    backend._append_eda_event("eda event detail", "warn")
+    backend.append_eda_event_for_test("eda event detail", "warn")
 
     state = backend.get_state()
     assert state["eda_history"]
@@ -413,7 +461,7 @@ def test_record_action_caps_evidence_history(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
     for i in range(STATE_LOG_LIMIT + 5):
-        backend._record_action("unit_action", "succeeded", f"detail-{i}", "ok")
+        backend.record_action_for_test("unit_action", "succeeded", f"detail-{i}", "ok")
 
     state = backend.get_state()
     evidence = state["evidence"]
@@ -426,7 +474,7 @@ def test_append_eda_event_caps_history(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
     for i in range(STATE_LOG_LIMIT + 5):
-        backend._append_eda_event(f"event-{i}", "warn")
+        backend.append_eda_event_for_test(f"event-{i}", "warn")
 
     state = backend.get_state()
     eda_history = state["eda_history"]
@@ -569,7 +617,7 @@ def test_auth_status_uses_dotenv_credentials(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
     auth = backend.get_auth_status(target="local-lab", portal="backstage")
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth["authenticated"] is True
     assert auth["ready"] is True
@@ -582,7 +630,7 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
     backend = _InspectableLocalLabBackend(tmp_path)
 
     auth = backend.get_auth_status(target="aws", portal="backstage")
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth["authenticated"] is False
     assert auth["ready"] is False
@@ -602,7 +650,7 @@ def test_configure_credentials_merges_ui_values(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
     auth = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth["authenticated"] is True
     assert auth["ready"] is True
@@ -638,7 +686,7 @@ def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_observability_dashboard_contract_includes_metrics(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
-    state = backend._default_state()
+    state = backend.default_state_for_test()
     state["terraform"] = {
         "run_id": "run-42",
         "status": "applied",
@@ -713,7 +761,7 @@ def test_observability_dashboard_contract_includes_metrics(tmp_path: Path) -> No
 @pytest.mark.unit
 def test_observability_dashboard_ignores_malformed_state_lists(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
-    state = backend._default_state()
+    state = backend.default_state_for_test()
     state["terraform"] = {
         "run_id": "run-bad",
         "status": "applied",
@@ -759,7 +807,7 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
     )
 
     auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "})
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth_after_clear["authenticated"] is False
     assert tf_token_key in auth_after_clear["missing_credentials"]
@@ -769,7 +817,7 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
 def test_configure_credentials_clear_restores_dotenv_value(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=from-dotenv\n", encoding="utf-8")
     backend = _InspectableLocalLabBackend(tmp_path)
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     auth_after_ui = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
     assert auth_after_ui["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
@@ -787,7 +835,7 @@ def test_configure_credentials_clear_restores_dotenv_value(tmp_path: Path) -> No
 def test_configure_credentials_clear_restores_dotenv_after_ui_update(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=from-dotenv\n", encoding="utf-8")
     backend = _InspectableLocalLabBackend(tmp_path)
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-1"})
     auth_after_second_ui = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-2"})
@@ -881,7 +929,7 @@ def test_bootstrap_prefers_environment_over_dotenv(
 
     backend = _InspectableLocalLabBackend(tmp_path)
     auth = backend.get_auth_status(target="local-lab", portal="backstage")
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth["credential_sources"] == {tf_token_key: "env (from HCP_TERRAFORM_TOKEN)"}
 
@@ -890,7 +938,7 @@ def test_bootstrap_prefers_environment_over_dotenv(
 def test_read_dotenv_missing_file_returns_empty(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
-    loaded = backend._read_dotenv(tmp_path / "missing.env")
+    loaded = backend.read_dotenv_for_test(tmp_path / "missing.env")
 
     assert loaded == {}
 
@@ -904,7 +952,7 @@ def test_read_dotenv_skips_comments_and_invalid_lines(tmp_path: Path) -> None:
     )
     backend = _InspectableLocalLabBackend(tmp_path)
 
-    loaded = backend._read_dotenv(dotenv_path)
+    loaded = backend.read_dotenv_for_test(dotenv_path)
 
     assert loaded == {"HCP_TERRAFORM_TOKEN": "from-dotenv"}
 
@@ -925,8 +973,8 @@ def test_credential_value_prefers_hostname_specific_token_and_non_token_value(
         }
     )
 
-    assert backend._credential_value(HCP_TOKEN_REQUIREMENT) == "hostname-token"
-    assert backend._credential_value("AWS_ACCESS_KEY_ID") == "aws-key"
+    assert backend.credential_value_for_test(HCP_TOKEN_REQUIREMENT) == "hostname-token"
+    assert backend.credential_value_for_test("AWS_ACCESS_KEY_ID") == "aws-key"
 
 
 @pytest.mark.unit
@@ -937,11 +985,11 @@ def test_auth_source_includes_hostname_specific_and_non_token_sources(
     monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "app.terraform.io")
     monkeypatch.setenv("TF_TOKEN_app_terraform_io", "hostname-token")
     backend = _InspectableLocalLabBackend(tmp_path)
-    tf_token_key = backend._tf_token_env_var()
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     backend.configure_credentials({"AWS_ACCESS_KEY_ID": "aws-key"})
 
-    sources = backend._auth_source((HCP_TOKEN_REQUIREMENT, "AWS_ACCESS_KEY_ID"))
+    sources = backend.auth_source_for_test((HCP_TOKEN_REQUIREMENT, "AWS_ACCESS_KEY_ID"))
 
     assert sources[tf_token_key] == "env"
     assert sources["AWS_ACCESS_KEY_ID"] == "ui"
@@ -1061,7 +1109,7 @@ def test_inject_synthetic_incident_respects_eda_disabled_state(tmp_path: Path) -
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.get_state()
     state["eda_enabled"] = False
-    backend._save_state(state)
+    backend.save_state_for_test(state)
 
     result = backend.inject_synthetic_incident()
 
@@ -1077,7 +1125,7 @@ def test_inject_synthetic_incident_emits_eda_event_when_enabled(tmp_path: Path) 
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.get_state()
     state["eda_enabled"] = True
-    backend._save_state(state)
+    backend.save_state_for_test(state)
 
     result = backend.inject_synthetic_incident()
 
@@ -1183,7 +1231,7 @@ def test_awx_run_rejects_unmapped_playbook(tmp_path: Path, monkeypatch: pytest.M
     backend = _InspectableLocalLabBackend(tmp_path)
 
     with pytest.raises(RuntimeError, match="No AWX template mapping"):
-        backend._run_awx_job_template("playbooks/unknown.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/unknown.yml", {})
 
 
 @pytest.mark.unit
@@ -1192,7 +1240,7 @@ def test_awx_run_requires_awx_credentials(tmp_path: Path, monkeypatch: pytest.Mo
     backend = _InspectableLocalLabBackend(tmp_path)
 
     with pytest.raises(RuntimeError, match="AWX execution requires"):
-        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
 @pytest.mark.unit
@@ -1204,7 +1252,7 @@ def test_awx_run_requires_https_host(tmp_path: Path, monkeypatch: pytest.MonkeyP
     backend = _InspectableLocalLabBackend(tmp_path)
 
     with pytest.raises(RuntimeError, match="AWX_HOST must use an https:// URL"):
-        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
 @pytest.mark.unit
@@ -1224,7 +1272,7 @@ def test_awx_run_raises_when_template_not_found(
     monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
 
     with pytest.raises(RuntimeError, match="AWX template not found"):
-        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
 @pytest.mark.unit
@@ -1256,7 +1304,7 @@ def test_awx_run_raises_when_launch_missing_job_id(
     monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
 
     with pytest.raises(RuntimeError, match="did not return job id"):
-        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
 @pytest.mark.unit
@@ -1288,7 +1336,7 @@ def test_awx_run_raises_when_job_fails(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
 
     with pytest.raises(RuntimeError, match="ended with status failed"):
-        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
 @pytest.mark.unit
@@ -1307,10 +1355,13 @@ def test_awx_request_raises_on_non_object_response(
         def read(self) -> bytes:
             return json.dumps(["not-an-object"]).encode("utf-8")
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
+    def fake_urlopen(*_args: Any, **_kwargs: Any) -> _Response:
+        return _Response()
+
+    monkeypatch.setattr("terraable.local_lab.urlopen", fake_urlopen)
 
     with pytest.raises(RuntimeError, match="not a JSON object"):
-        backend._awx_request(
+        backend.awx_request_for_test(
             "https://awx.example.invalid",
             "admin",
             "password",
@@ -1330,7 +1381,7 @@ def test_awx_request_wraps_url_errors(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.setattr("terraable.local_lab.urlopen", raise_url_error)
 
     with pytest.raises(RuntimeError, match="AWX API request failed"):
-        backend._awx_request(
+        backend.awx_request_for_test(
             "https://awx.example.invalid",
             "admin",
             "password",
@@ -1366,10 +1417,14 @@ def test_awx_run_raises_when_job_times_out(tmp_path: Path, monkeypatch: pytest.M
         raise AssertionError(f"Unexpected path {path}")
 
     monkeypatch.setattr(backend, "_awx_request", fake_awx_request)
-    monkeypatch.setattr("terraable.local_lab.time.sleep", lambda _seconds: None)
+
+    def no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("terraable.local_lab.time.sleep", no_sleep)
 
     with pytest.raises(RuntimeError, match="timed out"):
-        backend._run_awx_job_template("playbooks/compliance_scan.yml", {})
+        backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
 @pytest.mark.unit
@@ -1386,9 +1441,12 @@ def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.Mon
         def read(self) -> bytes:
             return json.dumps({"status": "ok"}).encode("utf-8")
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
+    def fake_urlopen(*_args: Any, **_kwargs: Any) -> _Response:
+        return _Response()
 
-    payload = backend._awx_request(
+    monkeypatch.setattr("terraable.local_lab.urlopen", fake_urlopen)
+
+    payload = backend.awx_request_for_test(
         "https://awx.example.invalid",
         "admin",
         "password",
@@ -1415,10 +1473,13 @@ def test_awx_request_raises_on_json_decode_error(
         def read(self) -> bytes:
             return b"{invalid-json"
 
-    monkeypatch.setattr("terraable.local_lab.urlopen", lambda *_args, **_kwargs: _Response())
+    def fake_urlopen(*_args: Any, **_kwargs: Any) -> _Response:
+        return _Response()
+
+    monkeypatch.setattr("terraable.local_lab.urlopen", fake_urlopen)
 
     with pytest.raises(RuntimeError, match="AWX API response parse failed"):
-        backend._awx_request(
+        backend.awx_request_for_test(
             "https://awx.example.invalid",
             "admin",
             "password",
