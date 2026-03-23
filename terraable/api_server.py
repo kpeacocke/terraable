@@ -134,9 +134,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             payload = self._read_json_payload()
             raw_credentials = payload.get("credentials")
             target = str(payload.get("target", "local-lab"))
-            normalized_target = (
-                target if target in self.supported_targets else "local-lab"
-            )
+            normalized_target = target if target in self.supported_targets else "local-lab"
             portal = str(payload.get("portal", "backstage"))
             credentials: dict[str, str] = {}
             if isinstance(raw_credentials, dict):
