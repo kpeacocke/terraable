@@ -4,21 +4,27 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 from .contract import build_handoff_payload
 from .local_lab import (
-    CREDENTIAL_KEYS,
-    EXECUTION_MODE_ENV_VAR,
-    HCP_TOKEN_REQUIREMENT,
     MOCK_MODE_ENV_VAR,
-    CommandResult,
     CommandRunner,
     LocalLabBackend,
-    default_runner,
 )
 from .orchestrator import ActionName, ActionStatus
+
+
+def _serialize_backend_action(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    @wraps(method)
+    def wrapped(self: LocalLabBackend, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        with self.action_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapped
 
 
 class OKDBackend(LocalLabBackend):
@@ -29,7 +35,7 @@ class OKDBackend(LocalLabBackend):
         workspace_root: Path,
         *,
         runner: CommandRunner | None = None,
-        clock: callable | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         """Initialise OKD backend with OKD-specific terraform module paths."""
         super().__init__(workspace_root, runner=runner, clock=clock)
@@ -37,7 +43,6 @@ class OKDBackend(LocalLabBackend):
         self.runtime_root = workspace_root / ".terraable" / "okd"
         self.state_file = self.runtime_root / "state.json"
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
-        self._execution_mode = os.getenv(EXECUTION_MODE_ENV_VAR, "direct").strip().lower()
 
     def get_auth_status(self, *, target: str, portal: str) -> dict[str, Any]:
         """Return authentication and readiness checks for OKD target."""
@@ -51,8 +56,37 @@ class OKDBackend(LocalLabBackend):
                 "blockers": [f"target={target} is not supported by OKD backend"],
             }
 
-        return super().get_auth_status(target=target, portal=portal)
+        status = super().get_auth_status(target=target, portal=portal)
+        if self._mock_mode:
+            return status
 
+        blockers = [str(item) for item in status.get("blockers", [])]
+        filtered_blockers = [
+            blocker
+            for blocker in blockers
+            if "target=okd is not executable in live mode" not in blocker
+        ]
+
+        cluster_name = os.getenv(
+            "TF_VAR_CLUSTER_NAME", os.getenv("TF_VAR_cluster_name", "")
+        ).strip()
+        base_domain = os.getenv(
+            "TF_VAR_BASE_DOMAIN", os.getenv("TF_VAR_base_domain", "")
+        ).strip()
+        if not cluster_name:
+            filtered_blockers.append(
+                "TF_VAR_cluster_name environment variable is required for OKD provisioning"
+            )
+        if not base_domain:
+            filtered_blockers.append(
+                "TF_VAR_base_domain environment variable is required for OKD provisioning"
+            )
+
+        status["blockers"] = filtered_blockers
+        status["ready"] = bool(status.get("authenticated")) and not filtered_blockers
+        return status
+
+    @_serialize_backend_action
     def create_environment(
         self,
         *,
@@ -208,13 +242,17 @@ class OKDBackend(LocalLabBackend):
     ) -> dict[str, Any]:
         """Execute Terraform apply for OKD substrate module with required variables."""
         # Check for required OKD cluster configuration
-        cluster_name = os.getenv("TF_VAR_cluster_name", "").strip()
+        cluster_name = os.getenv(
+            "TF_VAR_CLUSTER_NAME", os.getenv("TF_VAR_cluster_name", "")
+        ).strip()
         if not cluster_name:
             raise ValueError(
                 "TF_VAR_cluster_name environment variable is required for OKD provisioning"
             )
 
-        base_domain = os.getenv("TF_VAR_base_domain", "").strip()
+        base_domain = os.getenv(
+            "TF_VAR_BASE_DOMAIN", os.getenv("TF_VAR_base_domain", "")
+        ).strip()
         if not base_domain:
             raise ValueError(
                 "TF_VAR_base_domain environment variable is required for OKD provisioning"
@@ -256,11 +294,11 @@ class OKDBackend(LocalLabBackend):
                 "-var",
                 f"security_profile={profile}",
                 "-var",
-                f"ansible_inventory_group=okd_cluster",
+                "ansible_inventory_group=okd_cluster",
                 "-var",
-                f"ssh_user=core",
+                "ssh_user=core",
                 "-var",
-                f"ssh_port=22",
+                "ssh_port=22",
             ],
             cwd=self.workspace_root,
             env=None,

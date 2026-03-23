@@ -64,6 +64,9 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def get_active_backend(cls, target: str = "local-lab") -> Any:
         """Get or create backend instance for the given target."""
         with cls.backends_lock:
+            if target == "local-lab" and getattr(cls, "backend", None) is not None:
+                cls.backends[target] = cls.backend
+                return cls.backends[target]
             if target not in cls.backends:
                 cls.backends[target] = get_backend(cls.workspace_root, target)
             return cls.backends[target]
@@ -147,9 +150,11 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def _handle_action(self, parsed: ParseResult) -> None:
         action = parsed.path.rsplit("/", 1)[-1]
         response: dict[str, Any] | None
+        target = "local-lab"
         try:
             payload = self._read_json_payload()
             target = str(payload.get("target", "local-lab"))
+            self._current_target = target
             response = self._dispatch_action(action, payload, target)
         except Exception as exc:
             target = str(getattr(self, "_current_target", "local-lab"))
@@ -300,17 +305,11 @@ def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
         ui_path = workspace_root / "ui" / "index.html"
         backend: LocalLabBackend | None = None
 
-    # Set workspace_root as class variable
     Handler.workspace_root = workspace_root
-    
-    # Lazily initialize backend for local-lab target to allow test monkeypatching
-    def get_or_create_default_backend() -> LocalLabBackend:
-        if Handler.backend is None:
-            Handler.backend = get_backend(workspace_root, "local-lab")
-        return Handler.backend
-    
-    # Initialize the default backend once
+    Handler.backends = {}
+    Handler.backends_lock = threading.RLock()
     Handler.backend = get_backend(workspace_root, "local-lab")
+    Handler.backends["local-lab"] = Handler.backend
     return Handler
 
 

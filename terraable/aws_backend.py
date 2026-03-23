@@ -4,21 +4,27 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 from .contract import build_handoff_payload
 from .local_lab import (
-    CREDENTIAL_KEYS,
-    EXECUTION_MODE_ENV_VAR,
-    HCP_TOKEN_REQUIREMENT,
     MOCK_MODE_ENV_VAR,
-    CommandResult,
     CommandRunner,
     LocalLabBackend,
-    default_runner,
 )
 from .orchestrator import ActionName, ActionStatus
+
+
+def _serialize_backend_action(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    @wraps(method)
+    def wrapped(self: LocalLabBackend, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        with self.action_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapped
 
 
 class AWSBackend(LocalLabBackend):
@@ -29,7 +35,7 @@ class AWSBackend(LocalLabBackend):
         workspace_root: Path,
         *,
         runner: CommandRunner | None = None,
-        clock: callable | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         """Initialise AWS backend with AWS-specific terraform module paths."""
         super().__init__(workspace_root, runner=runner, clock=clock)
@@ -37,7 +43,6 @@ class AWSBackend(LocalLabBackend):
         self.runtime_root = workspace_root / ".terraable" / "aws"
         self.state_file = self.runtime_root / "state.json"
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
-        self._execution_mode = os.getenv(EXECUTION_MODE_ENV_VAR, "direct").strip().lower()
 
     def get_auth_status(self, *, target: str, portal: str) -> dict[str, Any]:
         """Return authentication and readiness checks for AWS target."""
@@ -51,8 +56,21 @@ class AWSBackend(LocalLabBackend):
                 "blockers": [f"target={target} is not supported by AWS backend"],
             }
 
-        return super().get_auth_status(target=target, portal=portal)
+        status = super().get_auth_status(target=target, portal=portal)
+        if self._mock_mode:
+            return status
 
+        blockers = [str(item) for item in status.get("blockers", [])]
+        status["blockers"] = [
+            blocker
+            for blocker in blockers
+            if "target=aws is not executable in live mode" not in blocker
+        ]
+        if status.get("authenticated") and portal in {"backstage", "rhdh"}:
+            status["ready"] = True
+        return status
+
+    @_serialize_backend_action
     def create_environment(
         self,
         *,
@@ -208,16 +226,43 @@ class AWSBackend(LocalLabBackend):
     ) -> dict[str, Any]:
         """Execute Terraform apply for AWS substrate module with required variables."""
         # Check for SSH public key
-        ssh_public_key = os.getenv("TF_VAR_ssh_public_key", "").strip()
+        ssh_public_key = os.getenv(
+            "TF_VAR_SSH_PUBLIC_KEY", os.getenv("TF_VAR_ssh_public_key", "")
+        ).strip()
         if not ssh_public_key:
             raise ValueError(
                 "TF_VAR_ssh_public_key environment variable is required for AWS provisioning"
             )
 
-        allowed_cidr = os.getenv("TF_VAR_allowed_cidr_blocks", "").strip()
-        if not allowed_cidr:
+        raw_allowed_cidrs = os.getenv(
+            "TF_VAR_ALLOWED_CIDR_BLOCKS", os.getenv("TF_VAR_allowed_cidr_blocks", "")
+        ).strip()
+        if not raw_allowed_cidrs:
             raise ValueError(
                 "TF_VAR_allowed_cidr_blocks environment variable is required for AWS provisioning"
+            )
+
+        allowed_cidrs: list[str] = []
+        if raw_allowed_cidrs.startswith("["):
+            try:
+                parsed = json.loads(raw_allowed_cidrs)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "TF_VAR_allowed_cidr_blocks must be valid JSON when using list syntax"
+                ) from exc
+            parsed_list = parsed if isinstance(parsed, list) else None
+            if parsed_list is None or not all(isinstance(item, str) for item in parsed_list):
+                raise ValueError(
+                    "TF_VAR_allowed_cidr_blocks JSON value must be a list of CIDR strings"
+                )
+            parsed_cidrs = [item for item in parsed_list if isinstance(item, str)]
+            allowed_cidrs = [item.strip() for item in parsed_cidrs if item.strip()]
+        else:
+            allowed_cidrs = [item.strip() for item in raw_allowed_cidrs.split(",") if item.strip()]
+
+        if not allowed_cidrs:
+            raise ValueError(
+                "TF_VAR_allowed_cidr_blocks must contain at least one CIDR value"
             )
 
         # Initialise terraform
@@ -252,15 +297,15 @@ class AWSBackend(LocalLabBackend):
                 "-var",
                 f"security_profile={profile}",
                 "-var",
-                f"ansible_inventory_group=aws_instances",
+                "ansible_inventory_group=aws_instances",
                 "-var",
-                f"ssh_user=ec2-user",
+                "ssh_user=ec2-user",
                 "-var",
-                f"ssh_port=22",
+                "ssh_port=22",
                 "-var",
                 f"ssh_public_key={ssh_public_key}",
                 "-var",
-                f'allowed_cidr_blocks=["{allowed_cidr}"]',
+                f"allowed_cidr_blocks={json.dumps(allowed_cidrs)}",
             ],
             cwd=self.workspace_root,
             env=None,

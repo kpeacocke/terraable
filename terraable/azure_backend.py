@@ -4,21 +4,27 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 from .contract import build_handoff_payload
 from .local_lab import (
-    CREDENTIAL_KEYS,
-    EXECUTION_MODE_ENV_VAR,
-    HCP_TOKEN_REQUIREMENT,
     MOCK_MODE_ENV_VAR,
-    CommandResult,
     CommandRunner,
     LocalLabBackend,
-    default_runner,
 )
 from .orchestrator import ActionName, ActionStatus
+
+
+def _serialize_backend_action(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    @wraps(method)
+    def wrapped(self: LocalLabBackend, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        with self.action_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapped
 
 
 class AzureBackend(LocalLabBackend):
@@ -29,7 +35,7 @@ class AzureBackend(LocalLabBackend):
         workspace_root: Path,
         *,
         runner: CommandRunner | None = None,
-        clock: callable | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         """Initialise Azure backend with Azure-specific terraform module paths."""
         super().__init__(workspace_root, runner=runner, clock=clock)
@@ -37,7 +43,6 @@ class AzureBackend(LocalLabBackend):
         self.runtime_root = workspace_root / ".terraable" / "azure"
         self.state_file = self.runtime_root / "state.json"
         self._mock_mode = os.getenv(MOCK_MODE_ENV_VAR, "").lower() in {"1", "true", "yes"}
-        self._execution_mode = os.getenv(EXECUTION_MODE_ENV_VAR, "direct").strip().lower()
 
     def get_auth_status(self, *, target: str, portal: str) -> dict[str, Any]:
         """Return authentication and readiness checks for Azure target."""
@@ -51,8 +56,21 @@ class AzureBackend(LocalLabBackend):
                 "blockers": [f"target={target} is not supported by Azure backend"],
             }
 
-        return super().get_auth_status(target=target, portal=portal)
+        status = super().get_auth_status(target=target, portal=portal)
+        if self._mock_mode:
+            return status
 
+        blockers = [str(item) for item in status.get("blockers", [])]
+        status["blockers"] = [
+            blocker
+            for blocker in blockers
+            if "target=azure is not executable in live mode" not in blocker
+        ]
+        if status.get("authenticated") and portal in {"backstage", "rhdh"}:
+            status["ready"] = True
+        return status
+
+    @_serialize_backend_action
     def create_environment(
         self,
         *,
@@ -208,19 +226,25 @@ class AzureBackend(LocalLabBackend):
     ) -> dict[str, Any]:
         """Execute Terraform apply for Azure substrate module with required variables."""
         # Check for required Azure credentials and configuration
-        resource_group = os.getenv("TF_VAR_resource_group_name", "").strip()
+        resource_group = os.getenv(
+            "TF_VAR_RESOURCE_GROUP_NAME", os.getenv("TF_VAR_resource_group_name", "")
+        ).strip()
         if not resource_group:
             raise ValueError(
                 "TF_VAR_resource_group_name environment variable is required for Azure provisioning"
             )
 
-        ssh_public_key = os.getenv("TF_VAR_ssh_public_key", "").strip()
+        ssh_public_key = os.getenv(
+            "TF_VAR_SSH_PUBLIC_KEY", os.getenv("TF_VAR_ssh_public_key", "")
+        ).strip()
         if not ssh_public_key:
             raise ValueError(
                 "TF_VAR_ssh_public_key environment variable is required for Azure provisioning"
             )
 
-        allowed_source = os.getenv("TF_VAR_allowed_source_prefix", "").strip()
+        allowed_source = os.getenv(
+            "TF_VAR_ALLOWED_SOURCE_PREFIX", os.getenv("TF_VAR_allowed_source_prefix", "")
+        ).strip()
         if not allowed_source:
             raise ValueError(
                 "TF_VAR_allowed_source_prefix environment variable is required for Azure provisioning"
@@ -260,11 +284,11 @@ class AzureBackend(LocalLabBackend):
                 "-var",
                 f"security_profile={profile}",
                 "-var",
-                f"ansible_inventory_group=azure_vms",
+                "ansible_inventory_group=azure_vms",
                 "-var",
-                f"ssh_user=azureuser",
+                "ssh_user=azureuser",
                 "-var",
-                f"ssh_port=22",
+                "ssh_port=22",
                 "-var",
                 f"ssh_public_key={ssh_public_key}",
                 "-var",
