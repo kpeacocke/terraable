@@ -817,12 +817,14 @@ def test_aws_action_lock_serialises_create_environment(
         except Exception as exc:  # pragma: no cover
             errors.append(exc)
 
-    thread_1 = threading.Thread(target=run_once)
-    thread_2 = threading.Thread(target=run_once)
+    thread_1 = threading.Thread(target=run_once, daemon=True)
+    thread_2 = threading.Thread(target=run_once, daemon=True)
     thread_1.start()
     thread_2.start()
     thread_1.join(timeout=2)
     thread_2.join(timeout=2)
 
+    assert not thread_1.is_alive(), "thread_1 did not finish; create_environment may be deadlocked"
+    assert not thread_2.is_alive(), "thread_2 did not finish; create_environment may be deadlocked"
     assert errors == []
     assert backend.max_active_ensures == 1

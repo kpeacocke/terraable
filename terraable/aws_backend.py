@@ -68,8 +68,8 @@ class AWSBackend(LocalLabBackend):
             for blocker in blockers
             if "target=aws is not executable in live mode" not in blocker
         ]
-        if status.get("authenticated") and portal in {"backstage", "rhdh"}:
-            status["ready"] = True
+        if portal in {"backstage", "rhdh"}:
+            status["ready"] = bool(status.get("authenticated")) and not status["blockers"]
         return status
 
     @_serialize_backend_action
