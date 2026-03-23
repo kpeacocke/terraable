@@ -95,6 +95,19 @@ def _as_str_any_dict(value: Any) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _as_dict_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _serialize_action(
     method: Callable[Concatenate[LocalLabBackend, P], R],
 ) -> Callable[Concatenate[LocalLabBackend, P], R]:
@@ -1228,14 +1241,14 @@ class LocalLabBackend:
     def _build_observability(self, state: dict[str, Any]) -> dict[str, Any]:
         terraform = _as_str_any_dict(state.get("terraform"))
         jobs = _as_str_any_dict(state.get("jobs"))
-        job_history = cast(list[dict[str, Any]], jobs.get("history", []))
-        evidence = cast(list[dict[str, Any]], state.get("evidence", []))
-        eda_history = cast(list[dict[str, Any]], state.get("eda_history", []))
-        incidents = cast(list[dict[str, Any]], state.get("incidents", []))
-        trend = cast(list[dict[str, Any]], state.get("trend", []))
+        job_history = _as_dict_list(jobs.get("history", []))
+        evidence = _as_dict_list(state.get("evidence", []))
+        eda_history = _as_dict_list(state.get("eda_history", []))
+        incidents = _as_dict_list(state.get("incidents", []))
+        trend = _as_dict_list(state.get("trend", []))
 
         traces: list[dict[str, Any]] = []
-        terraform_updated_at = int(terraform.get("updated_at", 0) or 0)
+        terraform_updated_at = _as_int(terraform.get("updated_at", 0) or 0)
         if terraform_updated_at:
             traces.append(
                 {
@@ -1252,7 +1265,7 @@ class LocalLabBackend:
                 {
                     "stage": str(job.get("action", "workflow")),
                     "status": str(job.get("status", "unknown")),
-                    "at": int(job.get("updated_at", 0) or 0),
+                    "at": _as_int(job.get("updated_at", 0) or 0),
                     "depends_on": ["terraform"],
                     "detail": str(job.get("detail", "")),
                     "backend": str(job.get("backend", "unknown")),

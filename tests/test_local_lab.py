@@ -711,6 +711,44 @@ def test_observability_dashboard_contract_includes_metrics(tmp_path: Path) -> No
 
 
 @pytest.mark.unit
+def test_observability_dashboard_ignores_malformed_state_lists(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    state = backend._default_state()
+    state["terraform"] = {
+        "run_id": "run-bad",
+        "status": "applied",
+        "detail": "ok",
+        "updated_at": "not-a-number",
+    }
+    state["jobs"] = {
+        "last_action": "run_compliance_scan",
+        "last_status": "failed",
+        "history": [
+            "bad-entry",
+            {"action": "apply_baseline", "status": "succeeded", "updated_at": "oops"},
+        ],
+    }
+    state["evidence"] = "invalid"
+    state["eda_history"] = ["bad", {"message": "event", "tone": "ok"}]
+    state["incidents"] = None
+    state["trend"] = [{"label": "scan", "pct": 100}, "bad"]
+    backend.save_state_for_test(state)
+
+    observability = backend.get_state()["observability"]
+
+    assert observability["summary"]["last_stage"] == "apply_baseline"
+    assert observability["summary"]["last_status"] == "succeeded"
+    assert observability["summary"]["total_stages"] == 1
+    assert observability["summary"]["success_rate_pct"] == 100
+    assert observability["metrics"]["signal_counts"] == {
+        "evidence": 0,
+        "eda_events": 1,
+        "incidents": 0,
+        "trend_points": 1,
+    }
+
+
+@pytest.mark.unit
 def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials(
