@@ -12,7 +12,7 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 
 | Target | Notes |
 |--------|-------|
-| `local-lab` | Recommended first target. Runs against localhost or a local VM. |
+| `local-lab` | Live-executable. Recommended first target. Runs against localhost or a local VM. Requires an HCP Terraform token via `HCP_TERRAFORM_TOKEN` or `TF_TOKEN_<hostname>`. |
 | `gcp` | Live-executable. Requires `GOOGLE_APPLICATION_CREDENTIALS` and `HCP_TERRAFORM_TOKEN`. |
 | `vmware` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Uses Terraform contract scaffold. |
 | `parallels` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to localhost management host. |

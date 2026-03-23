@@ -11,6 +11,7 @@ TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 
 ```
 
 Open `http://127.0.0.1:8000`. All UI actions return pre-seeded responses — no credentials needed.
+Note: `TERRAABLE_MOCK_MODE` is read from the active shell environment at process start, not from `.env`, so set it inline as shown above or export it before starting the server.
 Continue reading this guide to verify the setup, choose a mode, and advance to live execution.
 
 ---
