@@ -36,6 +36,7 @@ SUPPORTED_EXECUTION_TARGETS = {
 # Targets wired to a live Terraform config. vmware/parallels/hyper-v substrate
 # modules are scaffolded (contract outputs only) and not yet connected to
 # _terraform_apply(); they run correctly in mock mode only.
+# AWS, Azure, and OKD are wired through their respective backend classes.
 LIVE_EXECUTION_TARGETS = {"local-lab"}
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
 STATE_LOG_LIMIT = 50
