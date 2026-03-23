@@ -14,6 +14,10 @@ from urllib.request import Request, urlopen
 import pytest
 
 from terraable import api_server
+from terraable.aws_backend import AWSBackend
+from terraable.azure_backend import AzureBackend
+from terraable.local_lab import LocalLabBackend
+from terraable.okd_backend import OKDBackend
 
 
 def _headers(values: dict[str, str]) -> Message:
@@ -661,7 +665,7 @@ def test_handler_configure_passes_target_and_portal(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    captured: dict[str, str] = {}
+    captured_calls: list[tuple[str, str]] = []
 
     class _CapturingBackend(_FakeBackend):
         def configure_credentials(
@@ -671,8 +675,7 @@ def test_handler_configure_passes_target_and_portal(
             target: str = "local-lab",
             portal: str = "backstage",
         ) -> dict[str, object]:
-            captured["target"] = target
-            captured["portal"] = portal
+            captured_calls.append((target, portal))
             return super().configure_credentials(credentials, target=target, portal=portal)
 
     monkeypatch.setattr(api_server, "LocalLabBackend", _CapturingBackend)
@@ -698,8 +701,10 @@ def test_handler_configure_passes_target_and_portal(
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        urlopen(request)
-        assert captured == {"target": "aws", "portal": "rhdh"}
+        payload = json.loads(urlopen(request).read().decode("utf-8"))
+        assert payload["auth"]["ready"] is True
+        assert {target for target, _ in captured_calls} == {"local-lab", "aws", "azure", "okd"}
+        assert {portal for _, portal in captured_calls} == {"rhdh"}
     finally:
         server.shutdown()
         server.server_close()
@@ -743,3 +748,116 @@ def test_main_starts_and_closes_server(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     assert events["addr"] == ("127.0.0.1", 8123)
     assert events["closed"] is True
+
+
+@pytest.mark.unit
+def test_get_backend_dispatches_provider_backends(tmp_path: Path) -> None:
+    assert isinstance(api_server.get_backend(tmp_path, "local-lab"), LocalLabBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "aws"), AWSBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "azure"), AzureBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "okd"), OKDBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "unknown"), LocalLabBackend)
+
+
+@pytest.mark.unit
+def test_make_handler_resets_backend_cache_per_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    workspace_one = tmp_path / "one"
+    workspace_two = tmp_path / "two"
+    (workspace_one / "ui").mkdir(parents=True)
+    (workspace_two / "ui").mkdir(parents=True)
+    (workspace_one / "ui" / "index.html").write_text("<html></html>", encoding="utf-8")
+    (workspace_two / "ui" / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    handler_one = api_server.make_handler(workspace_one)
+    handler_two = api_server.make_handler(workspace_two)
+
+    backend_one = cast(Any, handler_one).backends["local-lab"]
+    backend_two = cast(Any, handler_two).backends["local-lab"]
+    assert backend_one.workspace_root == workspace_one
+    assert backend_two.workspace_root == workspace_two
+    assert cast(Any, handler_one).backends is not cast(Any, handler_two).backends
+
+
+@pytest.mark.unit
+def test_get_active_backend_prefers_handler_backend_for_local_target(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+
+    sentinel_backend = _FakeBackend(tmp_path)
+    cast(Any, handler).backend = sentinel_backend
+    backend = cast(Any, handler).get_active_backend("local-lab")
+
+    assert backend is sentinel_backend
+    assert cast(Any, handler).backends["local-lab"] is sentinel_backend
+
+
+@pytest.mark.unit
+def test_get_active_backend_normalises_unknown_targets_to_local_lab(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+
+    backend = cast(Any, handler).get_active_backend("foo123")
+
+    assert isinstance(backend, _FakeBackend)
+    assert backend is cast(Any, handler).backends["local-lab"]
+    assert "foo123" not in cast(Any, handler).backends
+
+
+@pytest.mark.unit
+def test_action_failure_uses_target_backend_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class _TargetBackend(_FakeBackend):
+        def __init__(self, workspace_root: Path, target_name: str) -> None:
+            super().__init__(workspace_root)
+            self.target_name = target_name
+
+        def get_state(self) -> dict[str, object]:
+            return {"mode": f"live-{self.target_name}", "controls": {"ssh_root_login": True}}
+
+    def fake_get_backend(workspace_root: Path, target: str) -> _TargetBackend:
+        return _TargetBackend(workspace_root, target)
+
+    monkeypatch.setattr(api_server, "get_backend", fake_get_backend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        request = Request(
+            f"{base}/api/actions/apply_baseline",
+            data=json.dumps({"target": "aws"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        payload = json.loads(urlopen(request).read().decode("utf-8"))
+
+        assert payload["status"] == "failed"
+        assert payload["state"]["mode"] == "live-aws"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

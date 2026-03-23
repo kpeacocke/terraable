@@ -33,9 +33,11 @@ SUPPORTED_EXECUTION_TARGETS = {
     "parallels",
     "hyper-v",
 }
-# Targets wired to a live Terraform config. vmware/parallels/hyper-v substrate
-# modules are scaffolded (contract outputs only) and not yet connected to
-# _terraform_apply(); they run correctly in mock mode only.
+# Targets that this local-lab backend treats as wired to a live Terraform config.
+# vmware/parallels/hyper-v substrate modules are scaffolded (contract outputs only)
+# and not yet connected to _terraform_apply(); they run correctly in mock mode only.
+# AWS, Azure, and OKD are handled via their own backend classes and API-dispatch
+# paths, not via LIVE_EXECUTION_TARGETS in this module.
 LIVE_EXECUTION_TARGETS = {"local-lab"}
 HCP_TOKEN_REQUIREMENT = "__HCP_TF_TOKEN__"
 STATE_LOG_LIMIT = 50
@@ -1080,14 +1082,19 @@ class LocalLabBackend:
             "ssh_password_authentication": "PasswordAuthentication no" in ssh_text,
         }
 
-    def _ensure_environment(self, environment_name: str) -> Path:
+    def _ensure_environment(
+        self,
+        environment_name: str,
+        *,
+        ansible_inventory_group: str = "local_lab",
+    ) -> Path:
         env_dir = self.runtime_root / environment_name
         env_dir.mkdir(parents=True, exist_ok=True)
         inventory = env_dir / "inventory.yml"
         inventory.write_text(
             "all:\n"
             "  children:\n"
-            "    local_lab:\n"
+            f"    {ansible_inventory_group}:\n"
             "      hosts:\n"
             "        localhost:\n"
             "          ansible_connection: local\n",

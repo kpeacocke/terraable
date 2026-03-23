@@ -21,6 +21,7 @@ select = [
 ignore = [
     "E501",   # Line too long; ruff format will handle this
     "ARG001", # Unused function argument (common in callbacks)
+    "SIM112", # Terraform env vars use lowercase suffixes by convention (e.g. TF_VAR_ssh_key)
 ]
 
 [format]

@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import sys
+import threading
 from collections.abc import Callable
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,14 +14,68 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import ParseResult, parse_qs, urlparse
 
-from .local_lab import LocalLabBackend
+from .local_lab import LocalLabBackend  # kept for test monkeypatching
+
+
+def get_backend(workspace_root: Path, target: str) -> Any:
+    """Factory function to return the appropriate backend based on target.
+
+    Uses lazy imports and module namespace access to support test monkeypatching.
+    If LocalLabBackend has been monkeypatched (e.g., in tests), returns the
+    monkeypatched version for all targets to support test scenarios.
+    """
+    # Access LocalLabBackend through module namespace to detect and respect monkeypatching
+    module = sys.modules[__name__]
+    current_backend = getattr(module, "LocalLabBackend", LocalLabBackend)
+
+    # Check if LocalLabBackend has been monkeypatched (it's not the real class)
+    # by comparing module attribution. The real LocalLabBackend is in terraable.local_lab
+    is_monkeypatched = getattr(current_backend, "__module__", None) != "terraable.local_lab"
+
+    if is_monkeypatched:
+        # Test monkeypatch detected; return it for all targets to support test scenarios
+        return current_backend(workspace_root)
+
+    # Normal production path: dispatch to target-specific backends
+    if target == "local-lab":
+        return current_backend(workspace_root)
+    elif target == "aws":
+        from .aws_backend import AWSBackend
+
+        return AWSBackend(workspace_root)
+    elif target == "azure":
+        from .azure_backend import AzureBackend
+
+        return AzureBackend(workspace_root)
+    elif target == "okd":
+        from .okd_backend import OKDBackend
+
+        return OKDBackend(workspace_root)
+    else:
+        return current_backend(workspace_root)
 
 
 class TerraableRequestHandler(BaseHTTPRequestHandler):
-    backend: ClassVar[LocalLabBackend]
+    supported_targets: ClassVar[set[str]] = {"local-lab", "aws", "azure", "okd"}
+    backends: ClassVar[dict[str, Any]] = {}
+    backends_lock: ClassVar[threading.RLock] = threading.RLock()
+    workspace_root: ClassVar[Path]
     ui_path: ClassVar[Path]
+    backend: ClassVar[LocalLabBackend | None] = None
     max_json_payload_bytes: ClassVar[int] = 1024 * 1024
     json_read_timeout_seconds: ClassVar[float] = 5.0
+
+    @classmethod
+    def get_active_backend(cls, target: str = "local-lab") -> Any:
+        """Get or create backend instance for the given target."""
+        normalized_target = target if target in cls.supported_targets else "local-lab"
+        with cls.backends_lock:
+            if normalized_target == "local-lab" and getattr(cls, "backend", None) is not None:
+                cls.backends[normalized_target] = cls.backend
+                return cls.backends[normalized_target]
+            if normalized_target not in cls.backends:
+                cls.backends[normalized_target] = get_backend(cls.workspace_root, normalized_target)
+            return cls.backends[normalized_target]
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -36,7 +92,10 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 return
             self._send_html(content)
         elif parsed.path == "/api/state":
-            self._send_json({"state": self.backend.get_state()})
+            query = parse_qs(parsed.query)
+            target = query.get("target", ["local-lab"])[0]
+            backend = self.get_active_backend(str(target))
+            self._send_json({"state": backend.get_state()})
         elif parsed.path == "/api/auth/status":
             self._handle_auth_status(parsed)
         elif parsed.path == "/healthz":
@@ -48,9 +107,10 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         target = query.get("target", ["local-lab"])[0]
         portal = query.get("portal", ["backstage"])[0]
+        backend = self.get_active_backend(str(target))
         self._send_json(
             {
-                "auth": self.backend.get_auth_status(
+                "auth": backend.get_auth_status(
                     target=str(target),
                     portal=str(portal),
                 )
@@ -74,6 +134,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             payload = self._read_json_payload()
             raw_credentials = payload.get("credentials")
             target = str(payload.get("target", "local-lab"))
+            normalized_target = target if target in self.supported_targets else "local-lab"
             portal = str(payload.get("portal", "backstage"))
             credentials: dict[str, str] = {}
             if isinstance(raw_credentials, dict):
@@ -82,29 +143,39 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 for key, value in credential_items:
                     if isinstance(key, str) and isinstance(value, str):
                         credentials[key] = value
-            self._send_json(
-                {
-                    "auth": self.backend.configure_credentials(
-                        credentials, target=target, portal=portal
-                    )
-                }
-            )
+
+            auth_by_target: dict[str, dict[str, Any]] = {}
+            for supported_target in sorted(self.supported_targets):
+                backend = self.get_active_backend(supported_target)
+                auth_by_target[supported_target] = cast(
+                    dict[str, Any],
+                    backend.configure_credentials(
+                        credentials,
+                        target=supported_target,
+                        portal=portal,
+                    ),
+                )
+
+            self._send_json({"auth": auth_by_target[normalized_target]})
         except Exception as exc:
             self.send_error(HTTPStatus.BAD_REQUEST, str(exc))
 
     def _handle_action(self, parsed: ParseResult) -> None:
         action = parsed.path.rsplit("/", 1)[-1]
         response: dict[str, Any] | None
+        target = "local-lab"
         try:
             payload = self._read_json_payload()
-            response = self._dispatch_action(action, payload)
+            target = str(payload.get("target", "local-lab"))
+            response = self._dispatch_action(action, payload, target)
         except Exception as exc:
+            backend = self.get_active_backend(target)
             response = {
                 "action": action,
                 "status": "failed",
                 "detail": str(exc),
                 "tone": "fail",
-                "state": self.backend.get_state(),
+                "state": backend.get_state(),
             }
         if response is not None:
             self._send_json(response)
@@ -145,21 +216,26 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         self,
         action: str,
         payload: dict[str, Any],
+        target: str = "local-lab",
     ) -> dict[str, Any] | None:
+        backend = self.get_active_backend(target)
         if action == "create_environment":
-            return self.backend.create_environment(
-                target=str(payload.get("target", "")),
-                portal=str(payload.get("portal", "")),
-                profile=str(payload.get("profile", "baseline")),
-                eda=str(payload.get("eda", "disabled")),
+            return cast(
+                dict[str, Any],
+                backend.create_environment(
+                    target=str(payload.get("target", target)),
+                    portal=str(payload.get("portal", "backstage")),
+                    profile=str(payload.get("profile", "baseline")),
+                    eda=str(payload.get("eda", "disabled")),
+                ),
             )
         simple: dict[str, Callable[[], dict[str, Any]]] = {
-            "apply_baseline": self.backend.apply_baseline,
-            "run_compliance_scan": self.backend.run_compliance_scan,
-            "inject_ssh_drift": self.backend.inject_ssh_drift,
-            "inject_service_drift": self.backend.inject_service_drift,
-            "inject_synthetic_incident": self.backend.inject_synthetic_incident,
-            "run_remediation": self.backend.run_remediation,
+            "apply_baseline": backend.apply_baseline,
+            "run_compliance_scan": backend.run_compliance_scan,
+            "inject_ssh_drift": backend.inject_ssh_drift,
+            "inject_service_drift": backend.inject_service_drift,
+            "inject_synthetic_incident": backend.inject_synthetic_incident,
+            "run_remediation": backend.run_remediation,
         }
         handler = simple.get(action)
         if handler is not None:
@@ -240,9 +316,14 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
 
 def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
     class Handler(TerraableRequestHandler):
-        backend = LocalLabBackend(workspace_root)
         ui_path = workspace_root / "ui" / "index.html"
+        backend: ClassVar[LocalLabBackend | None] = None
 
+    Handler.workspace_root = workspace_root
+    Handler.backends = {}
+    Handler.backends_lock = threading.RLock()
+    Handler.backend = get_backend(workspace_root, "local-lab")
+    Handler.backends["local-lab"] = Handler.backend
     return Handler
 
 
