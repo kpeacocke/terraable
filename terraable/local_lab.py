@@ -1229,6 +1229,10 @@ class LocalLabBackend:
         terraform = _as_str_any_dict(state.get("terraform"))
         jobs = _as_str_any_dict(state.get("jobs"))
         job_history = cast(list[dict[str, Any]], jobs.get("history", []))
+        evidence = cast(list[dict[str, Any]], state.get("evidence", []))
+        eda_history = cast(list[dict[str, Any]], state.get("eda_history", []))
+        incidents = cast(list[dict[str, Any]], state.get("incidents", []))
+        trend = cast(list[dict[str, Any]], state.get("trend", []))
 
         traces: list[dict[str, Any]] = []
         terraform_updated_at = int(terraform.get("updated_at", 0) or 0)
@@ -1239,6 +1243,7 @@ class LocalLabBackend:
                     "status": str(terraform.get("status", "unknown")),
                     "at": terraform_updated_at,
                     "depends_on": [],
+                    "detail": str(terraform.get("detail", "")),
                 }
             )
 
@@ -1249,14 +1254,69 @@ class LocalLabBackend:
                     "status": str(job.get("status", "unknown")),
                     "at": int(job.get("updated_at", 0) or 0),
                     "depends_on": ["terraform"],
+                    "detail": str(job.get("detail", "")),
+                    "backend": str(job.get("backend", "unknown")),
+                    "job_id": str(job.get("job_id", "n/a")),
                 }
             )
 
+        ordered_traces = sorted(traces, key=lambda item: int(item.get("at", 0)), reverse=True)
+
+        success_states = {"succeeded", "applied", "pass", "successful"}
+        failure_states = {"failed", "fail", "error"}
+        successful_stages = sum(
+            1 for stage in ordered_traces if str(stage.get("status", "")).lower() in success_states
+        )
+        failed_stages = sum(
+            1 for stage in ordered_traces if str(stage.get("status", "")).lower() in failure_states
+        )
+        total_stages = len(ordered_traces)
+        success_rate_pct = round((successful_stages / total_stages) * 100) if total_stages else 0
+        last_trace = ordered_traces[0] if ordered_traces else {}
+
         return {
-            "stages": traces,
+            "stages": ordered_traces,
             "summary": {
-                "last_stage": str(jobs.get("last_action") or "terraform"),
-                "last_status": str(jobs.get("last_status") or terraform.get("status", "idle")),
+                "last_stage": str(
+                    last_trace.get("stage")
+                    or jobs.get("last_action")
+                    or "terraform"
+                ),
+                "last_status": str(
+                    last_trace.get("status")
+                    or jobs.get("last_status")
+                    or terraform.get("status", "idle")
+                ),
+                "last_updated_at": int(last_trace.get("at", terraform_updated_at) or 0),
+                "total_stages": total_stages,
+                "failed_stages": failed_stages,
+                "success_rate_pct": success_rate_pct,
+            },
+            "metrics": {
+                "terraform": {
+                    "status": str(terraform.get("status", "idle")),
+                    "run_id": terraform.get("run_id"),
+                    "updated_at": terraform_updated_at,
+                },
+                "workflow": {
+                    "last_action": str(jobs.get("last_action") or "n/a"),
+                    "last_status": str(jobs.get("last_status") or "idle"),
+                    "last_backend": str(jobs.get("last_backend") or "n/a"),
+                    "last_job_id": str(jobs.get("last_job_id") or "n/a"),
+                    "history_count": len(job_history),
+                },
+                "signal_counts": {
+                    "evidence": len(evidence),
+                    "eda_events": len(eda_history),
+                    "incidents": len(incidents),
+                    "trend_points": len(trend),
+                },
+                "reliability": {
+                    "total_stages": total_stages,
+                    "successful_stages": successful_stages,
+                    "failed_stages": failed_stages,
+                    "success_rate_pct": success_rate_pct,
+                },
             },
         }
 

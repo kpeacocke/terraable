@@ -636,6 +636,81 @@ def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_observability_dashboard_contract_includes_metrics(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    state = backend._default_state()
+    state["terraform"] = {
+        "run_id": "run-42",
+        "status": "applied",
+        "detail": "terraform apply completed",
+        "updated_at": 1_700_000_001,
+    }
+    state["jobs"] = {
+        "last_action": "run_compliance_scan",
+        "last_status": "failed",
+        "last_detail": "drift detected",
+        "last_backend": "direct",
+        "last_job_id": "job-2",
+        "history": [
+            {
+                "action": "apply_baseline",
+                "status": "succeeded",
+                "detail": "baseline applied",
+                "backend": "direct",
+                "job_id": "job-1",
+                "updated_at": 1_700_000_002,
+            },
+            {
+                "action": "run_compliance_scan",
+                "status": "failed",
+                "detail": "ssh_root_login drift",
+                "backend": "direct",
+                "job_id": "job-2",
+                "updated_at": 1_700_000_003,
+            },
+        ],
+    }
+    state["evidence"] = [{"tone": "ok", "message": "baseline evidence"}]
+    state["eda_history"] = [{"tone": "warn", "message": "event received"}]
+    state["incidents"] = [
+        {
+            "severity": "high",
+            "component": "portal",
+            "message": "service stopped",
+        }
+    ]
+    state["trend"] = [
+        {"label": "scan 1", "pct": 100},
+        {"label": "scan 2", "pct": 50},
+    ]
+    backend.save_state_for_test(state)
+
+    observability = backend.get_state()["observability"]
+
+    assert observability["summary"]["last_stage"] == "run_compliance_scan"
+    assert observability["summary"]["last_status"] == "failed"
+    assert observability["summary"]["total_stages"] == 3
+    assert observability["summary"]["failed_stages"] == 1
+    assert observability["summary"]["success_rate_pct"] == 67
+
+    metrics = observability["metrics"]
+    assert metrics["terraform"]["run_id"] == "run-42"
+    assert metrics["workflow"]["history_count"] == 2
+    assert metrics["signal_counts"] == {
+        "evidence": 1,
+        "eda_events": 1,
+        "incidents": 1,
+        "trend_points": 2,
+    }
+
+    stages = observability["stages"]
+    assert stages[0]["stage"] == "run_compliance_scan"
+    assert stages[0]["status"] == "failed"
+    assert stages[1]["stage"] == "apply_baseline"
+    assert stages[2]["stage"] == "terraform"
+
+
+@pytest.mark.unit
 def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials(
