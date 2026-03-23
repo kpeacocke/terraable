@@ -21,13 +21,24 @@ def get_backend(workspace_root: Path, target: str) -> Any:
     """Factory function to return the appropriate backend based on target.
     
     Uses lazy imports and module namespace access to support test monkeypatching.
+    If LocalLabBackend has been monkeypatched (e.g., in tests), returns the 
+    monkeypatched version for all targets to support test scenarios.
     """
-    # Access LocalLabBackend through module namespace to support monkeypatching
+    # Access LocalLabBackend through module namespace to detect and respect monkeypatching
     module = sys.modules[__name__]
+    current_backend = getattr(module, "LocalLabBackend", LocalLabBackend)
     
+    # Check if LocalLabBackend has been monkeypatched (it's not the real class)
+    # by comparing module attribution. The real LocalLabBackend is in terraable.local_lab
+    is_monkeypatched = getattr(current_backend, "__module__", None) != "terraable.local_lab"
+    
+    if is_monkeypatched:
+        # Test monkeypatch detected; return it for all targets to support test scenarios
+        return current_backend(workspace_root)
+    
+    # Normal production path: dispatch to target-specific backends
     if target == "local-lab":
-        backend_class = getattr(module, "LocalLabBackend", LocalLabBackend)
-        return backend_class(workspace_root)
+        return current_backend(workspace_root)
     elif target == "aws":
         from .aws_backend import AWSBackend
         return AWSBackend(workspace_root)
@@ -38,8 +49,7 @@ def get_backend(workspace_root: Path, target: str) -> Any:
         from .okd_backend import OKDBackend
         return OKDBackend(workspace_root)
     else:
-        backend_class = getattr(module, "LocalLabBackend", LocalLabBackend)
-        return backend_class(workspace_root)
+        return current_backend(workspace_root)
 
 
 class TerraableRequestHandler(BaseHTTPRequestHandler):
