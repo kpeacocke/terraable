@@ -703,7 +703,16 @@ def test_handler_configure_passes_target_and_portal(
         )
         payload = json.loads(urlopen(request).read().decode("utf-8"))
         assert payload["auth"]["ready"] is True
-        assert {target for target, _ in captured_calls} == {"local-lab", "aws", "azure", "okd"}
+        assert {target for target, _ in captured_calls} == {
+            "local-lab",
+            "aws",
+            "azure",
+            "okd",
+            "gcp",
+            "vmware",
+            "parallels",
+            "hyper-v",
+        }
         assert {portal for _, portal in captured_calls} == {"rhdh"}
     finally:
         server.shutdown()
@@ -756,6 +765,10 @@ def test_get_backend_dispatches_provider_backends(tmp_path: Path) -> None:
     assert isinstance(api_server.get_backend(tmp_path, "aws"), AWSBackend)
     assert isinstance(api_server.get_backend(tmp_path, "azure"), AzureBackend)
     assert isinstance(api_server.get_backend(tmp_path, "okd"), OKDBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "gcp"), LocalLabBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "vmware"), LocalLabBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "parallels"), LocalLabBackend)
+    assert isinstance(api_server.get_backend(tmp_path, "hyper-v"), LocalLabBackend)
     assert isinstance(api_server.get_backend(tmp_path, "unknown"), LocalLabBackend)
 
 

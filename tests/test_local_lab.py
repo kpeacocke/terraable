@@ -40,13 +40,20 @@ class _FakeLocalLabBackend(LocalLabBackend):
         target: str = "local-lab",
     ) -> dict[str, Any]:
         assert env_dir.exists()
+        inventory_by_target = {
+            "local-lab": "local_lab",
+            "gcp": "gcp_hosts",
+            "vmware": "vmware_hosts",
+            "parallels": "parallels_hosts",
+            "hyper-v": "hyperv_hosts",
+        }
         return {
             "environment_name": environment_name,
             "target_platform": target,
             "portal_impl": portal,
             "security_profile": profile,
             "connection": {
-                "ansible_inventory_group": "local_lab",
+                "ansible_inventory_group": inventory_by_target.get(target, "local_lab"),
                 "ssh_user": "lab",
                 "ssh_port": 22,
                 "api_endpoint": "http://localhost:8080",
@@ -224,6 +231,9 @@ class _InspectableLocalLabBackend(LocalLabBackend):
     def ansible_vars_for_test(self, env_dir: Path) -> dict[str, Any]:
         return self._ansible_vars(env_dir)
 
+    def terraform_root_for_target_for_test(self, target: str) -> Path:
+        return self._terraform_root_for_target(target)
+
 
 class _ActionLockProbeBackend(LocalLabBackend):
     def __init__(self, workspace_root: Path) -> None:
@@ -376,6 +386,47 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
 
     assert result["status"] == "failed"
     assert "supported live targets" in result["detail"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("target", ["vmware", "parallels", "hyper-v"])
+def test_live_virtualisation_targets_are_executable(
+    target: str,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
+    backend = _FakeLocalLabBackend(tmp_path)
+
+    result = backend.create_environment(
+        target=target,
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["state"]["current"]["target"] == target
+    assert result["state"]["mode"].startswith("live-")
+
+
+@pytest.mark.unit
+def test_live_gcp_target_is_executable_with_required_credentials(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        "HCP_TERRAFORM_TOKEN=test-token\nGOOGLE_APPLICATION_CREDENTIALS=/tmp/fake-gcp-creds.json\n",
+        encoding="utf-8",
+    )
+    backend = _FakeLocalLabBackend(tmp_path)
+
+    result = backend.create_environment(
+        target="gcp",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["state"]["current"]["target"] == "gcp"
+    assert result["state"]["mode"] == "live-gcp"
 
 
 @pytest.mark.unit
@@ -563,6 +614,27 @@ def test_terraform_apply_runs_init_apply_and_output(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_terraform_root_mapping_includes_phase3_targets(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+
+    assert backend.terraform_root_for_target_for_test("local-lab") == (
+        tmp_path / "integration" / "local_lab" / "terraform"
+    )
+    assert backend.terraform_root_for_target_for_test("gcp") == (
+        tmp_path / "terraform" / "modules" / "substrate_gcp"
+    )
+    assert backend.terraform_root_for_target_for_test("vmware") == (
+        tmp_path / "terraform" / "modules" / "substrate_vmware"
+    )
+    assert backend.terraform_root_for_target_for_test("parallels") == (
+        tmp_path / "terraform" / "modules" / "substrate_parallels"
+    )
+    assert backend.terraform_root_for_target_for_test("hyper-v") == (
+        tmp_path / "terraform" / "modules" / "substrate_hyperv"
+    )
+
+
+@pytest.mark.unit
 def test_run_playbook_uses_local_inventory_and_ansible_config(tmp_path: Path) -> None:
     calls: list[tuple[list[str], Path | None, dict[str, str] | None]] = []
 
@@ -639,9 +711,9 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
     ]
-    assert (
-        "target=aws is not executable in live mode; supported live targets: local-lab"
-        in auth["blockers"]
+    assert any(
+        blocker.startswith("target=aws is not executable in live mode; supported live targets:")
+        for blocker in auth["blockers"]
     )
 
 
