@@ -787,7 +787,10 @@
 
     async function refreshState() {
       try {
-        const data = await api("/api/state");
+        const query = new URLSearchParams({
+          target: selected("target"),
+        });
+        const data = await api(`/api/state?${query.toString()}`);
         renderState(data.state);
         const mode = data.state?.mode || "live-local-lab";
         const target = data.state?.current?.target || "local-lab";
@@ -932,6 +935,7 @@
 
     document.getElementById("target").addEventListener("change", async () => {
       syncCredentialGroups(selected("target"));
+      await refreshState();
       await refreshAuthStatus();
     });
     document.getElementById("portal").addEventListener("change", async () => {

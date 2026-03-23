@@ -112,7 +112,10 @@ class OKDBackend(LocalLabBackend):
                 detail=f"mock terraform apply completed for {environment_name}",
                 run_id=run_id,
             )
-            env_dir = self._ensure_environment(environment_name)
+            env_dir = self._ensure_environment(
+                environment_name,
+                ansible_inventory_group="okd_cluster",
+            )
             runtime_vars: dict[str, Any] = {
                 "environment_name": environment_name,
                 "terraform_run_id": run_id,
@@ -162,7 +165,10 @@ class OKDBackend(LocalLabBackend):
 
         environment_name = f"okd-{int(self._clock())}"
         run_id = f"okd-{environment_name}"
-        env_dir = self._ensure_environment(environment_name)
+        env_dir = self._ensure_environment(
+            environment_name,
+            ansible_inventory_group="okd_cluster",
+        )
         self._set_terraform_status(
             status="running",
             detail=f"terraform apply started for {environment_name}",

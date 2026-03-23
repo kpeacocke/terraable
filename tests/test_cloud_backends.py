@@ -23,13 +23,21 @@ class _ActionLockProbeAWSBackend(AWSBackend):
         self._active_ensures = 0
         self.max_active_ensures = 0
 
-    def _ensure_environment(self, environment_name: str) -> Path:
+    def _ensure_environment(
+        self,
+        environment_name: str,
+        *,
+        ansible_inventory_group: str = "local_lab",
+    ) -> Path:
         with self._probe_lock:
             self._active_ensures += 1
             self.max_active_ensures = max(self.max_active_ensures, self._active_ensures)
         try:
             time.sleep(0.05)
-            return super()._ensure_environment(environment_name)
+            return super()._ensure_environment(
+                environment_name,
+                ansible_inventory_group=ansible_inventory_group,
+            )
         finally:
             with self._probe_lock:
                 self._active_ensures -= 1
@@ -218,14 +226,31 @@ def test_cloud_backends_reject_wrong_target(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_cloud_backends_get_auth_status_rejects_wrong_target(tmp_path: Path) -> None:
+    aws_status = AWSBackend(tmp_path).get_auth_status(target="azure", portal="backstage")
+    azure_status = AzureBackend(tmp_path).get_auth_status(target="okd", portal="backstage")
+    okd_status = OKDBackend(tmp_path).get_auth_status(target="aws", portal="backstage")
+
+    assert aws_status["ready"] is False
+    assert aws_status["authenticated"] is False
+    assert aws_status["blockers"] == ["target=azure is not supported by AWS backend"]
+
+    assert azure_status["ready"] is False
+    assert azure_status["authenticated"] is False
+    assert azure_status["blockers"] == ["target=okd is not supported by Azure backend"]
+
+    assert okd_status["ready"] is False
+    assert okd_status["authenticated"] is False
+    assert okd_status["blockers"] == ["target=aws is not supported by OKD backend"]
+
+
+@pytest.mark.unit
 def test_aws_create_environment_live_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     backend = AWSBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
-    monkeypatch.setattr(
-        backend, "_terraform_apply_aws", lambda *_, **__: _terraform_outputs("aws")
-    )
+    monkeypatch.setattr(backend, "_terraform_apply_aws", lambda *_, **__: _terraform_outputs("aws"))
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
         backend,
@@ -421,9 +446,7 @@ def test_okd_create_environment_live_success(
 ) -> None:
     backend = OKDBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
-    monkeypatch.setattr(
-        backend, "_terraform_apply_okd", lambda *_, **__: _terraform_outputs("okd")
-    )
+    monkeypatch.setattr(backend, "_terraform_apply_okd", lambda *_, **__: _terraform_outputs("okd"))
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
         backend,
@@ -494,9 +517,7 @@ def test_aws_terraform_apply_parses_comma_cidrs(
 def test_aws_terraform_apply_rejects_invalid_json_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = AWSBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AWSBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
@@ -515,9 +536,7 @@ def test_aws_terraform_apply_rejects_invalid_json_cidrs(
 def test_aws_terraform_apply_requires_ssh_public_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = AWSBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AWSBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.delenv("TF_VAR_ssh_public_key", raising=False)
@@ -536,9 +555,7 @@ def test_aws_terraform_apply_requires_ssh_public_key(
 def test_aws_terraform_apply_requires_allowed_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = AWSBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AWSBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
@@ -559,9 +576,7 @@ def test_aws_terraform_apply_rejects_non_string_json_list(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    backend = AWSBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AWSBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
@@ -581,9 +596,7 @@ def test_aws_terraform_apply_rejects_empty_json_list(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    backend = AWSBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AWSBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
@@ -602,9 +615,7 @@ def test_aws_terraform_apply_rejects_empty_json_list(
 def test_azure_terraform_apply_requires_resource_group(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = AzureBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AzureBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.delenv("TF_VAR_resource_group_name", raising=False)
@@ -623,9 +634,7 @@ def test_azure_terraform_apply_requires_resource_group(
 def test_azure_terraform_apply_requires_ssh_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = AzureBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AzureBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_resource_group_name", "rg-demo")
@@ -646,9 +655,7 @@ def test_azure_terraform_apply_requires_allowed_source(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    backend = AzureBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = AzureBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_resource_group_name", "rg-demo")
@@ -714,9 +721,7 @@ def test_azure_terraform_apply_parses_outputs(
 def test_okd_terraform_apply_requires_cluster_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = OKDBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = OKDBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.delenv("TF_VAR_cluster_name", raising=False)
@@ -735,9 +740,7 @@ def test_okd_terraform_apply_requires_cluster_name(
 def test_okd_terraform_apply_requires_base_domain(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    backend = OKDBackend(
-        tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr="")
-    )
+    backend = OKDBackend(tmp_path, runner=lambda *_, **__: CommandResult(stdout="", stderr=""))
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_cluster_name", "demo")

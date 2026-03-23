@@ -1082,14 +1082,19 @@ class LocalLabBackend:
             "ssh_password_authentication": "PasswordAuthentication no" in ssh_text,
         }
 
-    def _ensure_environment(self, environment_name: str) -> Path:
+    def _ensure_environment(
+        self,
+        environment_name: str,
+        *,
+        ansible_inventory_group: str = "local_lab",
+    ) -> Path:
         env_dir = self.runtime_root / environment_name
         env_dir.mkdir(parents=True, exist_ok=True)
         inventory = env_dir / "inventory.yml"
         inventory.write_text(
             "all:\n"
             "  children:\n"
-            "    local_lab:\n"
+            f"    {ansible_inventory_group}:\n"
             "      hosts:\n"
             "        localhost:\n"
             "          ansible_connection: local\n",
