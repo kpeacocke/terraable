@@ -387,7 +387,7 @@ class LocalLabBackend:
                 portal_impl=str(outputs["portal_impl"]),
                 security_profile=str(outputs["security_profile"]),
                 connection=dict(outputs["connection"]),
-                metadata={"mode": f"live-{target}", "runtime_dir": str(env_dir)},
+                metadata={"mode": f"live-{tf_target}", "runtime_dir": str(env_dir)},
             )
         except Exception as exc:  # pragma: no cover - exercised via tests with fakes
             self._set_terraform_status(
@@ -1322,9 +1322,7 @@ class LocalLabBackend:
             "stages": ordered_traces,
             "summary": {
                 "last_stage": str(
-                    last_trace.get("stage")
-                    or jobs.get("last_action")
-                    or "terraform"
+                    last_trace.get("stage") or jobs.get("last_action") or "terraform"
                 ),
                 "last_status": str(
                     last_trace.get("status")

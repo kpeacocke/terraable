@@ -55,6 +55,13 @@ def get_backend(workspace_root: Path, target: str) -> Any:
         return current_backend(workspace_root)
 
 
+# Targets that all route to LocalLabBackend. They share a single cached instance
+# so there is only one action lock and one runtime_root/state_file in use at a time.
+_LOCAL_LAB_BACKEND_TARGETS: frozenset[str] = frozenset(
+    {"local-lab", "gcp", "vmware", "parallels", "hyper-v"}
+)
+
+
 class TerraableRequestHandler(BaseHTTPRequestHandler):
     supported_targets: ClassVar[set[str]] = {
         "local-lab",
@@ -78,13 +85,16 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def get_active_backend(cls, target: str = "local-lab") -> Any:
         """Get or create backend instance for the given target."""
         normalized_target = target if target in cls.supported_targets else "local-lab"
+        # All targets routed to LocalLabBackend share one instance so that the
+        # action lock and runtime_root/state_file are never duplicated across targets.
+        cache_key = "local-lab" if normalized_target in _LOCAL_LAB_BACKEND_TARGETS else normalized_target
         with cls.backends_lock:
-            if normalized_target == "local-lab" and getattr(cls, "backend", None) is not None:
-                cls.backends[normalized_target] = cls.backend
-                return cls.backends[normalized_target]
-            if normalized_target not in cls.backends:
-                cls.backends[normalized_target] = get_backend(cls.workspace_root, normalized_target)
-            return cls.backends[normalized_target]
+            if cache_key == "local-lab" and getattr(cls, "backend", None) is not None:
+                cls.backends[cache_key] = cls.backend
+                return cls.backends[cache_key]
+            if cache_key not in cls.backends:
+                cls.backends[cache_key] = get_backend(cls.workspace_root, cache_key)
+            return cls.backends[cache_key]
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)

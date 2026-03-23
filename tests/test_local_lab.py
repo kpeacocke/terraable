@@ -412,8 +412,7 @@ def test_live_virtualisation_targets_are_executable(
 @pytest.mark.unit
 def test_live_gcp_target_is_executable_with_required_credentials(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text(
-        "HCP_TERRAFORM_TOKEN=test-token\n"
-        "GOOGLE_APPLICATION_CREDENTIALS=/tmp/fake-gcp-creds.json\n",
+        "HCP_TERRAFORM_TOKEN=test-token\nGOOGLE_APPLICATION_CREDENTIALS=/tmp/fake-gcp-creds.json\n",
         encoding="utf-8",
     )
     backend = _FakeLocalLabBackend(tmp_path)
