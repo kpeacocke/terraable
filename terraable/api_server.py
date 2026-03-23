@@ -87,7 +87,9 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         normalized_target = target if target in cls.supported_targets else "local-lab"
         # All targets routed to LocalLabBackend share one instance so that the
         # action lock and runtime_root/state_file are never duplicated across targets.
-        cache_key = "local-lab" if normalized_target in _LOCAL_LAB_BACKEND_TARGETS else normalized_target
+        cache_key = (
+            "local-lab" if normalized_target in _LOCAL_LAB_BACKEND_TARGETS else normalized_target
+        )
         with cls.backends_lock:
             if cache_key == "local-lab" and getattr(cls, "backend", None) is not None:
                 cls.backends[cache_key] = cls.backend

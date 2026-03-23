@@ -1,5 +1,38 @@
 # Fork-and-Run Lab Guide
 
+## Two-minute quick start
+
+```bash
+git clone https://github.com/<your-username>/terraable.git && cd terraable
+cp .env.example .env          # safe defaults — TERRAABLE_MOCK_MODE=true pre-enabled
+python3 -m venv .venv && source .venv/bin/activate
+pip install poetry && poetry install
+TERRAABLE_MOCK_MODE=true python -m terraable.api_server --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000`. All UI actions return pre-seeded responses — no credentials needed.
+Continue reading this guide to verify the setup, choose a mode, and advance to live execution.
+
+---
+
+## Target quick reference
+
+| Target | Live-executable | Credentials required | Notes |
+|--------|----------------|---------------------|-------|
+| `local-lab` | Yes | HCP Terraform token | Recommended first live target |
+| `gcp` | Yes | HCP Terraform token + `GOOGLE_APPLICATION_CREDENTIALS` | GCP service account JSON |
+| `vmware` | Yes | HCP Terraform token | Uses local Terraform data resource |
+| `parallels` | Yes | HCP Terraform token | Defaults to localhost management host |
+| `hyper-v` | Yes | HCP Terraform token | Defaults to localhost Hyper-V host |
+| `aws` | Yes (dedicated backend) | AWS IAM credentials | `substrate_aws` module |
+| `azure` | Yes (dedicated backend) | ARM service principal | `substrate_azure` module |
+| `okd` | Yes (dedicated backend) | OpenShift token | `substrate_okd` module |
+| `openshift` | Contract scaffold only | — | Phase 2 resource wiring pending |
+
+For credential details and minimum-scope guidance, see [credentials-matrix.md](credentials-matrix.md).
+
+---
+
 This guide walks you through forking the repository and running the Terraable demo in a local lab environment with minimal dependencies.
 
 ## Prerequisites
@@ -124,6 +157,11 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 | AWX bootstrap fails auth | Wrong credentials | Check `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD` in `.env` |
 | EDA webhook not firing | EDA mode disabled | Set EDA mode to `enabled` in the UI |
 | `local-lab + rhdh` rejected | Unsupported combination | Use `backstage` portal with `local-lab` target |
+| `gcp` target auth blocked | Missing credentials | Set `GOOGLE_APPLICATION_CREDENTIALS` and `HCP_TERRAFORM_TOKEN` in `.env`; `TERRAABLE_MOCK_MODE=true` bypasses this |
+| `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP token | Set `HCP_TERRAFORM_TOKEN` in `.env`; `TERRAABLE_MOCK_MODE=true` bypasses this |
+| UI stuck on `live-local-lab` after switching target | Stale backend cache | Reload the page; all local targets share one backend instance |
+| `terraform init` fails on Phase 3 module | Terraform version | Modules use only `terraform_data` — no external provider needed; confirm Terraform ≥ 1.9 |
+| `.env` values appear in logs or diff | Credentials committed | Confirm `.env` is gitignored; rotate any exposed credentials immediately |
 
 ---
 

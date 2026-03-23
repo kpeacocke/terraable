@@ -12,10 +12,15 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 
 | Target | Notes |
 |--------|-------|
-| `local-lab` | Recommended first target. Runs against localhost or a local VM and is the only end-to-end executable backend in this branch. |
-| `okd` | Contract and module scaffolding only. Provider-specific execution path is not wired yet. |
-| `aws` | Terraform module groundwork only. Control-plane execution path is not wired yet. |
-| `azure` | Terraform module groundwork only. Control-plane execution path is not wired yet. |
+| `local-lab` | Recommended first target. Runs against localhost or a local VM. |
+| `gcp` | Live-executable. Requires `GOOGLE_APPLICATION_CREDENTIALS` and `HCP_TERRAFORM_TOKEN`. |
+| `vmware` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Uses Terraform contract scaffold. |
+| `parallels` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to localhost management host. |
+| `hyper-v` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to localhost Hyper-V host. |
+| `aws` | Live-executable via dedicated backend (`AWSBackend`). Requires AWS IAM credentials. |
+| `azure` | Live-executable via dedicated backend (`AzureBackend`). Requires ARM service principal. |
+| `okd` | Live-executable via dedicated backend (`OKDBackend`). Requires OpenShift API token. |
+| `openshift` | Contract and module scaffolding only. Provider execution path pending Phase 2. |
 
 ## AWX setup
 
