@@ -12,7 +12,7 @@ import pytest
 
 from terraable.aws_backend import AWSBackend
 from terraable.azure_backend import AzureBackend
-from terraable.local_lab import CommandResult, LocalLabBackend, MOCK_MODE_ENV_VAR
+from terraable.local_lab import MOCK_MODE_ENV_VAR, CommandResult, LocalLabBackend
 from terraable.okd_backend import OKDBackend
 
 
@@ -51,7 +51,9 @@ def _terraform_outputs(target: str, portal: str = "backstage") -> dict[str, Any]
 
 
 @pytest.mark.unit
-def test_aws_get_auth_status_relaxes_live_target_gate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_get_auth_status_relaxes_live_target_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AWSBackend(tmp_path)
 
     def fake_super(self: LocalLabBackend, *, target: str, portal: str) -> dict[str, Any]:
@@ -62,7 +64,9 @@ def test_aws_get_auth_status_relaxes_live_target_gate(monkeypatch: pytest.Monkey
             "required_credentials": ["HCP_TOKEN_app_terraform_io"],
             "missing_credentials": [],
             "credential_sources": {},
-            "blockers": ["target=aws is not executable in live mode; supported live targets: local-lab"],
+            "blockers": [
+                "target=aws is not executable in live mode; supported live targets: local-lab"
+            ],
         }
 
     monkeypatch.setattr(LocalLabBackend, "get_auth_status", fake_super)
@@ -74,7 +78,9 @@ def test_aws_get_auth_status_relaxes_live_target_gate(monkeypatch: pytest.Monkey
 
 
 @pytest.mark.unit
-def test_azure_get_auth_status_relaxes_live_target_gate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_azure_get_auth_status_relaxes_live_target_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AzureBackend(tmp_path)
 
     def fake_super(self: LocalLabBackend, *, target: str, portal: str) -> dict[str, Any]:
@@ -85,7 +91,9 @@ def test_azure_get_auth_status_relaxes_live_target_gate(monkeypatch: pytest.Monk
             "required_credentials": ["HCP_TOKEN_app_terraform_io"],
             "missing_credentials": [],
             "credential_sources": {},
-            "blockers": ["target=azure is not executable in live mode; supported live targets: local-lab"],
+            "blockers": [
+                "target=azure is not executable in live mode; supported live targets: local-lab"
+            ],
         }
 
     monkeypatch.setattr(LocalLabBackend, "get_auth_status", fake_super)
@@ -97,7 +105,9 @@ def test_azure_get_auth_status_relaxes_live_target_gate(monkeypatch: pytest.Monk
 
 
 @pytest.mark.unit
-def test_okd_get_auth_status_requires_cluster_vars(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_okd_get_auth_status_requires_cluster_vars(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = OKDBackend(tmp_path)
 
     def fake_super(self: LocalLabBackend, *, target: str, portal: str) -> dict[str, Any]:
@@ -108,7 +118,9 @@ def test_okd_get_auth_status_requires_cluster_vars(monkeypatch: pytest.MonkeyPat
             "required_credentials": ["HCP_TOKEN_app_terraform_io"],
             "missing_credentials": [],
             "credential_sources": {},
-            "blockers": ["target=okd is not executable in live mode; supported live targets: local-lab"],
+            "blockers": [
+                "target=okd is not executable in live mode; supported live targets: local-lab"
+            ],
         }
 
     monkeypatch.setattr(LocalLabBackend, "get_auth_status", fake_super)
@@ -120,8 +132,14 @@ def test_okd_get_auth_status_requires_cluster_vars(monkeypatch: pytest.MonkeyPat
     status = backend.get_auth_status(target="okd", portal="backstage")
 
     assert status["ready"] is False
-    assert "TF_VAR_cluster_name environment variable is required for OKD provisioning" in status["blockers"]
-    assert "TF_VAR_base_domain environment variable is required for OKD provisioning" in status["blockers"]
+    assert (
+        "TF_VAR_cluster_name environment variable is required for OKD provisioning"
+        in status["blockers"]
+    )
+    assert (
+        "TF_VAR_base_domain environment variable is required for OKD provisioning"
+        in status["blockers"]
+    )
 
 
 @pytest.mark.unit
@@ -142,7 +160,9 @@ def test_aws_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 
 @pytest.mark.unit
-def test_azure_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_azure_create_environment_mock_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
     backend = AzureBackend(tmp_path, clock=lambda: 1_700_000_000.0)
 
@@ -177,22 +197,35 @@ def test_okd_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 @pytest.mark.unit
 def test_cloud_backends_reject_wrong_target(tmp_path: Path) -> None:
-    assert AWSBackend(tmp_path).create_environment(
-        target="azure", portal="backstage", profile="baseline", eda="disabled"
-    )["status"] == "failed"
-    assert AzureBackend(tmp_path).create_environment(
-        target="okd", portal="backstage", profile="baseline", eda="disabled"
-    )["status"] == "failed"
-    assert OKDBackend(tmp_path).create_environment(
-        target="aws", portal="backstage", profile="baseline", eda="disabled"
-    )["status"] == "failed"
+    assert (
+        AWSBackend(tmp_path).create_environment(
+            target="azure", portal="backstage", profile="baseline", eda="disabled"
+        )["status"]
+        == "failed"
+    )
+    assert (
+        AzureBackend(tmp_path).create_environment(
+            target="okd", portal="backstage", profile="baseline", eda="disabled"
+        )["status"]
+        == "failed"
+    )
+    assert (
+        OKDBackend(tmp_path).create_environment(
+            target="aws", portal="backstage", profile="baseline", eda="disabled"
+        )["status"]
+        == "failed"
+    )
 
 
 @pytest.mark.unit
-def test_aws_create_environment_live_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_create_environment_live_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AWSBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
-    monkeypatch.setattr(backend, "_terraform_apply_aws", lambda *args, **kwargs: _terraform_outputs("aws"))
+    monkeypatch.setattr(
+        backend, "_terraform_apply_aws", lambda *args, **kwargs: _terraform_outputs("aws")
+    )
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
         backend,
@@ -212,7 +245,9 @@ def test_aws_create_environment_live_success(monkeypatch: pytest.MonkeyPatch, tm
 
 
 @pytest.mark.unit
-def test_aws_create_environment_live_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_create_environment_live_blocked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AWSBackend(tmp_path)
     monkeypatch.setattr(
         backend,
@@ -232,7 +267,9 @@ def test_aws_create_environment_live_blocked(monkeypatch: pytest.MonkeyPatch, tm
 
 
 @pytest.mark.unit
-def test_aws_create_environment_live_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_create_environment_live_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AWSBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
 
@@ -254,7 +291,9 @@ def test_aws_create_environment_live_failure(monkeypatch: pytest.MonkeyPatch, tm
 
 
 @pytest.mark.unit
-def test_azure_create_environment_live_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_azure_create_environment_live_blocked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AzureBackend(tmp_path)
     monkeypatch.setattr(
         backend,
@@ -274,7 +313,9 @@ def test_azure_create_environment_live_blocked(monkeypatch: pytest.MonkeyPatch, 
 
 
 @pytest.mark.unit
-def test_azure_create_environment_live_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_azure_create_environment_live_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AzureBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
     monkeypatch.setattr(
@@ -300,7 +341,9 @@ def test_azure_create_environment_live_success(monkeypatch: pytest.MonkeyPatch, 
 
 
 @pytest.mark.unit
-def test_azure_create_environment_live_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_azure_create_environment_live_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = AzureBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
 
@@ -322,7 +365,9 @@ def test_azure_create_environment_live_failure(monkeypatch: pytest.MonkeyPatch, 
 
 
 @pytest.mark.unit
-def test_okd_create_environment_live_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_okd_create_environment_live_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = OKDBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
 
@@ -344,14 +389,18 @@ def test_okd_create_environment_live_failure(monkeypatch: pytest.MonkeyPatch, tm
 
 
 @pytest.mark.unit
-def test_okd_create_environment_live_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_okd_create_environment_live_blocked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = OKDBackend(tmp_path)
     monkeypatch.setattr(
         backend,
         "get_auth_status",
         lambda **_: {
             "ready": False,
-            "blockers": ["TF_VAR_cluster_name environment variable is required for OKD provisioning"],
+            "blockers": [
+                "TF_VAR_cluster_name environment variable is required for OKD provisioning"
+            ],
         },
     )
 
@@ -367,10 +416,14 @@ def test_okd_create_environment_live_blocked(monkeypatch: pytest.MonkeyPatch, tm
 
 
 @pytest.mark.unit
-def test_okd_create_environment_live_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_okd_create_environment_live_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     backend = OKDBackend(tmp_path, clock=lambda: 1_700_000_000.0)
     monkeypatch.setattr(backend, "get_auth_status", lambda **_: {"ready": True, "blockers": []})
-    monkeypatch.setattr(backend, "_terraform_apply_okd", lambda *args, **kwargs: _terraform_outputs("okd"))
+    monkeypatch.setattr(
+        backend, "_terraform_apply_okd", lambda *args, **kwargs: _terraform_outputs("okd")
+    )
     monkeypatch.setattr(backend, "_read_controls", lambda _env_dir: {"ssh_root_login": True})
     monkeypatch.setattr(
         backend,
@@ -389,7 +442,9 @@ def test_okd_create_environment_live_success(monkeypatch: pytest.MonkeyPatch, tm
 
 
 @pytest.mark.unit
-def test_aws_terraform_apply_parses_comma_cidrs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_terraform_apply_parses_comma_cidrs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     calls: list[list[str]] = []
 
     def runner(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
@@ -431,13 +486,17 @@ def test_aws_terraform_apply_parses_comma_cidrs(monkeypatch: pytest.MonkeyPatch,
     )
 
     apply_call = next(call for call in calls if "apply" in call)
-    assert "allowed_cidr_blocks=[\"10.0.0.0/24\", \"192.168.1.0/24\"]" in apply_call
+    assert 'allowed_cidr_blocks=["10.0.0.0/24", "192.168.1.0/24"]' in apply_call
     assert result["environment_name"] == "aws-env"
 
 
 @pytest.mark.unit
-def test_aws_terraform_apply_rejects_invalid_json_cidrs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = AWSBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_aws_terraform_apply_rejects_invalid_json_cidrs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = AWSBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
@@ -453,8 +512,12 @@ def test_aws_terraform_apply_rejects_invalid_json_cidrs(monkeypatch: pytest.Monk
 
 
 @pytest.mark.unit
-def test_aws_terraform_apply_requires_ssh_public_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = AWSBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_aws_terraform_apply_requires_ssh_public_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = AWSBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.delenv("TF_VAR_ssh_public_key", raising=False)
@@ -470,8 +533,12 @@ def test_aws_terraform_apply_requires_ssh_public_key(monkeypatch: pytest.MonkeyP
 
 
 @pytest.mark.unit
-def test_aws_terraform_apply_requires_allowed_cidrs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = AWSBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_aws_terraform_apply_requires_allowed_cidrs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = AWSBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
@@ -492,11 +559,13 @@ def test_aws_terraform_apply_rejects_non_string_json_list(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    backend = AWSBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+    backend = AWSBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
-    monkeypatch.setenv("TF_VAR_allowed_cidr_blocks", "[\"10.0.0.0/24\", 42]")
+    monkeypatch.setenv("TF_VAR_allowed_cidr_blocks", '["10.0.0.0/24", 42]')
 
     with pytest.raises(ValueError, match="list of CIDR strings"):
         backend._terraform_apply_aws(
@@ -512,11 +581,13 @@ def test_aws_terraform_apply_rejects_empty_json_list(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    backend = AWSBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+    backend = AWSBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_ssh_public_key", "ssh-rsa AAAA")
-    monkeypatch.setenv("TF_VAR_allowed_cidr_blocks", "[\"   \"]")
+    monkeypatch.setenv("TF_VAR_allowed_cidr_blocks", '["   "]')
 
     with pytest.raises(ValueError, match="must contain at least one CIDR"):
         backend._terraform_apply_aws(
@@ -528,8 +599,12 @@ def test_aws_terraform_apply_rejects_empty_json_list(
 
 
 @pytest.mark.unit
-def test_azure_terraform_apply_requires_resource_group(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = AzureBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_azure_terraform_apply_requires_resource_group(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = AzureBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.delenv("TF_VAR_resource_group_name", raising=False)
@@ -545,8 +620,12 @@ def test_azure_terraform_apply_requires_resource_group(monkeypatch: pytest.Monke
 
 
 @pytest.mark.unit
-def test_azure_terraform_apply_requires_ssh_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = AzureBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_azure_terraform_apply_requires_ssh_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = AzureBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_resource_group_name", "rg-demo")
@@ -567,7 +646,9 @@ def test_azure_terraform_apply_requires_allowed_source(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    backend = AzureBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+    backend = AzureBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_resource_group_name", "rg-demo")
@@ -585,7 +666,9 @@ def test_azure_terraform_apply_requires_allowed_source(
 
 
 @pytest.mark.unit
-def test_azure_terraform_apply_parses_outputs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_azure_terraform_apply_parses_outputs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     def runner(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
         del cwd, env
         if "output" in argv:
@@ -628,8 +711,12 @@ def test_azure_terraform_apply_parses_outputs(monkeypatch: pytest.MonkeyPatch, t
 
 
 @pytest.mark.unit
-def test_okd_terraform_apply_requires_cluster_name(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = OKDBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_okd_terraform_apply_requires_cluster_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = OKDBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.delenv("TF_VAR_cluster_name", raising=False)
@@ -645,8 +732,12 @@ def test_okd_terraform_apply_requires_cluster_name(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.unit
-def test_okd_terraform_apply_requires_base_domain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    backend = OKDBackend(tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr=""))
+def test_okd_terraform_apply_requires_base_domain(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    backend = OKDBackend(
+        tmp_path, runner=lambda *args, **kwargs: CommandResult(stdout="", stderr="")
+    )
     env_dir = tmp_path / "env"
     env_dir.mkdir(parents=True)
     monkeypatch.setenv("TF_VAR_cluster_name", "demo")
@@ -663,7 +754,9 @@ def test_okd_terraform_apply_requires_base_domain(monkeypatch: pytest.MonkeyPatc
 
 
 @pytest.mark.unit
-def test_okd_terraform_apply_parses_outputs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_okd_terraform_apply_parses_outputs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     def runner(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
         del cwd, env
         if "output" in argv:
@@ -705,7 +798,9 @@ def test_okd_terraform_apply_parses_outputs(monkeypatch: pytest.MonkeyPatch, tmp
 
 
 @pytest.mark.unit
-def test_aws_action_lock_serialises_create_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_aws_action_lock_serialises_create_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
     backend = _ActionLockProbeAWSBackend(tmp_path)
 

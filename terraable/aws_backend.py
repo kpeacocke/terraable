@@ -18,7 +18,9 @@ from .local_lab import (
 from .orchestrator import ActionName, ActionStatus
 
 
-def _serialize_backend_action(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+def _serialize_backend_action(
+    method: Callable[..., dict[str, Any]],
+) -> Callable[..., dict[str, Any]]:
     @wraps(method)
     def wrapped(self: LocalLabBackend, *args: Any, **kwargs: Any) -> dict[str, Any]:
         with self.action_lock:
@@ -261,9 +263,7 @@ class AWSBackend(LocalLabBackend):
             allowed_cidrs = [item.strip() for item in raw_allowed_cidrs.split(",") if item.strip()]
 
         if not allowed_cidrs:
-            raise ValueError(
-                "TF_VAR_allowed_cidr_blocks must contain at least one CIDR value"
-            )
+            raise ValueError("TF_VAR_allowed_cidr_blocks must contain at least one CIDR value")
 
         # Initialise terraform
         self._run(

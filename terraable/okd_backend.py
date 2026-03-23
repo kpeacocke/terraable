@@ -18,7 +18,9 @@ from .local_lab import (
 from .orchestrator import ActionName, ActionStatus
 
 
-def _serialize_backend_action(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+def _serialize_backend_action(
+    method: Callable[..., dict[str, Any]],
+) -> Callable[..., dict[str, Any]]:
     @wraps(method)
     def wrapped(self: LocalLabBackend, *args: Any, **kwargs: Any) -> dict[str, Any]:
         with self.action_lock:
@@ -70,9 +72,7 @@ class OKDBackend(LocalLabBackend):
         cluster_name = os.getenv(
             "TF_VAR_CLUSTER_NAME", os.getenv("TF_VAR_cluster_name", "")
         ).strip()
-        base_domain = os.getenv(
-            "TF_VAR_BASE_DOMAIN", os.getenv("TF_VAR_base_domain", "")
-        ).strip()
+        base_domain = os.getenv("TF_VAR_BASE_DOMAIN", os.getenv("TF_VAR_base_domain", "")).strip()
         if not cluster_name:
             filtered_blockers.append(
                 "TF_VAR_cluster_name environment variable is required for OKD provisioning"
@@ -250,9 +250,7 @@ class OKDBackend(LocalLabBackend):
                 "TF_VAR_cluster_name environment variable is required for OKD provisioning"
             )
 
-        base_domain = os.getenv(
-            "TF_VAR_BASE_DOMAIN", os.getenv("TF_VAR_base_domain", "")
-        ).strip()
+        base_domain = os.getenv("TF_VAR_BASE_DOMAIN", os.getenv("TF_VAR_base_domain", "")).strip()
         if not base_domain:
             raise ValueError(
                 "TF_VAR_base_domain environment variable is required for OKD provisioning"

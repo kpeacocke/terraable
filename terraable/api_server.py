@@ -19,34 +19,37 @@ from .local_lab import LocalLabBackend  # noqa: F401 - kept for test monkeypatch
 
 def get_backend(workspace_root: Path, target: str) -> Any:
     """Factory function to return the appropriate backend based on target.
-    
+
     Uses lazy imports and module namespace access to support test monkeypatching.
-    If LocalLabBackend has been monkeypatched (e.g., in tests), returns the 
+    If LocalLabBackend has been monkeypatched (e.g., in tests), returns the
     monkeypatched version for all targets to support test scenarios.
     """
     # Access LocalLabBackend through module namespace to detect and respect monkeypatching
     module = sys.modules[__name__]
     current_backend = getattr(module, "LocalLabBackend", LocalLabBackend)
-    
+
     # Check if LocalLabBackend has been monkeypatched (it's not the real class)
     # by comparing module attribution. The real LocalLabBackend is in terraable.local_lab
     is_monkeypatched = getattr(current_backend, "__module__", None) != "terraable.local_lab"
-    
+
     if is_monkeypatched:
         # Test monkeypatch detected; return it for all targets to support test scenarios
         return current_backend(workspace_root)
-    
+
     # Normal production path: dispatch to target-specific backends
     if target == "local-lab":
         return current_backend(workspace_root)
     elif target == "aws":
         from .aws_backend import AWSBackend
+
         return AWSBackend(workspace_root)
     elif target == "azure":
         from .azure_backend import AzureBackend
+
         return AzureBackend(workspace_root)
     elif target == "okd":
         from .okd_backend import OKDBackend
+
         return OKDBackend(workspace_root)
     else:
         return current_backend(workspace_root)
@@ -138,11 +141,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                         credentials[key] = value
             backend = self.get_active_backend(target)
             self._send_json(
-                {
-                    "auth": backend.configure_credentials(
-                        credentials, target=target, portal=portal
-                    )
-                }
+                {"auth": backend.configure_credentials(credentials, target=target, portal=portal)}
             )
         except Exception as exc:
             self.send_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -154,10 +153,8 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json_payload()
             target = str(payload.get("target", "local-lab"))
-            self._current_target = target
             response = self._dispatch_action(action, payload, target)
         except Exception as exc:
-            target = str(getattr(self, "_current_target", "local-lab"))
             backend = self.get_active_backend(target)
             response = {
                 "action": action,
@@ -304,13 +301,6 @@ def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
     class Handler(TerraableRequestHandler):
         ui_path = workspace_root / "ui" / "index.html"
         backend: LocalLabBackend | None = None
-
-    Handler.workspace_root = workspace_root
-    Handler.backends = {}
-    Handler.backends_lock = threading.RLock()
-    Handler.backend = get_backend(workspace_root, "local-lab")
-    Handler.backends["local-lab"] = Handler.backend
-    return Handler
 
 
 def main() -> None:

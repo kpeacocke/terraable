@@ -18,7 +18,9 @@ from .local_lab import (
 from .orchestrator import ActionName, ActionStatus
 
 
-def _serialize_backend_action(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+def _serialize_backend_action(
+    method: Callable[..., dict[str, Any]],
+) -> Callable[..., dict[str, Any]]:
     @wraps(method)
     def wrapped(self: LocalLabBackend, *args: Any, **kwargs: Any) -> dict[str, Any]:
         with self.action_lock:
