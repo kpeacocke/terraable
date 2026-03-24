@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Validate documentation target status against docs/target-capabilities.json."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import sys
+
+
+def fail(message: str) -> None:
+    print(f"target-capabilities: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+repo_root = Path(__file__).resolve().parents[1]
+manifest_path = repo_root / "docs" / "target-capabilities.json"
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+docs = {
+    "README.md": (repo_root / "README.md").read_text(encoding="utf-8"),
+    "docs/lab-guide.md": (repo_root / "docs" / "lab-guide.md").read_text(encoding="utf-8"),
+    "docs/mvp-demo-runbook.md": (
+        repo_root / "docs" / "mvp-demo-runbook.md"
+    ).read_text(encoding="utf-8"),
+    "modes/showcase/README.md": (
+        repo_root / "modes" / "showcase" / "README.md"
+    ).read_text(encoding="utf-8"),
+}
+
+scripted = manifest["scripted_mvp_target"]
+if f"`{scripted} + backstage`" not in docs["README.md"]:
+    fail("README.md missing scripted MVP target reference")
+if f"`{scripted} + backstage`" not in docs["docs/mvp-demo-runbook.md"]:
+    fail("docs/mvp-demo-runbook.md missing scripted MVP flow reference")
+
+for target in manifest["extended_live_targets"]:
+    if f"`{target}`" not in docs["README.md"]:
+        fail(f"README.md missing extended live target `{target}`")
+
+for target, details in manifest["targets"].items():
+    executable = bool(details["executable"])
+
+    # Lab guide executable matrix.
+    expected = "Yes" if executable else "No"
+    if f"| `{target}` | {expected}" not in docs["docs/lab-guide.md"]:
+        fail(f"docs/lab-guide.md target row for `{target}` is inconsistent with manifest")
+
+# Showcase status labels for key showcase targets.
+showcase_checks = {
+    "local-lab": manifest["targets"]["local-lab"]["status_label"],
+    "aws": manifest["targets"]["aws"]["status_label"],
+    "azure": manifest["targets"]["azure"]["status_label"],
+    "okd": manifest["targets"]["okd"]["status_label"],
+    "openshift": manifest["targets"]["openshift"]["status_label"],
+}
+for target, label in showcase_checks.items():
+    expected_row_fragment = f"| `{target}`"
+    if expected_row_fragment not in docs["modes/showcase/README.md"] or label not in docs[
+        "modes/showcase/README.md"
+    ]:
+        fail(f"modes/showcase/README.md missing expected status for `{target}`")
+
+print("target-capabilities: OK")

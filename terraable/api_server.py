@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import os
+import secrets
 import sys
 import threading
 from collections.abc import Callable
@@ -80,6 +82,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     backend: ClassVar[LocalLabBackend | None] = None
     max_json_payload_bytes: ClassVar[int] = 1024 * 1024
     json_read_timeout_seconds: ClassVar[float] = 5.0
+    api_post_token: ClassVar[str] = ""
 
     @classmethod
     def get_active_backend(cls, target: str = "local-lab") -> Any:
@@ -112,6 +115,19 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
             self._send_html(content)
+        elif parsed.path == "/targetAvailability.js":
+            js_path = self.workspace_root / "ui" / "targetAvailability.js"
+            try:
+                content = js_path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                self.send_error(HTTPStatus.NOT_FOUND, "UI module file not found")
+                return
+            except UnicodeDecodeError:
+                self.send_error(
+                    HTTPStatus.INTERNAL_SERVER_ERROR, "UI module file is not valid UTF-8"
+                )
+                return
+            self._send_text(content, "application/javascript; charset=utf-8")
         elif parsed.path == "/api/state":
             query = parse_qs(parsed.query)
             target = query.get("target", ["local-lab"])[0]
@@ -121,6 +137,8 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             self._handle_auth_status(parsed)
         elif parsed.path == "/api/auth/matrix":
             self._handle_auth_matrix(parsed)
+        elif parsed.path == "/api/session":
+            self._send_json({"post_token": self.api_post_token})
         elif parsed.path == "/healthz":
             self._send_json({"status": "ok"})
         else:
@@ -238,6 +256,11 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 self.send_error(HTTPStatus.FORBIDDEN, "POST origin must be localhost")
                 return False
 
+        supplied_token = self.headers.get("X-Terraable-Token", "")
+        if not self.api_post_token or not secrets.compare_digest(supplied_token, self.api_post_token):
+            self.send_error(HTTPStatus.FORBIDDEN, "Missing or invalid API session token")
+            return False
+
         return True
 
     @staticmethod
@@ -336,9 +359,12 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         return None
 
     def _send_html(self, body: str) -> None:
+        self._send_text(body, "text/html; charset=utf-8")
+
+    def _send_text(self, body: str, content_type: str) -> None:
         encoded = body.encode("utf-8")
         self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
@@ -362,6 +388,7 @@ def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
     Handler.backends_lock = threading.RLock()
     Handler.backend = get_backend(workspace_root, "local-lab")
     Handler.backends["local-lab"] = Handler.backend
+    Handler.api_post_token = os.getenv("TERRAABLE_API_POST_TOKEN", "terraable-local-token")
     return Handler
 
 

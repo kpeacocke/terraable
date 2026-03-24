@@ -8,6 +8,8 @@ permissions:
     paths:
       - '**/*.md'
       - 'scripts/check-doc-consistency.sh'
+      - 'scripts/check-target-capabilities.py'
+      - 'docs/target-capabilities.json'
       - '.github/workflows/docs.yml'
   push:
     branches:
@@ -15,6 +17,8 @@ permissions:
     paths:
       - '**/*.md'
       - 'scripts/check-doc-consistency.sh'
+      - 'scripts/check-target-capabilities.py'
+      - 'docs/target-capabilities.json'
       - '.github/workflows/docs.yml'
 
 jobs:

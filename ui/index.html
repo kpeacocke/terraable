@@ -341,6 +341,7 @@
             <option value="local-lab">local-lab</option>
           </select>
           <div class="hint" id="target-availability">Checking target availability...</div>
+          <ul id="target-availability-list" style="margin-top:6px; padding-left:16px; font-size:0.78rem;"></ul>
         </div>
         <div class="field">
           <label for="portal">Portal implementation</label>
@@ -497,6 +498,8 @@
   </main>
 
   <script type="module">
+    import { buildTargetAvailability } from "./targetAvailability.js";
+
     const evidence = document.getElementById("evidence");
     const runtimeStatusEl = document.getElementById("runtime-status");
     const edaHistory = document.getElementById("eda-history");
@@ -515,6 +518,7 @@
     const authStatusEl = document.getElementById("auth-status");
     const targetSuggestionEl = document.getElementById("target-suggestion");
     const targetAvailabilityEl = document.getElementById("target-availability");
+    const targetAvailabilityListEl = document.getElementById("target-availability-list");
     const targetSelectEl = document.getElementById("target");
     const actionButtons = Array.from(document.querySelectorAll(".actions button"));
 
@@ -529,49 +533,38 @@
       blockers: ["auth status has not been loaded yet"],
     };
     let authMatrix = {};
+    let apiPostToken = "";
     let pendingAction = false;
     let latestState = {};
 
-    function blockersText(auth) {
-      const blockers = auth?.blockers || [];
-      if (!blockers.length) {
-        return "configured for selected portal";
-      }
-      return blockers.join("; ");
-    }
-
     function applyTargetAvailability() {
       const options = Array.from(targetSelectEl.options);
-      const readyValues = options
-        .filter((option) => Boolean(authMatrix?.[option.value]?.ready))
-        .map((option) => option.value);
+      const targetOrder = options.map((option) => option.value);
+      const view = buildTargetAvailability(authMatrix, selected("target"), targetOrder);
 
-      if (!readyValues.includes(targetSelectEl.value) && readyValues.length > 0) {
-        targetSelectEl.value = readyValues[0];
-        syncCredentialGroups(targetSelectEl.value);
+      if (view.fallbackTarget && view.fallbackTarget !== selected("target")) {
+        targetSelectEl.value = view.fallbackTarget;
+        syncCredentialGroups(view.fallbackTarget);
       }
 
+      const selectedTarget = selected("target");
       for (const option of options) {
-        const auth = authMatrix?.[option.value];
-        const ready = Boolean(auth?.ready);
-        // Keep the currently selected option enabled so users can still inspect
-        // its credential requirements while unavailable.
-        option.disabled = !ready && option.value !== targetSelectEl.value;
-        option.title = ready
-          ? `${option.value}: ready for ${selected("portal")}`
-          : `${option.value}: ${blockersText(auth)}`;
+        const row = view.rows.find((entry) => entry.target === option.value);
+        const ready = Boolean(row?.ready);
+        // Keep selected option enabled so users can inspect requirements.
+        option.disabled = !ready && option.value !== selectedTarget;
       }
 
-      const selectedAuth = authMatrix?.[targetSelectEl.value];
-      if (!selectedAuth) {
-        targetAvailabilityEl.textContent = "Target availability unknown while authentication checks are loading.";
-        return;
+      targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}.`;
+      targetAvailabilityListEl.innerHTML = "";
+      for (const row of view.rows) {
+        const item = document.createElement("li");
+        item.className = row.ready ? "ok" : "warn";
+        item.textContent = row.ready
+          ? `${row.target}: available`
+          : `${row.target}: unavailable - ${row.reason}`;
+        targetAvailabilityListEl.appendChild(item);
       }
-      if (selectedAuth.ready) {
-        targetAvailabilityEl.textContent = `Selected target ${targetSelectEl.value} is available for ${selected("portal")}.`;
-        return;
-      }
-      targetAvailabilityEl.textContent = `Selected target ${targetSelectEl.value} is unavailable: ${blockersText(selectedAuth)}.`;
     }
 
     function updateComplianceScore() {
@@ -623,6 +616,8 @@
       observabilityStages.innerHTML = "";
       complianceControlsEl.innerHTML = "";
       targetSuggestionEl.textContent = "Target suggestion unavailable while API is offline.";
+      targetAvailabilityEl.textContent = "Target availability unavailable while API is offline.";
+      targetAvailabilityListEl.innerHTML = "";
       if (observabilitySummary) {
         observabilitySummary.textContent = "Observability summary unavailable while API is offline.";
       }
@@ -931,9 +926,16 @@
     }
 
     async function api(path, payload) {
+      const headers = { "Content-Type": "application/json" };
+      if (payload) {
+        if (!apiPostToken) {
+          throw new Error("API session token unavailable; refresh state and try again");
+        }
+        headers["X-Terraable-Token"] = apiPostToken;
+      }
       const response = await fetch(path, {
         method: payload ? "POST" : "GET",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: payload ? JSON.stringify(payload) : undefined,
       });
       if (!response.ok) {
@@ -1011,6 +1013,14 @@
       applyTargetAvailability();
       if (selected("target") !== previousTarget) {
         await refreshAuthStatus();
+      }
+    }
+
+    async function refreshSessionToken() {
+      const data = await api("/api/session");
+      apiPostToken = String(data.post_token || "");
+      if (!apiPostToken) {
+        throw new Error("API session token unavailable from server");
       }
     }
 
@@ -1136,6 +1146,7 @@
     });
 
     syncCredentialGroups(selected("target"));
+    await refreshSessionToken();
     await refreshState();
     await refreshAuthStatus();
     await refreshAuthMatrix();

@@ -33,4 +33,7 @@ done
 # 4) Source-of-truth section must exist in README.
 grep -q '^## Source Of Truth$' README.md || fail "README is missing Source Of Truth section"
 
+# 5) Validate docs against machine-readable target capability manifest.
+python3 scripts/check-target-capabilities.py
+
 echo "doc-consistency: OK"
