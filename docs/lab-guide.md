@@ -20,14 +20,14 @@ Continue reading this guide to verify the setup, choose a mode, and advance to l
 
 | Target | Live-executable | Credentials required | Notes |
 |--------|----------------|---------------------|-------|
-| `local-lab` | Yes | HCP Terraform token | Recommended first live target |
-| `gcp` | Yes | HCP Terraform token + `GOOGLE_APPLICATION_CREDENTIALS` | GCP service account JSON |
-| `vmware` | Yes | HCP Terraform token | Uses local Terraform data resource |
-| `parallels` | Yes | HCP Terraform token | Defaults to localhost management host |
-| `hyper-v` | Yes | HCP Terraform token | Defaults to localhost Hyper-V host |
-| `aws` | Yes (dedicated backend) | HCP Terraform token + AWS IAM credentials | `substrate_aws` module |
-| `azure` | Yes (dedicated backend) | HCP Terraform token + ARM service principal | `substrate_azure` module |
-| `okd` | Yes (dedicated backend) | HCP Terraform token + OpenShift token | `substrate_okd` module |
+| `local-lab` | Yes | `TF_TOKEN_<hostname>` (or `HCP_TERRAFORM_TOKEN` alias) | Recommended first live target |
+| `gcp` | Yes | `TF_TOKEN_<hostname>` (or alias) + `GOOGLE_APPLICATION_CREDENTIALS` | GCP service account JSON |
+| `vmware` | Yes | `TF_TOKEN_<hostname>` (or alias) | Uses local Terraform data resource |
+| `parallels` | Yes | `TF_TOKEN_<hostname>` (or alias) | Defaults to localhost management host |
+| `hyper-v` | Yes | `TF_TOKEN_<hostname>` (or alias) | Defaults to localhost Hyper-V host |
+| `aws` | Yes (dedicated backend) | `TF_TOKEN_<hostname>` (or alias) + AWS IAM credentials | `substrate_aws` module |
+| `azure` | Yes (dedicated backend) | `TF_TOKEN_<hostname>` (or alias) + ARM service principal | `substrate_azure` module |
+| `okd` | Yes (dedicated backend) | `TF_TOKEN_<hostname>` (or alias) + OpenShift token | `substrate_okd` module |
 | `openshift` | No (not selectable via current control-plane UI/API) | — | Contract scaffold only; Phase 2 resource wiring pending |
 
 For credential details and minimum-scope guidance, see [credentials-matrix.md](credentials-matrix.md).
@@ -157,8 +157,8 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 | Tests fail on import | Missing dependencies | Re-run `poetry install` |
 | AWX bootstrap fails auth | Wrong credentials | Check `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD` in `.env` |
 | EDA webhook not firing | EDA mode disabled | Set EDA mode to `enabled` in the UI |
-| `gcp` target auth blocked | Missing credentials | Set `GOOGLE_APPLICATION_CREDENTIALS` and `HCP_TERRAFORM_TOKEN` in `.env`; `TERRAABLE_MOCK_MODE=true` bypasses this |
-| `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP token | Set `HCP_TERRAFORM_TOKEN` in `.env`; `TERRAABLE_MOCK_MODE=true` bypasses this |
+| `gcp` target auth blocked | Missing credentials | Set `GOOGLE_APPLICATION_CREDENTIALS` and `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
+| `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP token | Set `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
 | UI stuck on `live-local-lab` after switching target | Persisted local lab state still pinned to previous target | Run **Create environment** again for the new target (or stop the server and delete `.terraable/local-lab/state.json`), then reload the UI |
 | `terraform init` fails on Phase 3 module | Terraform version | Modules use only `terraform_data` — no external provider needed; confirm Terraform ≥ 1.9 |
 | `.env` values appear in logs or diff | Credentials committed | Confirm `.env` is gitignored; rotate any exposed credentials immediately |

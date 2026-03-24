@@ -12,14 +12,14 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 
 | Target | Notes |
 |--------|-------|
-| `local-lab` | Live-executable. Recommended first target. Runs against localhost or a local VM. Requires an HCP Terraform token via `HCP_TERRAFORM_TOKEN` or `TF_TOKEN_<hostname>`. |
-| `gcp` | Live-executable. Requires `GOOGLE_APPLICATION_CREDENTIALS` and `HCP_TERRAFORM_TOKEN`. |
-| `vmware` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Uses Terraform contract scaffold. |
-| `parallels` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to `parallels-host.local` as the Parallels host system. Override with `TF_VAR_host_system` when needed. |
-| `hyper-v` | Live-executable. Requires `HCP_TERRAFORM_TOKEN`. Defaults to `hyperv-host.local` as the Hyper-V host system. Override with `TF_VAR_host_system` when needed. |
-| `aws` | Live-executable via dedicated backend (`AWSBackend`). Requires AWS IAM credentials and `HCP_TERRAFORM_TOKEN`. |
-| `azure` | Live-executable via dedicated backend (`AzureBackend`). Requires ARM service principal and `HCP_TERRAFORM_TOKEN`. |
-| `okd` | Live-executable via dedicated backend (`OKDBackend`). Requires OpenShift API token and `HCP_TERRAFORM_TOKEN`. |
+| `local-lab` | Live-executable. Recommended first target. Runs against localhost or a local VM. Requires `TF_TOKEN_<hostname>` (or `HCP_TERRAFORM_TOKEN` alias). |
+| `gcp` | Live-executable. Requires `GOOGLE_APPLICATION_CREDENTIALS` and `TF_TOKEN_<hostname>` (or alias). |
+| `vmware` | Live-executable. Requires `TF_TOKEN_<hostname>` (or alias). Uses Terraform contract scaffold. |
+| `parallels` | Live-executable. Requires `TF_TOKEN_<hostname>` (or alias). Defaults to `parallels-host.local` as the Parallels host system. Override with `TF_VAR_host_system` when needed. |
+| `hyper-v` | Live-executable. Requires `TF_TOKEN_<hostname>` (or alias). Defaults to `hyperv-host.local` as the Hyper-V host system. Override with `TF_VAR_host_system` when needed. |
+| `aws` | Live-executable via dedicated backend (`AWSBackend`). Requires AWS IAM credentials and `TF_TOKEN_<hostname>` (or alias). |
+| `azure` | Live-executable via dedicated backend (`AzureBackend`). Requires ARM service principal and `TF_TOKEN_<hostname>` (or alias). |
+| `okd` | Live-executable via dedicated backend (`OKDBackend`). Requires OpenShift API token and `TF_TOKEN_<hostname>` (or alias). |
 | `openshift` | Contract and module scaffolding only. Appears in the contract docs, but current control-plane API target routing does not provide an OpenShift backend path yet (planned Phase 2). |
 
 ## AWX setup

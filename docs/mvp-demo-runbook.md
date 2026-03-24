@@ -21,37 +21,37 @@ Use this checklist before any live demo run. For full credential definitions, ow
 ### Environment Sign-off
 | Environment | Status | Signed By | Date | Notes |
 |---|---|---|---|---|
-| Dev | TODO |  |  |  |
-| Test | TODO |  |  |  |
-| Demo | TODO |  |  |  |
-| Prod | TODO |  |  |  |
+| Dev | Pending sign-off |  |  |  |
+| Test | Pending sign-off |  |  |  |
+| Demo | Pending sign-off |  |  |  |
+| Prod | Pending sign-off |  |  |  |
 
 ### Required Credential Domains
 Mark each row as `Ready` or `N/A` for the selected target path.
 
 | Credential Domain | Dev | Test | Demo | Prod | Validation Check |
 |---|---|---|---|---|---|
-| HCP Terraform API token and workspace access | TODO | TODO | TODO | TODO | `HcpTerraformClient.get_run_status()` returns successfully for a known run |
-| Target platform identity (AWS/Azure/OpenShift/OKD/local) | TODO | TODO | TODO | TODO | Target API auth succeeds and Terraform plan can read provider data |
-| AAP/AWX controller credentials | TODO | TODO | TODO | TODO | Controller API auth succeeds and a test job template can be launched |
-| SSH/host credentials for operational targets | TODO | TODO | TODO | TODO | Ansible ad-hoc ping or equivalent host reachability check passes |
-| Registry/SCM credentials for portal path | TODO | TODO | TODO | TODO | Portal artefacts/templates can be fetched without interactive auth |
-| EDA webhook and source authentication (if enabled) | TODO | TODO | TODO | TODO | Test event accepted and routed to the expected rulebook path |
-| DNS/TLS credentials (if applicable) | TODO | TODO | TODO | TODO | DNS write and certificate issuance/renewal smoke checks pass |
-| Secrets backend access (if used) | TODO | TODO | TODO | TODO | Required secret paths are readable by runtime identities only |
+| HCP Terraform API token and workspace access | Pending | Pending | Pending | Pending | `HcpTerraformClient.get_run_status()` returns successfully for a known run |
+| Target platform identity (AWS/Azure/OpenShift/OKD/local) | Pending | Pending | Pending | Pending | Target API auth succeeds and Terraform plan can read provider data |
+| AAP/AWX controller credentials | Pending | Pending | Pending | Pending | Controller API auth succeeds and a test job template can be launched |
+| SSH/host credentials for operational targets | Pending | Pending | Pending | Pending | Ansible ad-hoc ping or equivalent host reachability check passes |
+| Registry/SCM credentials for portal path | Pending | Pending | Pending | Pending | Portal artefacts/templates can be fetched without interactive auth |
+| EDA webhook and source authentication (if enabled) | Pending | Pending | Pending | Pending | Test event accepted and routed to the expected rulebook path |
+| DNS/TLS credentials (if applicable) | Pending | Pending | Pending | Pending | DNS write and certificate issuance/renewal smoke checks pass |
+| Secrets backend access (if used) | Pending | Pending | Pending | Pending | Required secret paths are readable by runtime identities only |
 
 ### Go/No-Go Gate
 - Go: all required rows are `Ready` for the chosen environment and target selectors.
-- No-Go: any required row remains `TODO` or failed validation.
+- No-Go: any required row remains `Pending` or failed validation.
 
 ## Procedure Inputs
-- Target selector surface: `local-lab`, `openshift`, `aws`, `azure`, or `okd`
+- Target selector surface: `local-lab`, `aws`, `azure`, `okd`, `gcp`, `vmware`, `parallels`, or `hyper-v` (`openshift` remains scaffold-only in this branch)
 - Executable MVP target path: `local-lab`
 - Portal selector: `rhdh` or `backstage`
 - Security profile: `baseline` or `strict`
-- EDA toggle: `enabled` or `disabled` (MVP: informational/UI-only, does not change the Terraform-to-Ansible handoff or Python runtime models; used to narrate the future EDA path planned for Phase 2)
+- EDA toggle: `enabled` or `disabled` (MVP script does not depend on EDA; enabling EDA affects event and evidence messaging in live paths)
 
-For the current MVP execution path, use `local-lab + backstage`. The additional target selectors remain contract and module scaffolding for later provider-specific execution paths.
+For the scripted MVP flow, use `local-lab + backstage`. Additional executable targets can be used for extended demos when credentials and platform prerequisites are met.
 
 ## Procedure
 1. Start with control-plane selectors and create environment request.
@@ -69,9 +69,10 @@ For the current MVP execution path, use `local-lab + backstage`. The additional 
 
 ## Troubleshooting and Recovery
 
-- Control-plane backend connectivity (showcase mode only):
-  - If you are running with a future or lab “showcase mode” backend (beyond the MVP static UI), follow that integration’s authentication and token configuration documentation, including any required environment variables for API access.
-  - For the MVP static control-plane UI (`ui/index.html`), there is no authentication or token layer; if you see auth-related errors, confirm you are simply serving the static UI correctly and fall back to offline/mock narration for any unsupported interactions.
+- Control-plane backend connectivity (showcase mode):
+  - The UI is static, but the API backend enforces credential readiness for live actions by target and portal.
+  - If you see auth-related blockers, verify target-specific environment variables and UI authentication inputs, then re-run **Create environment** to refresh readiness state.
+  - If live connectivity remains unstable, switch to offline/mock mode and continue the narrative with deterministic evidence.
 
 - Inventory connectivity issues during scan or remediation:
   - Check that the inventory synchronisation has completed successfully in AAP/AWX or the chosen automation controller.

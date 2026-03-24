@@ -1,6 +1,6 @@
 # ansible/inventory.yml
 #
-# Stub inventory — populate with real targets before running playbooks.
+# Template inventory — populate with real targets before running playbooks.
 #
 # This file is intentionally minimal. The full inventory structure will be
 # defined as part of the Ansible Automation Platform integration (MVP phase).
