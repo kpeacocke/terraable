@@ -257,7 +257,9 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 return False
 
         supplied_token = self.headers.get("X-Terraable-Token", "")
-        if not self.api_post_token or not secrets.compare_digest(supplied_token, self.api_post_token):
+        if not self.api_post_token or not secrets.compare_digest(
+            supplied_token, self.api_post_token
+        ):
             self.send_error(HTTPStatus.FORBIDDEN, "Missing or invalid API session token")
             return False
 

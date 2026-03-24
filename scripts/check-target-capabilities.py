@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 
 def fail(message: str) -> None:
@@ -20,12 +20,12 @@ manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 docs = {
     "README.md": (repo_root / "README.md").read_text(encoding="utf-8"),
     "docs/lab-guide.md": (repo_root / "docs" / "lab-guide.md").read_text(encoding="utf-8"),
-    "docs/mvp-demo-runbook.md": (
-        repo_root / "docs" / "mvp-demo-runbook.md"
-    ).read_text(encoding="utf-8"),
-    "modes/showcase/README.md": (
-        repo_root / "modes" / "showcase" / "README.md"
-    ).read_text(encoding="utf-8"),
+    "docs/mvp-demo-runbook.md": (repo_root / "docs" / "mvp-demo-runbook.md").read_text(
+        encoding="utf-8"
+    ),
+    "modes/showcase/README.md": (repo_root / "modes" / "showcase" / "README.md").read_text(
+        encoding="utf-8"
+    ),
 }
 
 scripted = manifest["scripted_mvp_target"]
@@ -56,9 +56,10 @@ showcase_checks = {
 }
 for target, label in showcase_checks.items():
     expected_row_fragment = f"| `{target}`"
-    if expected_row_fragment not in docs["modes/showcase/README.md"] or label not in docs[
-        "modes/showcase/README.md"
-    ]:
+    if (
+        expected_row_fragment not in docs["modes/showcase/README.md"]
+        or label not in docs["modes/showcase/README.md"]
+    ):
         fail(f"modes/showcase/README.md missing expected status for `{target}`")
 
 print("target-capabilities: OK")
