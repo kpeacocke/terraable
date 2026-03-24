@@ -435,7 +435,7 @@ def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
     handler.headers = _headers({"Content-Length": "2"})
     handler.rfile = io.BytesIO(b"[]")
 
-    payload = handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+    payload = cast(Any, handler)._read_json_payload()
 
     assert payload == {}
 
@@ -447,7 +447,7 @@ def test_read_json_payload_rejects_invalid_content_length() -> None:
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Invalid Content-Length"):
-        handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+        cast(Any, handler)._read_json_payload()
 
 
 @pytest.mark.unit()
@@ -456,7 +456,7 @@ def test_read_json_payload_defaults_missing_content_length_to_empty_object() -> 
     handler.headers = _headers({})
     handler.rfile = io.BytesIO(b"")
 
-    payload = handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+    payload = cast(Any, handler)._read_json_payload()
 
     assert payload == {}
 
@@ -468,7 +468,7 @@ def test_read_json_payload_rejects_negative_content_length() -> None:
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Invalid Content-Length"):
-        handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+        cast(Any, handler)._read_json_payload()
 
 
 @pytest.mark.unit()
@@ -479,7 +479,7 @@ def test_read_json_payload_rejects_oversized_content_length() -> None:
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Content-Length exceeds maximum allowed size"):
-        handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+        cast(Any, handler)._read_json_payload()
 
 
 class _FakeConnection:
@@ -511,7 +511,7 @@ def test_read_json_payload_rejects_incomplete_body() -> None:
     handler.connection = _FakeConnection()
 
     with pytest.raises(ValueError, match="Incomplete JSON payload"):
-        handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+        cast(Any, handler)._read_json_payload()
 
 
 @pytest.mark.unit()
@@ -523,10 +523,10 @@ def test_read_json_payload_restores_socket_timeout_after_read() -> None:
     fake_connection.settimeout(30.0)
     handler.connection = fake_connection
 
-    payload = handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+    payload = cast(Any, handler)._read_json_payload()
 
     assert payload == {}
-    assert handler.connection.gettimeout() == pytest.approx(30.0)  # type: ignore[reportUnknownMemberType]
+    assert handler.connection.gettimeout() == pytest.approx(30.0)
 
 
 @pytest.mark.unit()
@@ -539,9 +539,9 @@ def test_read_json_payload_reports_timeout_and_restores_socket_timeout() -> None
     handler.connection = fake_connection
 
     with pytest.raises(ValueError, match="Timed out while reading JSON payload"):
-        handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+        cast(Any, handler)._read_json_payload()
 
-    assert handler.connection.gettimeout() == pytest.approx(15.0)  # type: ignore[reportUnknownMemberType]
+    assert handler.connection.gettimeout() == pytest.approx(15.0)
 
 
 @pytest.mark.unit()
@@ -554,17 +554,18 @@ def test_read_json_payload_reports_socket_timeout_and_restores_timeout() -> None
     handler.connection = fake_connection
 
     with pytest.raises(ValueError, match="Timed out while reading JSON payload"):
-        handler._read_json_payload()  # type: ignore[reportPrivateUsage]
+        cast(Any, handler)._read_json_payload()
 
-    assert handler.connection.gettimeout() == pytest.approx(20.0)  # type: ignore[reportUnknownMemberType]
+    assert handler.connection.gettimeout() == pytest.approx(20.0)
 
 
 @pytest.mark.unit()
 def test_loopback_host_helper_accepts_localhost_and_loopback_ip() -> None:
-    assert api_server.TerraableRequestHandler._is_loopback_host("localhost")  # type: ignore[reportPrivateUsage]
-    assert api_server.TerraableRequestHandler._is_loopback_host("127.0.0.1")  # type: ignore[reportPrivateUsage]
-    assert api_server.TerraableRequestHandler._is_loopback_host("::1")  # type: ignore[reportPrivateUsage]
-    assert not api_server.TerraableRequestHandler._is_loopback_host("example.com")  # type: ignore[reportPrivateUsage]
+    h = cast(Any, api_server.TerraableRequestHandler)
+    assert h._is_loopback_host("localhost")
+    assert h._is_loopback_host("127.0.0.1")
+    assert h._is_loopback_host("::1")
+    assert not h._is_loopback_host("example.com")
 
 
 @pytest.mark.unit()
@@ -579,7 +580,7 @@ def test_safe_post_request_rejects_non_loopback_client() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    allowed = handler._require_safe_post_request()  # type: ignore[reportPrivateUsage]
+    allowed = cast(Any, handler)._require_safe_post_request()
 
     assert allowed is False
     assert called == [(403, "POST access restricted to localhost")]
@@ -597,7 +598,7 @@ def test_safe_post_request_rejects_null_origin() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    allowed = handler._require_safe_post_request()  # type: ignore[reportPrivateUsage]
+    allowed = cast(Any, handler)._require_safe_post_request()
 
     assert allowed is False
     assert called == [(403, "POST origin is not allowed")]
@@ -615,7 +616,7 @@ def test_safe_post_request_rejects_hostname_less_origin() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    allowed = handler._require_safe_post_request()  # type: ignore[reportPrivateUsage]
+    allowed = cast(Any, handler)._require_safe_post_request()
 
     assert allowed is False
     assert called == [(403, "POST origin is not allowed")]
@@ -1013,7 +1014,7 @@ def test_handle_session_rejects_non_loopback_client() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    handler._handle_session()  # type: ignore[reportPrivateUsage]
+    cast(Any, handler)._handle_session()
 
     assert called == [(403, "Session token access restricted to localhost")]
 
@@ -1030,7 +1031,7 @@ def test_handle_session_returns_token_for_loopback_client() -> None:
 
     handler._send_json = fake_send_json  # type: ignore[assignment]
 
-    handler._handle_session()  # type: ignore[reportPrivateUsage]
+    cast(Any, handler)._handle_session()
 
     assert sent_json == [{"post_token": "test-token-123"}]
 
@@ -1048,4 +1049,4 @@ def test_make_handler_generates_random_token_when_env_unset(
     handler = api_server.make_handler(tmp_path)
     token = handler.api_post_token  # type: ignore[attr-defined]
     assert token
-    assert token != "terraable-local-token"  # type: ignore[comparison-overlap]
+    assert token != "terraable-local-token"

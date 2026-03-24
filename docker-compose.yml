@@ -42,6 +42,9 @@ services:
 
     working_dir: /workspace
 
+    # Explicit command to pass workspace path to the API server CLI
+    command: ["python", "-m", "terraable.api_server", "--host", "0.0.0.0", "--port", "8000", "--workspace", "/workspace"]
+
     # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]

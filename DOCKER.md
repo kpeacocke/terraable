@@ -6,7 +6,7 @@ This guide explains how to run Terraable using Docker and docker-compose for loc
 
 - Docker Engine 20.10+
 - docker-compose 1.29+
-- Port 8000 available on localhost
+- Port 8888 available on localhost
 
 ## Quick Start
 
@@ -26,16 +26,16 @@ docker-compose logs -f backend
 docker-compose down
 ```
 
-The API server will be available at `http://localhost:8000`.
+The API server will be available at `http://localhost:8888`.
 
 ### Verify it's working
 
 ```bash
 # Check health
-curl http://localhost:8000/healthz
+curl http://localhost:8888/healthz
 
 # Access the UI
-open http://localhost:8000
+open http://localhost:8888
 
 # See active backend logs
 docker-compose logs -f backend
@@ -130,17 +130,17 @@ docker-compose down -v
 ### Build a production image tag
 
 ```bash
-docker build -t kpeacocke/terraable:latest .
-docker push kpeacocke/terraable:latest
+docker build -t <your-registry>/<your-org>/terraable:latest .
+docker push <your-registry>/<your-org>/terraable:latest
 ```
 
 ### Run without source mounts (clean demo)
 
 ```bash
-docker run -p 127.0.0.1:8000:8000 \
+docker run -p 127.0.0.1:8888:8000 \
   --env TERRAABLE_MOCK_MODE=true \
   --env TERRAABLE_MODE=offline-mock \
-  kpeacocke/terraable:latest
+  <your-registry>/<your-org>/terraable:latest
 ```
 
 ### Using named volumes for state storage
@@ -155,24 +155,31 @@ docker-compose up
 
 ## Networking
 
-- Backend serves on `127.0.0.1:8000` (localhost-only for security)
-- For remote access (e.g., from VM/remote machine), adjust `ports` in docker-compose.yml:
+The backend binds to `0.0.0.0:8000` inside the container. The docker-compose configuration publishes this
+as `127.0.0.1:8888:8000` — accessible on the Docker host at `http://localhost:8888`.
 
-```yaml
-ports:
-  - "0.0.0.0:8000:8000"  # Accessible from any network interface
-```
+> **Important:** The API server enforces loopback-only access for all POST endpoints and `/api/session`
+> in the server code itself — not just at the network layer. Requests from non-loopback clients to these
+> endpoints will be rejected with HTTP 403 regardless of how the port is exposed.
+
+This means:
+- If you change `ports` in docker-compose.yml to `"0.0.0.0:8888:8000"`, the UI static files
+  will load from remote clients, but `/api/session` and all action POSTs will still return 403.
+- For local development and demos, run the browser on the same host as Docker and access
+  `http://localhost:8888`.
+- For remote access, use SSH port forwarding (`ssh -L 8888:localhost:8888 yourhost`) so
+  requests originate from loopback on the Docker host.
 
 ## Troubleshooting
 
-### Port 8000 already in use
+### Port 8888 already in use
 
 ```bash
-# Find process using port 8000
-lsof -i :8000
+# Find process using port 8888
+lsof -i :8888
 
-# Use a different port
-ports: ["127.0.0.1:8001:8000"]
+# Use a different host port
+ports: ["127.0.0.1:8889:8000"]
 ```
 
 ### Container exits immediately
@@ -204,9 +211,9 @@ docker-compose up
 
 ### Can't reach API from outside localhost
 
-Change docker-compose.yml `ports` from `127.0.0.1:8000:8000` to `0.0.0.0:8000:8000`.
-
-Note: This exposes the API to the network. Ensure `/api/session` rate-limiting or IP restrictions are in place for untrusted networks.
+By design, the server rejects session and POST requests from non-loopback clients (HTTP 403).
+Changing the docker-compose port binding to `0.0.0.0` only exposes the TCP port — it does not
+relax the server's loopback check. Use SSH port forwarding for secure remote access.
 
 ## Next Steps
 

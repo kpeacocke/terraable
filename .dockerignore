@@ -67,9 +67,5 @@ htmlcov
 tmp
 temp
 
-# Uncommon directories
-modes/lab
-modes/offline
-modes/showcase
-integration
+# Dev and CI tooling only
 scripts

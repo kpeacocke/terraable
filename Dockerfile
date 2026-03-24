@@ -23,16 +23,23 @@ RUN poetry config virtualenvs.create false && \
 # Runtime stage: Minimal image with only runtime dependencies
 FROM python:3.11-slim
 
-WORKDIR /app
+ARG TERRAFORM_VERSION=1.7.5
 
-# Install only runtime dependencies (Ansible, Terraform, etc.)
+WORKDIR /workspace
+
+# Install runtime dependencies and Terraform CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
     curl \
     ca-certificates \
+    unzip \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -s /bin/bash terraable
+    && useradd -m -s /bin/bash terraable \
+    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip \
+    && unzip /tmp/terraform.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/terraform \
+    && rm -f /tmp/terraform.zip
 
 # Copy installed packages from builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
@@ -44,7 +51,7 @@ COPY --chown=terraable:terraable . .
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app:$PATH"
+    PATH="/workspace:$PATH"
 
 # Switch to non-root user
 USER terraable
@@ -56,6 +63,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')" || exit 1
 
-# Default command: start API server
-# Mount workspace root at /workspace if custom environment needed
-CMD ["python", "-m", "terraable.api_server", "--host", "0.0.0.0", "--port", "8000", "--workspace", "/app"]
+# Default command: start API server with workspace at /workspace
+CMD ["python", "-m", "terraable.api_server", "--host", "0.0.0.0", "--port", "8000", "--workspace", "/workspace"]
