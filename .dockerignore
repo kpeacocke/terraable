@@ -1,0 +1,75 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist
+build
+.eggs
+*.egg
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# Development tools
+.venv
+venv
+env
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+.env
+.env.local
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Documentation
+docs
+README.md
+*.md
+CONTRIBUTING.md
+SECURITY.md
+DEVELOP.md
+LICENSE
+
+# Node modules (even though we serve UI, don't need node in backend image)
+node_modules
+package-lock.json
+
+# Test files
+tests
+htmlcov
+*.coverage
+.mutation
+
+# Temporary files
+*.tmp
+*.log
+tmp
+temp
+
+# Uncommon directories
+modes/lab
+modes/offline
+modes/showcase
+integration
+scripts
