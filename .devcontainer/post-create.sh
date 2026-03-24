@@ -31,6 +31,16 @@ fi
 
 terraform --version
 
+if command -v docker >/dev/null 2>&1; then
+  echo "Docker CLI detected in dev container."
+  if ! docker version >/dev/null 2>&1; then
+    echo "Warning: Docker CLI is installed but daemon is unreachable from the container." >&2
+    echo "Ensure Docker Desktop is running and rebuild/reopen the dev container." >&2
+  fi
+else
+  echo "Warning: Docker CLI not found in container PATH." >&2
+fi
+
 echo "Installation complete."
 echo ""
 echo "Quick start:"
