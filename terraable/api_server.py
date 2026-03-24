@@ -104,45 +104,47 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path in {"/", "/index.html"}:
-            try:
-                content = self.ui_path.read_text(encoding="utf-8")
-            except FileNotFoundError:
-                self.send_error(HTTPStatus.NOT_FOUND, "UI index file not found")
-                return
-            except UnicodeDecodeError:
-                self.send_error(
-                    HTTPStatus.INTERNAL_SERVER_ERROR, "UI index file is not valid UTF-8"
-                )
-                return
-            self._send_html(content)
-        elif parsed.path == "/targetAvailability.js":
+            self._serve_file_safely(self.ui_path, "text/html; charset=utf-8")
+            return
+        if parsed.path == "/targetAvailability.js":
             js_path = self.workspace_root / "ui" / "targetAvailability.js"
-            try:
-                content = js_path.read_text(encoding="utf-8")
-            except FileNotFoundError:
-                self.send_error(HTTPStatus.NOT_FOUND, "UI module file not found")
-                return
-            except UnicodeDecodeError:
-                self.send_error(
-                    HTTPStatus.INTERNAL_SERVER_ERROR, "UI module file is not valid UTF-8"
-                )
-                return
-            self._send_text(content, "application/javascript; charset=utf-8")
-        elif parsed.path == "/api/state":
-            query = parse_qs(parsed.query)
-            target = query.get("target", ["local-lab"])[0]
-            backend = self.get_active_backend(str(target))
-            self._send_json({"state": backend.get_state()})
-        elif parsed.path == "/api/auth/status":
-            self._handle_auth_status(parsed)
-        elif parsed.path == "/api/auth/matrix":
-            self._handle_auth_matrix(parsed)
-        elif parsed.path == "/api/session":
-            self._send_json({"post_token": self.api_post_token})
-        elif parsed.path == "/healthz":
-            self._send_json({"status": "ok"})
-        else:
-            self.send_error(HTTPStatus.NOT_FOUND)
+            self._serve_file_safely(js_path, "application/javascript; charset=utf-8")
+            return
+
+        # Dispatch simple routes via dictionary to reduce complexity
+        simple_routes: dict[str, Callable[[], None]] = {
+            "/api/state": lambda: self._handle_api_state(parsed),
+            "/api/auth/status": lambda: self._handle_auth_status(parsed),
+            "/api/auth/matrix": lambda: self._handle_auth_matrix(parsed),
+            "/api/session": lambda: self._send_json({"post_token": self.api_post_token}),
+            "/healthz": lambda: self._send_json({"status": "ok"}),
+        }
+        handler = simple_routes.get(parsed.path)
+        if handler:
+            handler()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _serve_file_safely(self, file_path: Path, content_type: str) -> None:
+        """Serve a file with safe error handling for missing or malformed UTF-8."""
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            self.send_error(HTTPStatus.NOT_FOUND, f"{file_path.name} file not found")
+            return
+        except UnicodeDecodeError:
+            self.send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR, f"{file_path.name} file is not valid UTF-8"
+            )
+            return
+        self._send_text(content, content_type)
+
+    def _handle_api_state(self, parsed: ParseResult) -> None:
+        """Handle GET /api/state request."""
+        query = parse_qs(parsed.query)
+        target = query.get("target", ["local-lab"])[0]
+        backend = self.get_active_backend(str(target))
+        self._send_json({"state": backend.get_state()})
 
     def _handle_auth_status(self, parsed: ParseResult) -> None:
         query = parse_qs(parsed.query)

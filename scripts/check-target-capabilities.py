@@ -17,26 +17,27 @@ repo_root = Path(__file__).resolve().parents[1]
 manifest_path = repo_root / "docs" / "target-capabilities.json"
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
+README_MD = "README.md"
+SHOWCASE_README_MD = "modes/showcase/README.md"
+
 docs = {
-    "README.md": (repo_root / "README.md").read_text(encoding="utf-8"),
+    README_MD: (repo_root / README_MD).read_text(encoding="utf-8"),
     "docs/lab-guide.md": (repo_root / "docs" / "lab-guide.md").read_text(encoding="utf-8"),
     "docs/mvp-demo-runbook.md": (repo_root / "docs" / "mvp-demo-runbook.md").read_text(
         encoding="utf-8"
     ),
-    "modes/showcase/README.md": (repo_root / "modes" / "showcase" / "README.md").read_text(
-        encoding="utf-8"
-    ),
+    SHOWCASE_README_MD: (repo_root / SHOWCASE_README_MD).read_text(encoding="utf-8"),
 }
 
 scripted = manifest["scripted_mvp_target"]
-if f"`{scripted} + backstage`" not in docs["README.md"]:
-    fail("README.md missing scripted MVP target reference")
+if f"`{scripted} + backstage`" not in docs[README_MD]:
+    fail(f"{README_MD} missing scripted MVP target reference")
 if f"`{scripted} + backstage`" not in docs["docs/mvp-demo-runbook.md"]:
     fail("docs/mvp-demo-runbook.md missing scripted MVP flow reference")
 
 for target in manifest["extended_live_targets"]:
-    if f"`{target}`" not in docs["README.md"]:
-        fail(f"README.md missing extended live target `{target}`")
+    if f"`{target}`" not in docs[README_MD]:
+        fail(f"{README_MD} missing extended live target `{target}`")
 
 for target, details in manifest["targets"].items():
     executable = bool(details["executable"])
@@ -57,9 +58,9 @@ showcase_checks = {
 for target, label in showcase_checks.items():
     expected_row_fragment = f"| `{target}`"
     if (
-        expected_row_fragment not in docs["modes/showcase/README.md"]
-        or label not in docs["modes/showcase/README.md"]
+        expected_row_fragment not in docs[SHOWCASE_README_MD]
+        or label not in docs[SHOWCASE_README_MD]
     ):
-        fail(f"modes/showcase/README.md missing expected status for `{target}`")
+        fail(f"{SHOWCASE_README_MD} missing expected status for `{target}`")
 
 print("target-capabilities: OK")

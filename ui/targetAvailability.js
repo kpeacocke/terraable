@@ -22,16 +22,19 @@ export function buildTargetAvailability(authByTarget, selectedTarget, targetOrde
   const selectedRow = rows.find((row) => row.target === selectedTarget) || null;
 
   let fallbackTarget = selectedTarget;
-  if ((!selectedRow || !selectedRow.ready) && readyTargets.length > 0) {
+  if (!selectedRow?.ready && readyTargets.length > 0) {
     fallbackTarget = readyTargets[0];
   }
 
   const resolvedSelected = rows.find((row) => row.target === fallbackTarget) || selectedRow;
-  const selectedMessage = resolvedSelected
-    ? resolvedSelected.ready
-      ? `Selected target ${resolvedSelected.target} is available.`
-      : `Selected target ${resolvedSelected.target} is unavailable: ${resolvedSelected.reason}.`
-    : "Target availability unknown while authentication checks are loading.";
+  let selectedMessage;
+  if (!resolvedSelected) {
+    selectedMessage = "Target availability unknown while authentication checks are loading.";
+  } else if (resolvedSelected.ready) {
+    selectedMessage = `Selected target ${resolvedSelected.target} is available.`;
+  } else {
+    selectedMessage = `Selected target ${resolvedSelected.target} is unavailable: ${resolvedSelected.reason}.`;
+  }
 
   return {
     rows,
