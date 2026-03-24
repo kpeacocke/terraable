@@ -119,6 +119,8 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"state": backend.get_state()})
         elif parsed.path == "/api/auth/status":
             self._handle_auth_status(parsed)
+        elif parsed.path == "/api/auth/matrix":
+            self._handle_auth_matrix(parsed)
         elif parsed.path == "/healthz":
             self._send_json({"status": "ok"})
         else:
@@ -137,6 +139,21 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 )
             }
         )
+
+    def _handle_auth_matrix(self, parsed: ParseResult) -> None:
+        query = parse_qs(parsed.query)
+        portal = query.get("portal", ["backstage"])[0]
+        auth_by_target: dict[str, dict[str, Any]] = {}
+        for supported_target in sorted(self.supported_targets):
+            backend = self.get_active_backend(supported_target)
+            auth_by_target[supported_target] = cast(
+                dict[str, Any],
+                backend.get_auth_status(
+                    target=supported_target,
+                    portal=str(portal),
+                ),
+            )
+        self._send_json({"portal": str(portal), "auth_by_target": auth_by_target})
 
     def do_POST(self) -> None:
         if not self._require_safe_post_request():

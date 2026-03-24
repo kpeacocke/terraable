@@ -558,6 +558,13 @@ def test_handler_serves_auth_endpoints(
         )
         assert auth_payload["auth"]["ready"] is True
 
+        matrix_payload = json.loads(
+            urlopen(f"{base}/api/auth/matrix?portal=backstage").read().decode("utf-8")
+        )
+        assert matrix_payload["portal"] == "backstage"
+        assert matrix_payload["auth_by_target"]["local-lab"]["ready"] is True
+        assert matrix_payload["auth_by_target"]["aws"]["ready"] is False
+
         request = Request(
             f"{base}/api/auth/configure",
             data=json.dumps({"credentials": {"HCP_TERRAFORM_TOKEN": "token"}}).encode("utf-8"),

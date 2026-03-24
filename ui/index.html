@@ -340,6 +340,7 @@
             <option value="hyper-v">hyper-v</option>
             <option value="local-lab">local-lab</option>
           </select>
+          <div class="hint" id="target-availability">Checking target availability...</div>
         </div>
         <div class="field">
           <label for="portal">Portal implementation</label>
@@ -513,6 +514,8 @@
     const runtimeBadge = document.getElementById("runtime-badge");
     const authStatusEl = document.getElementById("auth-status");
     const targetSuggestionEl = document.getElementById("target-suggestion");
+    const targetAvailabilityEl = document.getElementById("target-availability");
+    const targetSelectEl = document.getElementById("target");
     const actionButtons = Array.from(document.querySelectorAll(".actions button"));
 
     const controls = {
@@ -525,8 +528,51 @@
       ready: false,
       blockers: ["auth status has not been loaded yet"],
     };
+    let authMatrix = {};
     let pendingAction = false;
     let latestState = {};
+
+    function blockersText(auth) {
+      const blockers = auth?.blockers || [];
+      if (!blockers.length) {
+        return "configured for selected portal";
+      }
+      return blockers.join("; ");
+    }
+
+    function applyTargetAvailability() {
+      const options = Array.from(targetSelectEl.options);
+      const readyValues = options
+        .filter((option) => Boolean(authMatrix?.[option.value]?.ready))
+        .map((option) => option.value);
+
+      if (!readyValues.includes(targetSelectEl.value) && readyValues.length > 0) {
+        targetSelectEl.value = readyValues[0];
+        syncCredentialGroups(targetSelectEl.value);
+      }
+
+      for (const option of options) {
+        const auth = authMatrix?.[option.value];
+        const ready = Boolean(auth?.ready);
+        // Keep the currently selected option enabled so users can still inspect
+        // its credential requirements while unavailable.
+        option.disabled = !ready && option.value !== targetSelectEl.value;
+        option.title = ready
+          ? `${option.value}: ready for ${selected("portal")}`
+          : `${option.value}: ${blockersText(auth)}`;
+      }
+
+      const selectedAuth = authMatrix?.[targetSelectEl.value];
+      if (!selectedAuth) {
+        targetAvailabilityEl.textContent = "Target availability unknown while authentication checks are loading.";
+        return;
+      }
+      if (selectedAuth.ready) {
+        targetAvailabilityEl.textContent = `Selected target ${targetSelectEl.value} is available for ${selected("portal")}.`;
+        return;
+      }
+      targetAvailabilityEl.textContent = `Selected target ${targetSelectEl.value} is unavailable: ${blockersText(selectedAuth)}.`;
+    }
 
     function updateComplianceScore() {
       // Merge controls and compliance_controls using AND-logic for shared keys,
@@ -950,6 +996,24 @@
       updateActionButtons();
     }
 
+    async function refreshAuthMatrix() {
+      const previousTarget = selected("target");
+      try {
+        const query = new URLSearchParams({
+          portal: selected("portal"),
+        });
+        const data = await api(`/api/auth/matrix?${query.toString()}`);
+        authMatrix = data.auth_by_target || {};
+      } catch (error) {
+        authMatrix = {};
+        targetAvailabilityEl.textContent = `Target availability unavailable: ${String(error)}`;
+      }
+      applyTargetAvailability();
+      if (selected("target") !== previousTarget) {
+        await refreshAuthStatus();
+      }
+    }
+
     async function saveCredentials() {
       const credentialInputs = {
         HCP_TERRAFORM_TOKEN: document.getElementById("hcp-token").value,
@@ -1045,6 +1109,7 @@
       this.textContent = "Saving...";
       try {
         await saveCredentials();
+        await refreshAuthMatrix();
       } catch (error) {
         authState = {
           authenticated: false,
@@ -1061,16 +1126,19 @@
 
     document.getElementById("target").addEventListener("change", async () => {
       syncCredentialGroups(selected("target"));
+      applyTargetAvailability();
       await refreshState();
       await refreshAuthStatus();
     });
     document.getElementById("portal").addEventListener("change", async () => {
       await refreshAuthStatus();
+      await refreshAuthMatrix();
     });
 
     syncCredentialGroups(selected("target"));
     await refreshState();
     await refreshAuthStatus();
+    await refreshAuthMatrix();
   </script>
 </body>
 </html>
