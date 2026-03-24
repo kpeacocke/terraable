@@ -15,19 +15,32 @@ def fail(message: str) -> None:
 
 repo_root = Path(__file__).resolve().parents[1]
 manifest_path = repo_root / "docs" / "target-capabilities.json"
-manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+try:
+    manifest_text = manifest_path.read_text(encoding="utf-8")
+except FileNotFoundError:
+    fail(f"manifest file not found at {manifest_path}")
+
+try:
+    manifest = json.loads(manifest_text)
+except json.JSONDecodeError as exc:
+    fail(f"failed to parse JSON from manifest at {manifest_path}: {exc}")
 
 README_MD = "README.md"
 SHOWCASE_README_MD = "modes/showcase/README.md"
 
-docs = {
-    README_MD: (repo_root / README_MD).read_text(encoding="utf-8"),
-    "docs/lab-guide.md": (repo_root / "docs" / "lab-guide.md").read_text(encoding="utf-8"),
-    "docs/mvp-demo-runbook.md": (repo_root / "docs" / "mvp-demo-runbook.md").read_text(
-        encoding="utf-8"
-    ),
-    SHOWCASE_README_MD: (repo_root / SHOWCASE_README_MD).read_text(encoding="utf-8"),
-}
+try:
+    docs = {
+        README_MD: (repo_root / README_MD).read_text(encoding="utf-8"),
+        "docs/lab-guide.md": (repo_root / "docs" / "lab-guide.md").read_text(encoding="utf-8"),
+        "docs/mvp-demo-runbook.md": (repo_root / "docs" / "mvp-demo-runbook.md").read_text(
+            encoding="utf-8"
+        ),
+        SHOWCASE_README_MD: (repo_root / SHOWCASE_README_MD).read_text(encoding="utf-8"),
+    }
+except FileNotFoundError as exc:
+    missing = getattr(exc, "filename", None) or "<unknown>"
+    fail(f"documentation file not found: {missing}")
 
 scripted = manifest["scripted_mvp_target"]
 if f"`{scripted} + backstage`" not in docs[README_MD]:

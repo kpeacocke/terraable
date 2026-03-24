@@ -169,9 +169,14 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         all_ui_targets = sorted(self.supported_targets | frozenset({"openshift"}))
         for target in all_ui_targets:
             if target == "openshift":
-                # Scaffold-only target; show as unavailable with explanation
+                # Scaffold-only target; return a full auth-status-like payload
+                # so clients can rely on a consistent schema across targets.
                 auth_by_target[target] = {
+                    "authenticated": False,
                     "ready": False,
+                    "required_credentials": [],
+                    "missing_credentials": [],
+                    "credential_sources": {},
                     "blockers": ["scaffold-only; use okd for executable deployments"],
                 }
             else:
