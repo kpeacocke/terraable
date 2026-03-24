@@ -18,7 +18,7 @@ COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies (without dev dependencies for production)
 RUN poetry config virtualenvs.create false && \
-    poetry install --no-dev --no-directory
+    poetry install --no-root --only main
 
 # Runtime stage: Minimal image with only runtime dependencies
 FROM python:3.11-slim
