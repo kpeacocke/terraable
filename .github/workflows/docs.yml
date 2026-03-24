@@ -7,15 +7,27 @@ permissions:
   pull_request:
     paths:
       - '**/*.md'
+      - 'scripts/check-doc-consistency.sh'
       - '.github/workflows/docs.yml'
   push:
     branches:
       - main
     paths:
       - '**/*.md'
+      - 'scripts/check-doc-consistency.sh'
       - '.github/workflows/docs.yml'
 
 jobs:
+  doc-consistency:
+    name: Doc consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Check documentation consistency
+        run: bash scripts/check-doc-consistency.sh
+
   markdown-links:
     name: Markdown links
     runs-on: ubuntu-latest
