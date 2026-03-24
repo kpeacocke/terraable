@@ -158,7 +158,7 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 | AWX bootstrap fails auth | Wrong credentials | Check `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD` in `.env` |
 | EDA webhook not firing | EDA mode disabled | Set EDA mode to `enabled` in the UI |
 | `gcp` target auth blocked | Missing credentials | Set `GOOGLE_APPLICATION_CREDENTIALS` and `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
-| `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP token | Set `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
+| `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP Terraform token (`TF_TOKEN_<hostname>` / `HCP_TERRAFORM_TOKEN`) | Set `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
 | UI stuck on `live-local-lab` after switching target | Persisted local lab state still pinned to previous target | Run **Create environment** again for the new target (or stop the server and delete `.terraable/local-lab/state.json`), then reload the UI |
 | `terraform init` fails on Phase 3 module | Terraform version | Modules use only `terraform_data` — no external provider needed; confirm Terraform ≥ 1.9 |
 | `.env` values appear in logs or diff | Credentials committed | Confirm `.env` is gitignored; rotate any exposed credentials immediately |

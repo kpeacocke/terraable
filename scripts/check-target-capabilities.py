@@ -42,38 +42,41 @@ except FileNotFoundError as exc:
     missing = getattr(exc, "filename", None) or "<unknown>"
     fail(f"documentation file not found: {missing}")
 
-scripted = manifest["scripted_mvp_target"]
-if f"`{scripted} + backstage`" not in docs[README_MD]:
-    fail(f"{README_MD} missing scripted MVP target reference")
-if f"`{scripted} + backstage`" not in docs["docs/mvp-demo-runbook.md"]:
-    fail("docs/mvp-demo-runbook.md missing scripted MVP flow reference")
+try:
+    scripted = manifest["scripted_mvp_target"]
+    if f"`{scripted} + backstage`" not in docs[README_MD]:
+        fail(f"{README_MD} missing scripted MVP target reference")
+    if f"`{scripted} + backstage`" not in docs["docs/mvp-demo-runbook.md"]:
+        fail("docs/mvp-demo-runbook.md missing scripted MVP flow reference")
 
-for target in manifest["extended_live_targets"]:
-    if f"`{target}`" not in docs[README_MD]:
-        fail(f"{README_MD} missing extended live target `{target}`")
+    for target in manifest["extended_live_targets"]:
+        if f"`{target}`" not in docs[README_MD]:
+            fail(f"{README_MD} missing extended live target `{target}`")
 
-for target, details in manifest["targets"].items():
-    executable = bool(details["executable"])
+    for target, details in manifest["targets"].items():
+        executable = bool(details["executable"])
 
-    # Lab guide executable matrix.
-    expected = "Yes" if executable else "No"
-    if f"| `{target}` | {expected}" not in docs["docs/lab-guide.md"]:
-        fail(f"docs/lab-guide.md target row for `{target}` is inconsistent with manifest")
+        # Lab guide executable matrix.
+        expected = "Yes" if executable else "No"
+        if f"| `{target}` | {expected}" not in docs["docs/lab-guide.md"]:
+            fail(f"docs/lab-guide.md target row for `{target}` is inconsistent with manifest")
 
-# Showcase status labels for key showcase targets.
-showcase_checks = {
-    "local-lab": manifest["targets"]["local-lab"]["status_label"],
-    "aws": manifest["targets"]["aws"]["status_label"],
-    "azure": manifest["targets"]["azure"]["status_label"],
-    "okd": manifest["targets"]["okd"]["status_label"],
-    "openshift": manifest["targets"]["openshift"]["status_label"],
-}
-for target, label in showcase_checks.items():
-    expected_row_fragment = f"| `{target}`"
-    if (
-        expected_row_fragment not in docs[SHOWCASE_README_MD]
-        or label not in docs[SHOWCASE_README_MD]
-    ):
-        fail(f"{SHOWCASE_README_MD} missing expected status for `{target}`")
+    # Showcase status labels for key showcase targets.
+    showcase_checks = {
+        "local-lab": manifest["targets"]["local-lab"]["status_label"],
+        "aws": manifest["targets"]["aws"]["status_label"],
+        "azure": manifest["targets"]["azure"]["status_label"],
+        "okd": manifest["targets"]["okd"]["status_label"],
+        "openshift": manifest["targets"]["openshift"]["status_label"],
+    }
+    for target, label in showcase_checks.items():
+        expected_row_fragment = f"| `{target}`"
+        if (
+            expected_row_fragment not in docs[SHOWCASE_README_MD]
+            or label not in docs[SHOWCASE_README_MD]
+        ):
+            fail(f"{SHOWCASE_README_MD} missing expected status for `{target}`")
+except (KeyError, TypeError) as exc:
+    fail(f"invalid manifest structure in {manifest_path}: {exc}")
 
 print("target-capabilities: OK")

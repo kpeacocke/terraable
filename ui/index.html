@@ -1023,7 +1023,10 @@
         targetAvailabilityListEl.innerHTML = "";
       }
       if (selected("target") !== previousTarget) {
+        // Target selection changed as a result of updated availability; refresh both
+        // auth status and state so latestState and button enablement match the new target.
         await refreshAuthStatus();
+        await refreshState();
       }
     }
 
