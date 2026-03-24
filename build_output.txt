@@ -1,0 +1,60 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.97kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 770B done
+#3 DONE 0.0s
+
+#4 [builder 1/6] FROM docker.io/library/python:3.11-slim@sha256:fba6f3b73795df99960f4269b297420bdbe01a8631fc31ea3f121f2486d332d0
+#4 resolve docker.io/library/python:3.11-slim@sha256:fba6f3b73795df99960f4269b297420bdbe01a8631fc31ea3f121f2486d332d0 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 74.22kB 0.1s done
+#5 DONE 0.1s
+
+#6 [stage-1 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [builder 6/6] RUN poetry config virtualenvs.create false &&     poetry install --no-root --only main
+#7 CACHED
+
+#8 [builder 5/6] COPY pyproject.toml poetry.lock* ./
+#8 CACHED
+
+#9 [stage-1 3/6] RUN apt-get update && apt-get install -y --no-install-recommends     git     openssh-client     curl     ca-certificates     && rm -rf /var/lib/apt/lists/*     && useradd -m -s /bin/bash terraable
+#9 CACHED
+
+#10 [builder 4/6] RUN curl -sSL https://install.python-poetry.org | python3 - &&     ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+#10 CACHED
+
+#11 [stage-1 4/6] COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+#11 CACHED
+
+#12 [builder 2/6] WORKDIR /build
+#12 CACHED
+
+#13 [builder 3/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [stage-1 5/6] COPY --from=builder /usr/local/bin /usr/local/bin
+#14 CACHED
+
+#15 [stage-1 6/6] COPY --chown=terraable:terraable . .
+#15 DONE 1.4s
+
+#16 exporting to image
+#16 exporting layers
+#16 exporting layers 11.4s done
+#16 exporting manifest sha256:89aeb50ea7acff6edf3580a3965732141232c9e108e03dfe3df0c1693dc178bb 0.0s done
+#16 exporting config sha256:1766410c5983a97d7fbf0e649d0e5121143552dca283a5b89018ab8cc427e939 done
+#16 exporting attestation manifest sha256:21b87491ee599669023d463a566f8991da609f517ae683953b2172e4e6ff623d 0.0s done
+#16 exporting manifest list sha256:8b9554f42ed39f6537952a401e305dddfe997fc7536f66b70b870a56aa7ff262 done
+#16 naming to docker.io/library/terraable:test done
+#16 unpacking to docker.io/library/terraable:test
