@@ -1,0 +1,94 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: terraable-backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # API server configuration
+      - TERRAABLE_WORKSPACE=/workspace
+      - TERRAABLE_MODE=${TERRAABLE_MODE:-live-local-lab}
+      - TERRAABLE_MOCK_MODE=${TERRAABLE_MOCK_MODE:-false}
+      
+      # Terraform configuration
+      - TF_LOG=${TF_LOG:-}
+      - TF_LOG_PATH=/workspace/.terraform.log
+      
+      # Ansible configuration
+      - ANSIBLE_VERBOSITY=${ANSIBLE_VERBOSITY:-0}
+      - ANSIBLE_HOST_KEY_CHECKING=False
+      
+      # HCP Terraform (if credentials provided)
+      - HCP_TERRAFORM_TOKEN=${HCP_TERRAFORM_TOKEN:-}
+      - TF_TOKEN_app_terraform_io=${TF_TOKEN_app_terraform_io:-}
+    
+    volumes:
+      # Project root for workspace access
+      - .:/workspace:delegated
+      
+      # State persistence
+      - terraable_state:/workspace/.terraable
+      
+      # Terraform cache persistence (speeds up builds)
+      - terraform_cache:/workspace/.terraform
+      
+      # Ansible inventory and playbooks
+      - ./ansible:/workspace/ansible:ro
+      
+      # UI files
+      - ./ui:/workspace/ui:ro
+    
+    working_dir: /workspace
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Always restart on failure (useful for demo)
+    restart: unless-stopped
+    
+    # Resource limits (optional, adjust to your system)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '1'
+    #       memory: 1G
+    
+    networks:
+      - terraable
+
+  # Optional: Frontend development server (if needed for UI development)
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.ui
+  #   container_name: terraable-frontend
+  #   ports:
+  #     - "127.0.0.1:3000:3000"
+  #   volumes:
+  #     - ./ui:/app/ui:delegated
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - terraable
+
+volumes:
+  terraable_state:
+    driver: local
+  terraform_cache:
+    driver: local
+
+networks:
+  terraable:
+    driver: bridge
