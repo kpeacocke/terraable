@@ -164,15 +164,25 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         portal = query.get("portal", ["backstage"])[0]
         auth_by_target: dict[str, dict[str, Any]] = {}
-        for supported_target in sorted(self.supported_targets):
-            backend = self.get_active_backend(supported_target)
-            auth_by_target[supported_target] = cast(
-                dict[str, Any],
-                backend.get_auth_status(
-                    target=supported_target,
-                    portal=str(portal),
-                ),
-            )
+        # Include all UI-selectable targets: both executable (supported_targets)
+        # and scaffold-only targets like 'openshift' with ready=false and blockers
+        all_ui_targets = sorted(self.supported_targets | frozenset({"openshift"}))
+        for target in all_ui_targets:
+            if target == "openshift":
+                # Scaffold-only target; show as unavailable with explanation
+                auth_by_target[target] = {
+                    "ready": False,
+                    "blockers": ["scaffold-only; use okd for executable deployments"],
+                }
+            else:
+                backend = self.get_active_backend(target)
+                auth_by_target[target] = cast(
+                    dict[str, Any],
+                    backend.get_auth_status(
+                        target=target,
+                        portal=str(portal),
+                    ),
+                )
         self._send_json({"portal": str(portal), "auth_by_target": auth_by_target})
 
     def do_POST(self) -> None:

@@ -102,7 +102,7 @@ poetry run ruff check terraable tests
 poetry run ruff format terraable tests
 
 # YAML lint
-poetry run yamllint .
+yamllint .
 
 # Markdown lint
 markdownlint-cli2 "**/*.md"

@@ -550,9 +550,12 @@
       const selectedTarget = selected("target");
       for (const option of options) {
         const row = view.rows.find((entry) => entry.target === option.value);
-        const ready = Boolean(row?.ready);
+        const isUnknown = !row;
+        const ready = !isUnknown && Boolean(row?.ready);
         // Keep selected option enabled so users can inspect requirements.
-        option.disabled = !ready && option.value !== selectedTarget;
+        // When availability data is missing for a target (unknown), keep it enabled
+        // rather than treating it as unavailable.
+        option.disabled = !ready && !isUnknown && option.value !== selectedTarget;
       }
 
       targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}.`;
@@ -1006,11 +1009,12 @@
         });
         const data = await api(`/api/auth/matrix?${query.toString()}`);
         authMatrix = data.auth_by_target || {};
+        applyTargetAvailability();
       } catch (error) {
         authMatrix = {};
         targetAvailabilityEl.textContent = `Target availability unavailable: ${String(error)}`;
+        targetAvailabilityListEl.innerHTML = "";
       }
-      applyTargetAvailability();
       if (selected("target") !== previousTarget) {
         await refreshAuthStatus();
       }
