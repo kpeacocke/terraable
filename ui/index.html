@@ -548,8 +548,10 @@
       }
 
       const selectedTarget = selected("target");
+      // Build a Map for O(1) target lookup instead of O(n²) find() in loop.
+      const rowByTarget = new Map(view.rows.map((row) => [row.target, row]));
       for (const option of options) {
-        const row = view.rows.find((entry) => entry.target === option.value);
+        const row = rowByTarget.get(option.value);
         const isUnknown = row ? !row.known : true;
         const ready = Boolean(row?.ready);
         // Keep selected option enabled so users can inspect requirements.
@@ -932,7 +934,12 @@
       const headers = { "Content-Type": "application/json" };
       if (payload) {
         if (!apiPostToken) {
-          throw new Error("API session token unavailable; refresh state and try again");
+          // Token missing; try lazy refresh before failing.
+          try {
+            await refreshSessionToken();
+          } catch (error) {
+            throw new Error("API session token unavailable; refresh state and try again");
+          }
         }
         headers["X-Terraable-Token"] = apiPostToken;
       }

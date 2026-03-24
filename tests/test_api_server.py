@@ -1002,6 +1002,41 @@ def test_action_failure_uses_target_backend_state(
 
 
 @pytest.mark.unit
+def test_handle_session_rejects_non_loopback_client() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("10.0.0.2", 12345)
+    handler.api_post_token = "test-token"
+    called: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        called.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    handler._handle_session()
+
+    assert called == [(403, "Session token access restricted to localhost")]
+
+
+@pytest.mark.unit
+def test_handle_session_returns_token_for_loopback_client() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.api_post_token = "test-token-123"
+    sent_json: dict[str, Any] | None = None
+
+    def fake_send_json(payload: dict[str, Any]) -> None:
+        nonlocal sent_json
+        sent_json = payload
+
+    handler._send_json = fake_send_json  # type: ignore[assignment]
+
+    handler._handle_session()
+
+    assert sent_json == {"post_token": "test-token-123"}
+
+
+@pytest.mark.unit
 def test_make_handler_generates_random_token_when_env_unset(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

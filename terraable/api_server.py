@@ -116,7 +116,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             "/api/state": lambda: self._handle_api_state(parsed),
             "/api/auth/status": lambda: self._handle_auth_status(parsed),
             "/api/auth/matrix": lambda: self._handle_auth_matrix(parsed),
-            "/api/session": lambda: self._send_json({"post_token": self.api_post_token}),
+            "/api/session": lambda: self._handle_session(),
             "/healthz": lambda: self._send_json({"status": "ok"}),
         }
         handler = simple_routes.get(parsed.path)
@@ -184,6 +184,14 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                     ),
                 )
         self._send_json({"portal": str(portal), "auth_by_target": auth_by_target})
+
+    def _handle_session(self) -> None:
+        """Handle GET /api/session request with loopback restriction."""
+        client_host = self.client_address[0] if self.client_address else ""
+        if not self._is_loopback_host(client_host):
+            self.send_error(HTTPStatus.FORBIDDEN, "Session token access restricted to localhost")
+            return
+        self._send_json({"post_token": self.api_post_token})
 
     def do_POST(self) -> None:
         if not self._require_safe_post_request():
