@@ -1023,17 +1023,16 @@ def test_handle_session_returns_token_for_loopback_client() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
     api_server.TerraableRequestHandler.api_post_token = "test-token-123"
-    sent_json: dict[str, Any] | None = None
+    sent_json: list[dict[str, Any]] = []
 
     def fake_send_json(payload: dict[str, Any]) -> None:
-        nonlocal sent_json
-        sent_json = payload
+        sent_json.append(payload)
 
     handler._send_json = fake_send_json  # type: ignore[assignment]
 
     handler._handle_session()  # type: ignore[reportPrivateUsage]
 
-    assert sent_json == {"post_token": "test-token-123"}
+    assert sent_json == [{"post_token": "test-token-123"}]
 
 
 @pytest.mark.unit
