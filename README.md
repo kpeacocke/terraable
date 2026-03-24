@@ -58,6 +58,14 @@ Local-lab now has an executable end-to-end path: UI -> Python API -> Terraform c
 - Lab mode: reduced-complexity local target path.
 - Offline/mock mode: deterministic demo replay using simulated outcomes.
 
+## Source Of Truth
+
+- Scripted MVP flow: `local-lab + backstage` is the default presenter path.
+- Extended live targets: `aws`, `azure`, `okd`, `gcp`, `vmware`, `parallels`, and `hyper-v` are executable when credentials and platform prerequisites are satisfied.
+- Scaffold-only in this branch: `openshift` remains contract/module scaffolding and is not selectable as a live control-plane target.
+- Token convention: use `TF_TOKEN_<hostname>` as primary. `HCP_TERRAFORM_TOKEN` is supported as a backwards-compatible alias in UI-driven auth flows.
+- Machine-readable target matrix: `docs/target-capabilities.json` is validated in CI to keep docs and executable scope aligned.
+
 ## Running The Control Plane
 
 Preconditions:

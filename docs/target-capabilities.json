@@ -1,0 +1,50 @@
+{
+  "scripted_mvp_target": "local-lab",
+  "extended_live_targets": [
+    "aws",
+    "azure",
+    "okd",
+    "gcp",
+    "vmware",
+    "parallels",
+    "hyper-v"
+  ],
+  "targets": {
+    "local-lab": {
+      "executable": true,
+      "status_label": "Executable end-to-end via the control plane"
+    },
+    "aws": {
+      "executable": true,
+      "status_label": "Executable via dedicated backend (`AWSBackend`)"
+    },
+    "azure": {
+      "executable": true,
+      "status_label": "Executable via dedicated backend (`AzureBackend`)"
+    },
+    "okd": {
+      "executable": true,
+      "status_label": "Executable via dedicated backend (`OKDBackend`)"
+    },
+    "gcp": {
+      "executable": true,
+      "status_label": "Live-executable"
+    },
+    "vmware": {
+      "executable": true,
+      "status_label": "Live-executable"
+    },
+    "parallels": {
+      "executable": true,
+      "status_label": "Live-executable"
+    },
+    "hyper-v": {
+      "executable": true,
+      "status_label": "Live-executable"
+    },
+    "openshift": {
+      "executable": false,
+      "status_label": "Module and contract scaffolding only"
+    }
+  }
+}

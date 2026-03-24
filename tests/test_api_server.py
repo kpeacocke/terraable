@@ -20,6 +20,16 @@ from terraable.local_lab import LocalLabBackend
 from terraable.okd_backend import OKDBackend
 
 
+def _post_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
+    headers = {
+        "Content-Type": "application/json",
+        "X-Terraable-Token": "terraable-local-token",
+    }
+    if extra:
+        headers.update(extra)
+    return headers
+
+
 def _headers(values: dict[str, str]) -> Message:
     headers: Message = Message()
     for key, value in values.items():
@@ -152,7 +162,7 @@ def test_handler_serves_ui_state_and_action(
                     "eda": "enabled",
                 }
             ).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         action_payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -183,7 +193,7 @@ def test_handler_returns_fail_payload_for_runtime_error_and_404(
         request = Request(
             f"{base}/api/actions/apply_baseline",
             data=b"{}",
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         error_payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -199,7 +209,7 @@ def test_handler_returns_fail_payload_for_runtime_error_and_404(
                 Request(
                     f"{base}/not-an-action",
                     data=b"{}",
-                    headers={"Content-Type": "application/json"},
+                    headers=_post_headers(),
                     method="POST",
                 )
             )
@@ -258,6 +268,82 @@ def test_handler_returns_500_when_ui_index_is_invalid_utf8(
 
 
 @pytest.mark.unit
+def test_handler_serves_target_availability_module(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    (ui_dir / "targetAvailability.mjs").write_text("export const ok = true;", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        body = urlopen(f"{base}/targetAvailability.mjs").read().decode("utf-8")
+        assert "export const ok = true;" in body
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_handler_returns_404_when_target_availability_module_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(f"{base}/targetAvailability.mjs")
+        assert excinfo.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_handler_returns_500_when_target_availability_module_invalid_utf8(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    (ui_dir / "targetAvailability.mjs").write_bytes(b"\xff\xfe")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(f"{base}/targetAvailability.mjs")
+        assert excinfo.value.code == 500
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
 def test_handler_configure_auth_accepts_non_object_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -276,7 +362,7 @@ def test_handler_configure_auth_accepts_non_object_json_payload(
         request = Request(
             f"{base}/api/auth/configure?target=local-lab&portal=backstage",
             data=b"[]",
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -320,7 +406,7 @@ def test_handler_serves_healthz_and_other_actions(
             request = Request(
                 f"{base}/api/actions/{action}",
                 data=b"{}",
-                headers={"Content-Type": "application/json"},
+                headers=_post_headers(),
                 method="POST",
             )
             payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -332,7 +418,7 @@ def test_handler_serves_healthz_and_other_actions(
                 Request(
                     f"{base}/api/actions/unknown",
                     data=b"{}",
-                    headers={"Content-Type": "application/json"},
+                    headers=_post_headers(),
                     method="POST",
                 )
             )
@@ -558,10 +644,20 @@ def test_handler_serves_auth_endpoints(
         )
         assert auth_payload["auth"]["ready"] is True
 
+        matrix_payload = json.loads(
+            urlopen(f"{base}/api/auth/matrix?portal=backstage").read().decode("utf-8")
+        )
+        assert matrix_payload["portal"] == "backstage"
+        assert matrix_payload["auth_by_target"]["local-lab"]["ready"] is True
+        assert matrix_payload["auth_by_target"]["aws"]["ready"] is False
+
+        session_payload = json.loads(urlopen(f"{base}/api/session").read().decode("utf-8"))
+        assert session_payload["post_token"] == "terraable-local-token"
+
         request = Request(
             f"{base}/api/auth/configure",
             data=json.dumps({"credentials": {"HCP_TERRAFORM_TOKEN": "token"}}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         configure_payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -570,11 +666,43 @@ def test_handler_serves_auth_endpoints(
         bad_request = Request(
             f"{base}/api/auth/configure",
             data=json.dumps({"credentials": []}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         bad_payload = json.loads(urlopen(bad_request).read().decode("utf-8"))
         assert bad_payload["auth"]["authenticated"] is False
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_post_rejects_missing_session_token(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    server = api_server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(HTTPError) as excinfo:
+            urlopen(
+                Request(
+                    f"{base}/api/actions/run_compliance_scan",
+                    data=b"{}",
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+            )
+        assert excinfo.value.code == 403
     finally:
         server.shutdown()
         server.server_close()
@@ -603,7 +731,7 @@ def test_handler_returns_400_for_malformed_json(
                 Request(
                     f"{base}/api/auth/configure",
                     data=b"not-json{{",
-                    headers={"Content-Type": "application/json", "Content-Length": "10"},
+                    headers=_post_headers({"Content-Length": "10"}),
                     method="POST",
                 )
             )
@@ -613,7 +741,7 @@ def test_handler_returns_400_for_malformed_json(
         action_request = Request(
             f"{base}/api/actions/run_compliance_scan",
             data=b"not-json{{",
-            headers={"Content-Type": "application/json", "Content-Length": "10"},
+            headers=_post_headers({"Content-Length": "10"}),
             method="POST",
         )
         error_payload = json.loads(urlopen(action_request).read().decode("utf-8"))
@@ -646,10 +774,7 @@ def test_post_rejects_non_local_origin(
                 Request(
                     f"{base}/api/actions/create_environment",
                     data=b"{}",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Origin": "https://evil.example",
-                    },
+                    headers=_post_headers({"Origin": "https://evil.example"}),
                     method="POST",
                 )
             )
@@ -698,7 +823,7 @@ def test_handler_configure_passes_target_and_portal(
                     "portal": "rhdh",
                 }
             ).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -863,7 +988,7 @@ def test_action_failure_uses_target_backend_state(
         request = Request(
             f"{base}/api/actions/apply_baseline",
             data=json.dumps({"target": "aws"}).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=_post_headers(),
             method="POST",
         )
         payload = json.loads(urlopen(request).read().decode("utf-8"))
@@ -874,3 +999,54 @@ def test_action_failure_uses_target_backend_state(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@pytest.mark.unit
+def test_handle_session_rejects_non_loopback_client() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("10.0.0.2", 12345)
+    handler.api_post_token = "test-token"
+    called: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        called.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    handler._handle_session()
+
+    assert called == [(403, "Session token access restricted to localhost")]
+
+
+@pytest.mark.unit
+def test_handle_session_returns_token_for_loopback_client() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.api_post_token = "test-token-123"
+    sent_json: dict[str, Any] | None = None
+
+    def fake_send_json(payload: dict[str, Any]) -> None:
+        nonlocal sent_json
+        sent_json = payload
+
+    handler._send_json = fake_send_json  # type: ignore[assignment]
+
+    handler._handle_session()
+
+    assert sent_json == {"post_token": "test-token-123"}
+
+
+@pytest.mark.unit
+def test_make_handler_generates_random_token_when_env_unset(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("TERRAABLE_API_POST_TOKEN", raising=False)
+    monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
+    ui_dir = tmp_path / "ui"
+    ui_dir.mkdir()
+    (ui_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    handler = api_server.make_handler(tmp_path)
+    token = handler.api_post_token  # type: ignore[attr-defined]
+    assert token
+    assert token != "terraable-local-token"

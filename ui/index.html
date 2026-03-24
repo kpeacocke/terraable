@@ -340,6 +340,8 @@
             <option value="hyper-v">hyper-v</option>
             <option value="local-lab">local-lab</option>
           </select>
+          <div class="hint" id="target-availability">Checking target availability...</div>
+          <ul id="target-availability-list" style="margin-top:6px; padding-left:16px; font-size:0.78rem;"></ul>
         </div>
         <div class="field">
           <label for="portal">Portal implementation</label>
@@ -496,6 +498,8 @@
   </main>
 
   <script type="module">
+    import { buildTargetAvailability } from "./targetAvailability.mjs";
+
     const evidence = document.getElementById("evidence");
     const runtimeStatusEl = document.getElementById("runtime-status");
     const edaHistory = document.getElementById("eda-history");
@@ -513,6 +517,9 @@
     const runtimeBadge = document.getElementById("runtime-badge");
     const authStatusEl = document.getElementById("auth-status");
     const targetSuggestionEl = document.getElementById("target-suggestion");
+    const targetAvailabilityEl = document.getElementById("target-availability");
+    const targetAvailabilityListEl = document.getElementById("target-availability-list");
+    const targetSelectEl = document.getElementById("target");
     const actionButtons = Array.from(document.querySelectorAll(".actions button"));
 
     const controls = {
@@ -525,8 +532,45 @@
       ready: false,
       blockers: ["auth status has not been loaded yet"],
     };
+    let authMatrix = {};
+    let apiPostToken = "";
     let pendingAction = false;
     let latestState = {};
+
+    function applyTargetAvailability() {
+      const options = Array.from(targetSelectEl.options);
+      const targetOrder = options.map((option) => option.value);
+      const view = buildTargetAvailability(authMatrix, selected("target"), targetOrder);
+
+      if (view.fallbackTarget && view.fallbackTarget !== selected("target")) {
+        targetSelectEl.value = view.fallbackTarget;
+        syncCredentialGroups(view.fallbackTarget);
+      }
+
+      const selectedTarget = selected("target");
+      // Build a Map for O(1) target lookup instead of O(n²) find() in loop.
+      const rowByTarget = new Map(view.rows.map((row) => [row.target, row]));
+      for (const option of options) {
+        const row = rowByTarget.get(option.value);
+        const isUnknown = row ? !row.known : true;
+        const ready = Boolean(row?.ready);
+        // Keep selected option enabled so users can inspect requirements.
+        // When availability data is missing for a target (unknown), keep it enabled
+        // rather than treating it as unavailable.
+        option.disabled = !ready && !isUnknown && option.value !== selectedTarget;
+      }
+
+      targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}`;
+      targetAvailabilityListEl.innerHTML = "";
+      for (const row of view.rows) {
+        const item = document.createElement("li");
+        item.className = row.ready ? "ok" : "warn";
+        item.textContent = row.ready
+          ? `${row.target}: available`
+          : `${row.target}: unavailable - ${row.reason}`;
+        targetAvailabilityListEl.appendChild(item);
+      }
+    }
 
     function updateComplianceScore() {
       // Merge controls and compliance_controls using AND-logic for shared keys,
@@ -577,6 +621,8 @@
       observabilityStages.innerHTML = "";
       complianceControlsEl.innerHTML = "";
       targetSuggestionEl.textContent = "Target suggestion unavailable while API is offline.";
+      targetAvailabilityEl.textContent = "Target availability unavailable while API is offline.";
+      targetAvailabilityListEl.innerHTML = "";
       if (observabilitySummary) {
         observabilitySummary.textContent = "Observability summary unavailable while API is offline.";
       }
@@ -885,9 +931,21 @@
     }
 
     async function api(path, payload) {
+      const headers = { "Content-Type": "application/json" };
+      if (payload) {
+        if (!apiPostToken) {
+          // Token missing; try lazy refresh before failing.
+          try {
+            await refreshSessionToken();
+          } catch (error) {
+            throw new Error("API session token unavailable; refresh state and try again");
+          }
+        }
+        headers["X-Terraable-Token"] = apiPostToken;
+      }
       const response = await fetch(path, {
         method: payload ? "POST" : "GET",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: payload ? JSON.stringify(payload) : undefined,
       });
       if (!response.ok) {
@@ -948,6 +1006,36 @@
       }
       renderAuthStatus();
       updateActionButtons();
+    }
+
+    async function refreshAuthMatrix() {
+      const previousTarget = selected("target");
+      try {
+        const query = new URLSearchParams({
+          portal: selected("portal"),
+        });
+        const data = await api(`/api/auth/matrix?${query.toString()}`);
+        authMatrix = data.auth_by_target || {};
+        applyTargetAvailability();
+      } catch (error) {
+        authMatrix = {};
+        targetAvailabilityEl.textContent = `Target availability unavailable: ${String(error)}`;
+        targetAvailabilityListEl.innerHTML = "";
+      }
+      if (selected("target") !== previousTarget) {
+        // Target selection changed as a result of updated availability; refresh both
+        // auth status and state so latestState and button enablement match the new target.
+        await refreshAuthStatus();
+        await refreshState();
+      }
+    }
+
+    async function refreshSessionToken() {
+      const data = await api("/api/session");
+      apiPostToken = String(data.post_token || "");
+      if (!apiPostToken) {
+        throw new Error("API session token unavailable from server");
+      }
     }
 
     async function saveCredentials() {
@@ -1045,6 +1133,7 @@
       this.textContent = "Saving...";
       try {
         await saveCredentials();
+        await refreshAuthMatrix();
       } catch (error) {
         authState = {
           authenticated: false,
@@ -1061,16 +1150,36 @@
 
     document.getElementById("target").addEventListener("change", async () => {
       syncCredentialGroups(selected("target"));
+      applyTargetAvailability();
       await refreshState();
       await refreshAuthStatus();
     });
     document.getElementById("portal").addEventListener("change", async () => {
       await refreshAuthStatus();
+      await refreshAuthMatrix();
     });
 
     syncCredentialGroups(selected("target"));
-    await refreshState();
-    await refreshAuthStatus();
+    try {
+      await refreshSessionToken();
+    } catch (error) {
+      console.error("Failed to refresh session token during startup:", error);
+    }
+    try {
+      await refreshState();
+    } catch (error) {
+      console.error("Failed to refresh state during startup:", error);
+    }
+    try {
+      await refreshAuthStatus();
+    } catch (error) {
+      console.error("Failed to refresh auth status during startup:", error);
+    }
+    try {
+      await refreshAuthMatrix();
+    } catch (error) {
+      console.error("Failed to refresh auth matrix during startup:", error);
+    }
   </script>
 </body>
 </html>

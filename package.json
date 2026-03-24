@@ -1,0 +1,7 @@
+{
+  "name": "terraable",
+  "private": true,
+  "devDependencies": {
+    "markdownlint-cli2": "^0.22.0"
+  }
+}

@@ -57,8 +57,12 @@ ssh-add ~/.ssh/id_ed25519  # or your preferred key
 To verify all tools are available after local setup, run:
 
 ```bash
-bash scripts/check-tools.sh
+poetry run bash scripts/check-tools.sh
 ```
+
+Notes:
+- Run checks from an activated virtual environment (`.venv`) so Python CLIs resolve on `PATH`.
+- `poetry install` installs project Python dependencies (including `ansible`), but does not install non-Python binaries such as `terraform`, `shellcheck`, `markdownlint-cli2`, or `git`.
 
 ## Installation
 
@@ -156,7 +160,7 @@ and rotation targets for Dev, Test, Demo, and Prod before enabling live mode.
 ├── ansible/
 │   ├── awx/                    # AWX lab-mode bootstrap playbook and config
 │   ├── eda/                    # EDA rulebooks, sources, and vars
-│   ├── inventory.yml           # Inventory stub (copy to inventory.local.yml for real use)
+│   ├── inventory.yml           # Inventory template (copy to inventory.local.yml for real use)
 │   ├── playbooks/              # Operational workflow playbooks
 │   └── roles/                  # Ansible roles (baseline_hardening, portal_deploy, ssh_root_control)
 ├── docs/                       # Architecture, handoff contract, runbook, lab guide

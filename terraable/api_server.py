@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import os
+import secrets
 import sys
 import threading
 from collections.abc import Callable
@@ -80,6 +82,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     backend: ClassVar[LocalLabBackend | None] = None
     max_json_payload_bytes: ClassVar[int] = 1024 * 1024
     json_read_timeout_seconds: ClassVar[float] = 5.0
+    api_post_token: ClassVar[str] = ""
 
     @classmethod
     def get_active_backend(cls, target: str = "local-lab") -> Any:
@@ -101,28 +104,47 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path in {"/", "/index.html"}:
-            try:
-                content = self.ui_path.read_text(encoding="utf-8")
-            except FileNotFoundError:
-                self.send_error(HTTPStatus.NOT_FOUND, "UI index file not found")
-                return
-            except UnicodeDecodeError:
-                self.send_error(
-                    HTTPStatus.INTERNAL_SERVER_ERROR, "UI index file is not valid UTF-8"
-                )
-                return
-            self._send_html(content)
-        elif parsed.path == "/api/state":
-            query = parse_qs(parsed.query)
-            target = query.get("target", ["local-lab"])[0]
-            backend = self.get_active_backend(str(target))
-            self._send_json({"state": backend.get_state()})
-        elif parsed.path == "/api/auth/status":
-            self._handle_auth_status(parsed)
-        elif parsed.path == "/healthz":
-            self._send_json({"status": "ok"})
-        else:
-            self.send_error(HTTPStatus.NOT_FOUND)
+            self._serve_file_safely(self.ui_path, "text/html; charset=utf-8")
+            return
+        if parsed.path == "/targetAvailability.mjs":
+            js_path = self.workspace_root / "ui" / "targetAvailability.mjs"
+            self._serve_file_safely(js_path, "application/javascript; charset=utf-8")
+            return
+
+        # Dispatch simple routes via dictionary to reduce complexity
+        simple_routes: dict[str, Callable[[], None]] = {
+            "/api/state": lambda: self._handle_api_state(parsed),
+            "/api/auth/status": lambda: self._handle_auth_status(parsed),
+            "/api/auth/matrix": lambda: self._handle_auth_matrix(parsed),
+            "/api/session": lambda: self._handle_session(),
+            "/healthz": lambda: self._send_json({"status": "ok"}),
+        }
+        handler = simple_routes.get(parsed.path)
+        if handler:
+            handler()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _serve_file_safely(self, file_path: Path, content_type: str) -> None:
+        """Serve a file with safe error handling for missing or malformed UTF-8."""
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            self.send_error(HTTPStatus.NOT_FOUND, f"{file_path.name} file not found")
+            return
+        except UnicodeDecodeError:
+            self.send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR, f"{file_path.name} file is not valid UTF-8"
+            )
+            return
+        self._send_text(content, content_type)
+
+    def _handle_api_state(self, parsed: ParseResult) -> None:
+        """Handle GET /api/state request."""
+        query = parse_qs(parsed.query)
+        target = query.get("target", ["local-lab"])[0]
+        backend = self.get_active_backend(str(target))
+        self._send_json({"state": backend.get_state()})
 
     def _handle_auth_status(self, parsed: ParseResult) -> None:
         query = parse_qs(parsed.query)
@@ -137,6 +159,44 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
                 )
             }
         )
+
+    def _handle_auth_matrix(self, parsed: ParseResult) -> None:
+        query = parse_qs(parsed.query)
+        portal = query.get("portal", ["backstage"])[0]
+        auth_by_target: dict[str, dict[str, Any]] = {}
+        # Include all UI-selectable targets: both executable (supported_targets)
+        # and scaffold-only targets like 'openshift' with ready=false and blockers
+        all_ui_targets = sorted(self.supported_targets | frozenset({"openshift"}))
+        for target in all_ui_targets:
+            if target == "openshift":
+                # Scaffold-only target; return a full auth-status-like payload
+                # so clients can rely on a consistent schema across targets.
+                auth_by_target[target] = {
+                    "authenticated": False,
+                    "ready": False,
+                    "required_credentials": [],
+                    "missing_credentials": [],
+                    "credential_sources": {},
+                    "blockers": ["scaffold-only; use okd for executable deployments"],
+                }
+            else:
+                backend = self.get_active_backend(target)
+                auth_by_target[target] = cast(
+                    dict[str, Any],
+                    backend.get_auth_status(
+                        target=target,
+                        portal=str(portal),
+                    ),
+                )
+        self._send_json({"portal": str(portal), "auth_by_target": auth_by_target})
+
+    def _handle_session(self) -> None:
+        """Handle GET /api/session request with loopback restriction."""
+        client_host = self.client_address[0] if self.client_address else ""
+        if not self._is_loopback_host(client_host):
+            self.send_error(HTTPStatus.FORBIDDEN, "Session token access restricted to localhost")
+            return
+        self._send_json({"post_token": self.api_post_token})
 
     def do_POST(self) -> None:
         if not self._require_safe_post_request():
@@ -220,6 +280,13 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             if not self._is_loopback_host(origin_host):
                 self.send_error(HTTPStatus.FORBIDDEN, "POST origin must be localhost")
                 return False
+
+        supplied_token = self.headers.get("X-Terraable-Token", "")
+        if not self.api_post_token or not secrets.compare_digest(
+            supplied_token, self.api_post_token
+        ):
+            self.send_error(HTTPStatus.FORBIDDEN, "Missing or invalid API session token")
+            return False
 
         return True
 
@@ -318,10 +385,10 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         del format, args
         return None
 
-    def _send_html(self, body: str) -> None:
+    def _send_text(self, body: str, content_type: str) -> None:
         encoded = body.encode("utf-8")
         self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
@@ -345,6 +412,9 @@ def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
     Handler.backends_lock = threading.RLock()
     Handler.backend = get_backend(workspace_root, "local-lab")
     Handler.backends["local-lab"] = Handler.backend
+    # Prefer a random per-process token by default; allow env override for deterministic tests.
+    env_token = os.getenv("TERRAABLE_API_POST_TOKEN")
+    Handler.api_post_token = env_token if env_token else secrets.token_urlsafe(32)
     return Handler
 
 
