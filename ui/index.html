@@ -935,11 +935,7 @@
       if (payload) {
         if (!apiPostToken) {
           // Token missing; try lazy refresh before failing.
-          try {
-            await refreshSessionToken();
-          } catch (error) {
-            throw new Error("API session token unavailable; refresh state and try again");
-          }
+          await refreshSessionToken();
         }
         headers["X-Terraable-Token"] = apiPostToken;
       }
