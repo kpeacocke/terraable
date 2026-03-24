@@ -106,8 +106,8 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         if parsed.path in {"/", "/index.html"}:
             self._serve_file_safely(self.ui_path, "text/html; charset=utf-8")
             return
-        if parsed.path == "/targetAvailability.js":
-            js_path = self.workspace_root / "ui" / "targetAvailability.js"
+        if parsed.path == "/targetAvailability.mjs":
+            js_path = self.workspace_root / "ui" / "targetAvailability.mjs"
             self._serve_file_safely(js_path, "application/javascript; charset=utf-8")
             return
 
@@ -362,9 +362,6 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         del format, args
         return None
 
-    def _send_html(self, body: str) -> None:
-        self._send_text(body, "text/html; charset=utf-8")
-
     def _send_text(self, body: str, content_type: str) -> None:
         encoded = body.encode("utf-8")
         self.send_response(HTTPStatus.OK)
@@ -392,7 +389,9 @@ def make_handler(workspace_root: Path) -> type[BaseHTTPRequestHandler]:
     Handler.backends_lock = threading.RLock()
     Handler.backend = get_backend(workspace_root, "local-lab")
     Handler.backends["local-lab"] = Handler.backend
-    Handler.api_post_token = os.getenv("TERRAABLE_API_POST_TOKEN", "terraable-local-token")
+    # Prefer a random per-process token by default; allow env override for deterministic tests.
+    env_token = os.getenv("TERRAABLE_API_POST_TOKEN")
+    Handler.api_post_token = env_token if env_token else secrets.token_urlsafe(32)
     return Handler
 
 

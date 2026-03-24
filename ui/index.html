@@ -498,7 +498,7 @@
   </main>
 
   <script type="module">
-    import { buildTargetAvailability } from "./targetAvailability.js";
+    import { buildTargetAvailability } from "./targetAvailability.mjs";
 
     const evidence = document.getElementById("evidence");
     const runtimeStatusEl = document.getElementById("runtime-status");
@@ -1146,10 +1146,26 @@
     });
 
     syncCredentialGroups(selected("target"));
-    await refreshSessionToken();
-    await refreshState();
-    await refreshAuthStatus();
-    await refreshAuthMatrix();
+    try {
+      await refreshSessionToken();
+    } catch (error) {
+      console.error("Failed to refresh session token during startup:", error);
+    }
+    try {
+      await refreshState();
+    } catch (error) {
+      console.error("Failed to refresh state during startup:", error);
+    }
+    try {
+      await refreshAuthStatus();
+    } catch (error) {
+      console.error("Failed to refresh auth status during startup:", error);
+    }
+    try {
+      await refreshAuthMatrix();
+    } catch (error) {
+      console.error("Failed to refresh auth matrix during startup:", error);
+    }
   </script>
 </body>
 </html>

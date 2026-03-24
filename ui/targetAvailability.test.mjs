@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildTargetAvailability } from "./targetAvailability.js";
+import { buildTargetAvailability } from "./targetAvailability.mjs";
 
 test("keeps selected target when ready", () => {
   const view = buildTargetAvailability(
@@ -50,4 +50,21 @@ test("keeps selected target when none are ready and reports blocker reason", () 
   assert.equal(view.fallbackTarget, "aws");
   assert.match(view.selectedMessage, /unavailable/i);
   assert.match(view.selectedMessage, /AWX_HOST must use an https:\/\//i);
+});
+
+test("reports availability-unknown reason when auth entry is missing", () => {
+  // authByTarget has no entry for 'gcp'; the target was in targetOrder but not yet returned by the API
+  const view = buildTargetAvailability(
+    {
+      "local-lab": { ready: true, blockers: [] },
+    },
+    "gcp",
+    ["local-lab", "gcp"],
+  );
+
+  const gcpRow = view.rows.find((r) => r.target === "gcp");
+  assert.equal(gcpRow.ready, false);
+  assert.match(gcpRow.reason, /not yet loaded/i);
+  // Falls back to local-lab since gcp has no auth data
+  assert.equal(view.fallbackTarget, "local-lab");
 });

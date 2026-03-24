@@ -1,5 +1,8 @@
 export function describeBlockers(auth) {
-  const blockers = auth?.blockers || [];
+  if (auth == null) {
+    return "availability checks not yet loaded";
+  }
+  const blockers = auth.blockers || [];
   if (!blockers.length) {
     return "configured for selected portal";
   }
@@ -9,8 +12,8 @@ export function describeBlockers(auth) {
 export function buildTargetAvailability(authByTarget, selectedTarget, targetOrder) {
   const order = Array.isArray(targetOrder) ? targetOrder : Object.keys(authByTarget || {});
   const rows = order.map((target) => {
-    const auth = authByTarget?.[target] || {};
-    const ready = Boolean(auth.ready);
+    const auth = authByTarget?.[target] ?? null;
+    const ready = Boolean(auth?.ready);
     return {
       target,
       ready,
