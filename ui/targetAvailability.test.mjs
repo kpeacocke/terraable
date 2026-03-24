@@ -63,6 +63,7 @@ test("reports availability-unknown reason when auth entry is missing", () => {
   );
 
   const gcpRow = view.rows.find((r) => r.target === "gcp");
+  assert.equal(gcpRow.known, false);
   assert.equal(gcpRow.ready, false);
   assert.match(gcpRow.reason, /not yet loaded/i);
   // Falls back to local-lab since gcp has no auth data

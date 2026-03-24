@@ -550,15 +550,15 @@
       const selectedTarget = selected("target");
       for (const option of options) {
         const row = view.rows.find((entry) => entry.target === option.value);
-        const isUnknown = !row;
-        const ready = !isUnknown && Boolean(row?.ready);
+        const isUnknown = row ? !row.known : true;
+        const ready = Boolean(row?.ready);
         // Keep selected option enabled so users can inspect requirements.
         // When availability data is missing for a target (unknown), keep it enabled
         // rather than treating it as unavailable.
         option.disabled = !ready && !isUnknown && option.value !== selectedTarget;
       }
 
-      targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}.`;
+      targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}`;
       targetAvailabilityListEl.innerHTML = "";
       for (const row of view.rows) {
         const item = document.createElement("li");

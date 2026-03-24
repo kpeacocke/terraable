@@ -12,10 +12,12 @@ export function describeBlockers(auth) {
 export function buildTargetAvailability(authByTarget, selectedTarget, targetOrder) {
   const order = Array.isArray(targetOrder) ? targetOrder : Object.keys(authByTarget || {});
   const rows = order.map((target) => {
-    const auth = authByTarget?.[target] ?? null;
+    const known = Object.prototype.hasOwnProperty.call(authByTarget || {}, target);
+    const auth = known ? (authByTarget?.[target] ?? null) : null;
     const ready = Boolean(auth?.ready);
     return {
       target,
+      known,
       ready,
       reason: describeBlockers(auth),
     };
