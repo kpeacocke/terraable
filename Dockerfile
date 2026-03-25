@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Poetry into a stable path so it can be copied to the runtime stage
 ENV POETRY_HOME=/opt/poetry
 ARG POETRY_VERSION=1.8.5
-RUN curl -sSL https://install.python-poetry.org | python3 - --version "$POETRY_VERSION"
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION" && \
+    mkdir -p "$POETRY_HOME/bin" && \
+    ln -sf /usr/local/bin/poetry "$POETRY_HOME/bin/poetry"
 ENV PATH="$POETRY_HOME/bin:$PATH"
 
 # Copy only dependency files first (for better layer caching)

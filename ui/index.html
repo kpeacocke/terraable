@@ -939,7 +939,7 @@
             await refreshSessionToken();
           } catch (err) {
             throw new Error(
-              "Unable to refresh session token. Reload the Terraable Control Plane UI and sign in again.",
+              "Unable to refresh the session token. Reload the Terraable Control Plane UI and try the action again. If this continues, check that the Terraable API service is running.",
               { cause: err }
             );
           }

@@ -13,11 +13,11 @@ services:
 
       # Terraform configuration
       - TF_LOG=${TF_LOG:-}
-      - TF_LOG_PATH=/workspace/.terraform.log
+      - TF_LOG_PATH=/workspace/.terraable/terraform.log
 
       # Ansible configuration
       - ANSIBLE_VERBOSITY=${ANSIBLE_VERBOSITY:-0}
-      - ANSIBLE_HOST_KEY_CHECKING=False
+      - ANSIBLE_HOST_KEY_CHECKING=${ANSIBLE_HOST_KEY_CHECKING:-True}
 
       # HCP Terraform (if credentials provided)
       - HCP_TERRAFORM_TOKEN=${HCP_TERRAFORM_TOKEN:-}

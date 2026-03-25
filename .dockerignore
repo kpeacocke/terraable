@@ -24,6 +24,7 @@ htmlcov
 .venv
 venv
 env
+.devcontainer
 .vscode
 .idea
 *.swp
@@ -49,7 +50,6 @@ README.md
 CONTRIBUTING.md
 SECURITY.md
 DEVELOP.md
-LICENSE
 
 # Node modules (even though we serve UI, don't need node in backend image)
 node_modules
