@@ -110,10 +110,10 @@ The docker-compose setup mounts:
 - **`.`** → `/workspace` (full project, read-write for state/logs)
 - **`ansible/`** → `/workspace/ansible` (read-only, playbooks/roles)
 - **`ui/`** → `/workspace/ui` (read-only, web interface)
-- **`terraable_state`** (named volume) → `/workspace/.terraable` (persistent state)
-- **`terraform_cache`** (named volume) → `/workspace/.terraform` (persistent Terraform cache)
+- **`./.terraable/`** → `/workspace/.terraable` (bind mount for Terraable state and logs)
+- **`./.terraform/`** → `/workspace/.terraform` (bind mount for Terraform plugin and module cache)
 
-State and cache persist across container restarts, speeding up subsequent runs.
+State and cache persist across container restarts because they are written to bind-mounted host directories. `docker compose down -v` will not remove these directories; delete `./.terraable/` and `./.terraform/` manually if you need a clean reset.
 
 ## Development Workflow
 

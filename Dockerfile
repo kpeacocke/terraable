@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry into a stable path so it can be copied to the runtime stage
+# Install Poetry into a fixed path so it is available in the builder stage
 ENV POETRY_HOME=/opt/poetry
 ARG POETRY_VERSION=1.8.5
 RUN pip install --no-cache-dir "poetry==$POETRY_VERSION" && \
