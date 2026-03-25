@@ -1003,10 +1003,10 @@ def test_action_failure_uses_target_backend_state(
 
 
 @pytest.mark.unit()
-def test_handle_session_rejects_non_loopback_client() -> None:
+def test_handle_session_rejects_non_loopback_client(monkeypatch: pytest.MonkeyPatch) -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("10.0.0.2", 12345)
-    api_server.TerraableRequestHandler.api_post_token = "test-token"
+    monkeypatch.setattr(api_server.TerraableRequestHandler, "api_post_token", "test-token")
     called: list[tuple[int, str]] = []
 
     def fake_send_error(code: int, message: str = "") -> None:
@@ -1020,10 +1020,12 @@ def test_handle_session_rejects_non_loopback_client() -> None:
 
 
 @pytest.mark.unit()
-def test_handle_session_returns_token_for_loopback_client() -> None:
+def test_handle_session_returns_token_for_loopback_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
-    api_server.TerraableRequestHandler.api_post_token = "test-token-123"
+    monkeypatch.setattr(api_server.TerraableRequestHandler, "api_post_token", "test-token-123")
     sent_json: list[dict[str, Any]] = []
 
     def fake_send_json(payload: dict[str, Any]) -> None:

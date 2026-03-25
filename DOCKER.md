@@ -1,6 +1,8 @@
 # Running Terraable in Docker
 
-This guide explains how to run Terraable using Docker and docker-compose for local development and demos.
+## Purpose and scope
+
+This runbook explains how to run the Terraable backend container for local development and demo workflows using Docker Compose. It covers the backend API, the static UI served from the same container, persistent state and Terraform cache handling, and the recovery steps for the most common operational failures.
 
 ## Prerequisites
 
@@ -8,6 +10,23 @@ This guide explains how to run Terraable using Docker and docker-compose for loc
 - Docker Compose v2 (`docker compose`) — available with Docker Desktop and Docker Engine 23+.
   If you only have the legacy `docker-compose` v1 binary, substitute `docker-compose` for `docker compose` in all commands below.
 - Port 8888 available on localhost
+
+## Inputs and configuration
+
+The default compose configuration uses these effective inputs:
+
+- `TERRAABLE_MODE=live-local-lab`
+- `TERRAABLE_MOCK_MODE=false`
+- `TF_LOG=`
+- `TF_LOG_PATH=/workspace/.terraable/terraform.log`
+- `ANSIBLE_VERBOSITY=0`
+- `ANSIBLE_HOST_KEY_CHECKING=True`
+- Optional credentials via `HCP_TERRAFORM_TOKEN` or `TF_TOKEN_app_terraform_io`
+
+Runtime data is written under the repo root bind mounts:
+
+- `./.terraable/` for Terraable state and Terraform logs
+- `./.terraform/` for Terraform plugin and module cache
 
 ## Quick Start
 
@@ -27,7 +46,15 @@ docker compose logs -f backend
 docker compose down
 ```
 
-The API server will be available at `http://localhost:8888`.
+## Expected outputs
+
+A healthy startup produces these operator-visible outcomes:
+
+- The API server is reachable at `http://localhost:8888`
+- `GET /healthz` returns a successful response
+- The UI loads from the same origin at `http://localhost:8888`
+- Container logs are available with `docker compose logs -f backend`
+- State files and logs land under `./.terraable/`, and Terraform cache lands under `./.terraform/`
 
 ### Verify it's working
 
@@ -197,18 +224,31 @@ Check for errors in the log output. Common issues:
 
 ### State/cache not persisting
 
-Verify volumes are created:
+Verify the runtime directories exist and are writable on the host:
 
 ```bash
-docker volume ls | grep terraable
-docker volume inspect terraable_state
+ls -ld .terraable .terraform
 ```
 
-If volumes are missing, recreate them:
+If they are missing or have stale root-owned contents, recreate them:
 
 ```bash
-docker compose down -v
+rm -rf .terraable .terraform
+mkdir -p .terraable .terraform
 docker compose up
+```
+
+### Recovery
+
+Use these recovery actions when the demo state or cache is no longer trustworthy:
+
+```bash
+# Stop containers and remove runtime state/cache
+rm -rf .terraable .terraform
+
+# Recreate clean runtime directories and restart
+mkdir -p .terraable .terraform
+docker compose up --build
 ```
 
 ### Can't reach API from outside localhost

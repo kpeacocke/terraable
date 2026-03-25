@@ -47,11 +47,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && chmod +x /usr/local/bin/terraform \
     && rm -f /tmp/terraform.zip
 
-# Copy installed packages and Poetry from builder stage
+# Copy only installed Python packages from builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /opt/poetry /opt/poetry
-ENV PATH="/opt/poetry/bin:$PATH"
 
 # Copy application code
 COPY --chown=terraable:terraable . .

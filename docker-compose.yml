@@ -28,10 +28,10 @@ services:
       - .:/workspace:delegated
 
       # State persistence
-      - terraable_state:/workspace/.terraable
+      - ./.terraable:/workspace/.terraable:delegated
 
       # Terraform cache persistence (speeds up builds)
-      - terraform_cache:/workspace/.terraform
+      - ./.terraform:/workspace/.terraform:delegated
 
       # Ansible inventory and playbooks
       - ./ansible:/workspace/ansible:ro
@@ -82,12 +82,6 @@ services:
   #     - backend
   #   networks:
   #     - terraable
-
-volumes:
-  terraable_state:
-    driver: local
-  terraform_cache:
-    driver: local
 
 networks:
   terraable:
