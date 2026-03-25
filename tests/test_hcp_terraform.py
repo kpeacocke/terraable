@@ -26,7 +26,7 @@ class _FakeResponse:
         return json.dumps(self._payload).encode("utf-8")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_status() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -44,7 +44,7 @@ def test_get_run_status() -> None:
         assert client.get_run_status("run-1") == "applied"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs() -> None:
     """Test correct resolution chain: run -> apply -> state-version -> outputs."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
@@ -82,7 +82,7 @@ def test_get_run_outputs() -> None:
     assert outputs["api_endpoint"] == "https://api.example"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs_uses_run_level_state_version_when_present() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -110,7 +110,7 @@ def test_get_run_outputs_uses_run_level_state_version_when_present() -> None:
     assert outputs["environment_name"] == "demo-direct"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs_resolves_hyphenated_state_version_from_apply() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -145,7 +145,7 @@ def test_get_run_outputs_resolves_hyphenated_state_version_from_apply() -> None:
     assert outputs["api_endpoint"] == "https://api.hyphen"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs_resolves_state_version_from_list_relationship() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -175,7 +175,7 @@ def test_get_run_outputs_resolves_state_version_from_list_relationship() -> None
     assert outputs["environment_name"] == "demo-list"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_api_error_raises_runtime_error() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -186,7 +186,7 @@ def test_api_error_raises_runtime_error() -> None:
         client.get_run("run-3")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_raises_when_response_is_not_object() -> None:
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
 
@@ -199,7 +199,7 @@ def test_get_run_raises_when_response_is_not_object() -> None:
         client.get_run("run-list-response")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs_raises_when_apply_state_missing() -> None:
     """Test error when apply lacks state_version relationship."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
@@ -229,7 +229,7 @@ def test_get_run_outputs_raises_when_apply_state_missing() -> None:
         client.get_run_outputs("run-4")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_reads_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TF_TOKEN_tfc_example_internal", "env-token")
     monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "tfc.example.internal")
@@ -240,7 +240,7 @@ def test_config_from_env_reads_env_vars(monkeypatch: pytest.MonkeyPatch) -> None
     assert config.hostname == "tfc.example.internal"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_prefers_explicit_values(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TF_TOKEN_env_host", "env-token")
     monkeypatch.setenv("TERRAABLE_TFC_HOSTNAME", "env-host")
@@ -251,7 +251,7 @@ def test_config_from_env_prefers_explicit_values(monkeypatch: pytest.MonkeyPatch
     assert config.hostname == "explicit-host"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_uses_default_hostname(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TF_TOKEN_app_terraform_io", "env-token")
     monkeypatch.delenv("TERRAABLE_TFC_HOSTNAME", raising=False)
@@ -261,7 +261,7 @@ def test_config_from_env_uses_default_hostname(monkeypatch: pytest.MonkeyPatch) 
     assert config.hostname == "app.terraform.io"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_raises_without_token(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TF_TOKEN_app_terraform_io", raising=False)
 
@@ -269,7 +269,7 @@ def test_config_from_env_raises_without_token(monkeypatch: pytest.MonkeyPatch) -
         HcpTerraformConfig.from_env()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_derives_token_env_var_from_hostname(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -281,7 +281,7 @@ def test_config_from_env_derives_token_env_var_from_hostname(
     assert config.hostname == "tfe.example.com"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_error_shows_derived_env_var_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -291,7 +291,7 @@ def test_config_from_env_error_shows_derived_env_var_name(
         HcpTerraformConfig.from_env()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_normalizes_hostname_with_hyphens(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -303,7 +303,7 @@ def test_config_from_env_normalizes_hostname_with_hyphens(
     assert config.hostname == "tfc.my-company.internal"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_config_from_env_lowercases_hostname_in_env_var_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -314,7 +314,7 @@ def test_config_from_env_lowercases_hostname_in_env_var_name(
     assert config.token == "uppercase-token"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs_raises_when_state_version_id_missing() -> None:
     """Test error when apply has state_version but with no ID."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))
@@ -344,7 +344,7 @@ def test_get_run_outputs_raises_when_state_version_id_missing() -> None:
         client.get_run_outputs("run-5")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_run_outputs_raises_when_apply_is_missing() -> None:
     """Test error when run has no apply relationship."""
     client = HcpTerraformClient(HcpTerraformConfig(token="token-123"))

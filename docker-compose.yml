@@ -1,0 +1,88 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: terraable-backend
+    ports:
+      - "127.0.0.1:8888:8000"
+    environment:
+      # API server configuration
+      - TERRAABLE_MODE=${TERRAABLE_MODE:-live-local-lab}
+      - TERRAABLE_MOCK_MODE=${TERRAABLE_MOCK_MODE:-false}
+
+      # Terraform configuration
+      - TF_LOG=${TF_LOG:-}
+      - TF_LOG_PATH=/workspace/.terraable/terraform.log
+
+      # Ansible configuration
+      - ANSIBLE_VERBOSITY=${ANSIBLE_VERBOSITY:-0}
+      - ANSIBLE_HOST_KEY_CHECKING=${ANSIBLE_HOST_KEY_CHECKING:-True}
+
+      # HCP Terraform (if credentials provided)
+      - HCP_TERRAFORM_TOKEN=${HCP_TERRAFORM_TOKEN:-}
+      - TF_TOKEN_app_terraform_io=${TF_TOKEN_app_terraform_io:-}
+
+    volumes:
+      # Project root for workspace access
+      - .:/workspace:delegated
+
+      # State persistence
+      - ./.terraable:/workspace/.terraable:delegated
+
+      # Terraform cache persistence (speeds up builds)
+      - ./.terraform:/workspace/.terraform:delegated
+
+      # Ansible inventory and playbooks
+      - ./ansible:/workspace/ansible:ro
+
+      # UI files
+      - ./ui:/workspace/ui:ro
+
+    working_dir: /workspace
+
+    # Explicit command to pass workspace path to the API server CLI
+    command: ["python", "-m", "terraable.api_server", "--host", "0.0.0.0", "--port", "8000", "--workspace", "/workspace"]
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Always restart on failure (useful for demo)
+    restart: unless-stopped
+
+    # Resource limits (optional, adjust to your system)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '1'
+    #       memory: 1G
+
+    networks:
+      - terraable
+
+  # Optional: Frontend development server (if needed for UI development)
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.ui
+  #   container_name: terraable-frontend
+  #   ports:
+  #     - "127.0.0.1:3000:3000"
+  #   volumes:
+  #     - ./ui:/app/ui:delegated
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - terraable
+
+networks:
+  terraable:
+    driver: bridge

@@ -131,7 +131,7 @@ class _FakeBackend:
         }
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_serves_ui_state_and_action(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -174,7 +174,7 @@ def test_handler_serves_ui_state_and_action(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_returns_fail_payload_for_runtime_error_and_404(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -220,7 +220,7 @@ def test_handler_returns_fail_payload_for_runtime_error_and_404(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_returns_404_when_ui_index_is_missing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -242,7 +242,7 @@ def test_handler_returns_404_when_ui_index_is_missing(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_returns_500_when_ui_index_is_invalid_utf8(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -267,7 +267,7 @@ def test_handler_returns_500_when_ui_index_is_invalid_utf8(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_serves_target_availability_module(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -292,7 +292,7 @@ def test_handler_serves_target_availability_module(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_returns_404_when_target_availability_module_missing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -317,7 +317,7 @@ def test_handler_returns_404_when_target_availability_module_missing(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_returns_500_when_target_availability_module_invalid_utf8(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -343,7 +343,7 @@ def test_handler_returns_500_when_target_availability_module_invalid_utf8(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_configure_auth_accepts_non_object_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -377,7 +377,7 @@ def test_handler_configure_auth_accepts_non_object_json_payload(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_serves_healthz_and_other_actions(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -429,49 +429,49 @@ def test_handler_serves_healthz_and_other_actions(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_returns_empty_dict_for_non_object_payload() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "2"})
     handler.rfile = io.BytesIO(b"[]")
 
-    payload = handler._read_json_payload()
+    payload = cast(Any, handler)._read_json_payload()
 
     assert payload == {}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_rejects_invalid_content_length() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "abc"})
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Invalid Content-Length"):
-        handler._read_json_payload()
+        cast(Any, handler)._read_json_payload()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_defaults_missing_content_length_to_empty_object() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({})
     handler.rfile = io.BytesIO(b"")
 
-    payload = handler._read_json_payload()
+    payload = cast(Any, handler)._read_json_payload()
 
     assert payload == {}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_rejects_negative_content_length() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "-1"})
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Invalid Content-Length"):
-        handler._read_json_payload()
+        cast(Any, handler)._read_json_payload()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_rejects_oversized_content_length() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     too_large = api_server.TerraableRequestHandler.max_json_payload_bytes + 1
@@ -479,7 +479,7 @@ def test_read_json_payload_rejects_oversized_content_length() -> None:
     handler.rfile = io.BytesIO(b"{}")
 
     with pytest.raises(ValueError, match="Content-Length exceeds maximum allowed size"):
-        handler._read_json_payload()
+        cast(Any, handler)._read_json_payload()
 
 
 class _FakeConnection:
@@ -503,7 +503,7 @@ class _SocketTimeoutReader:
         raise TimeoutError("timed out")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_rejects_incomplete_body() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "10"})
@@ -511,10 +511,10 @@ def test_read_json_payload_rejects_incomplete_body() -> None:
     handler.connection = _FakeConnection()
 
     with pytest.raises(ValueError, match="Incomplete JSON payload"):
-        handler._read_json_payload()
+        cast(Any, handler)._read_json_payload()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_restores_socket_timeout_after_read() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "2"})
@@ -523,13 +523,13 @@ def test_read_json_payload_restores_socket_timeout_after_read() -> None:
     fake_connection.settimeout(30.0)
     handler.connection = fake_connection
 
-    payload = handler._read_json_payload()
+    payload = cast(Any, handler)._read_json_payload()
 
     assert payload == {}
     assert handler.connection.gettimeout() == pytest.approx(30.0)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_reports_timeout_and_restores_socket_timeout() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "2"})
@@ -539,12 +539,12 @@ def test_read_json_payload_reports_timeout_and_restores_socket_timeout() -> None
     handler.connection = fake_connection
 
     with pytest.raises(ValueError, match="Timed out while reading JSON payload"):
-        handler._read_json_payload()
+        cast(Any, handler)._read_json_payload()
 
     assert handler.connection.gettimeout() == pytest.approx(15.0)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_json_payload_reports_socket_timeout_and_restores_timeout() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.headers = _headers({"Content-Length": "2"})
@@ -554,20 +554,21 @@ def test_read_json_payload_reports_socket_timeout_and_restores_timeout() -> None
     handler.connection = fake_connection
 
     with pytest.raises(ValueError, match="Timed out while reading JSON payload"):
-        handler._read_json_payload()
+        cast(Any, handler)._read_json_payload()
 
     assert handler.connection.gettimeout() == pytest.approx(20.0)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_loopback_host_helper_accepts_localhost_and_loopback_ip() -> None:
-    assert api_server.TerraableRequestHandler._is_loopback_host("localhost")
-    assert api_server.TerraableRequestHandler._is_loopback_host("127.0.0.1")
-    assert api_server.TerraableRequestHandler._is_loopback_host("::1")
-    assert not api_server.TerraableRequestHandler._is_loopback_host("example.com")
+    h = cast(Any, api_server.TerraableRequestHandler)
+    assert h._is_loopback_host("localhost")
+    assert h._is_loopback_host("127.0.0.1")
+    assert h._is_loopback_host("::1")
+    assert not h._is_loopback_host("example.com")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_safe_post_request_rejects_non_loopback_client() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("10.0.0.2", 12345)
@@ -579,13 +580,13 @@ def test_safe_post_request_rejects_non_loopback_client() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    allowed = handler._require_safe_post_request()
+    allowed = cast(Any, handler)._require_safe_post_request()
 
     assert allowed is False
     assert called == [(403, "POST access restricted to localhost")]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_safe_post_request_rejects_null_origin() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
@@ -597,13 +598,13 @@ def test_safe_post_request_rejects_null_origin() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    allowed = handler._require_safe_post_request()
+    allowed = cast(Any, handler)._require_safe_post_request()
 
     assert allowed is False
     assert called == [(403, "POST origin is not allowed")]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_safe_post_request_rejects_hostname_less_origin() -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
@@ -615,13 +616,13 @@ def test_safe_post_request_rejects_hostname_less_origin() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    allowed = handler._require_safe_post_request()
+    allowed = cast(Any, handler)._require_safe_post_request()
 
     assert allowed is False
     assert called == [(403, "POST origin is not allowed")]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_serves_auth_endpoints(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -677,7 +678,7 @@ def test_handler_serves_auth_endpoints(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_post_rejects_missing_session_token(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -709,7 +710,7 @@ def test_post_rejects_missing_session_token(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_returns_400_for_malformed_json(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -753,7 +754,7 @@ def test_handler_returns_400_for_malformed_json(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_post_rejects_non_local_origin(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -785,7 +786,7 @@ def test_post_rejects_non_local_origin(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_handler_configure_passes_target_and_portal(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -845,7 +846,7 @@ def test_handler_configure_passes_target_and_portal(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_main_starts_and_closes_server(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     events: dict[str, object] = {}
 
@@ -884,7 +885,7 @@ def test_main_starts_and_closes_server(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert events["closed"] is True
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_backend_dispatches_provider_backends(tmp_path: Path) -> None:
     assert isinstance(api_server.get_backend(tmp_path, "local-lab"), LocalLabBackend)
     assert isinstance(api_server.get_backend(tmp_path, "aws"), AWSBackend)
@@ -897,7 +898,7 @@ def test_get_backend_dispatches_provider_backends(tmp_path: Path) -> None:
     assert isinstance(api_server.get_backend(tmp_path, "unknown"), LocalLabBackend)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_make_handler_resets_backend_cache_per_workspace(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -920,7 +921,7 @@ def test_make_handler_resets_backend_cache_per_workspace(
     assert cast(Any, handler_one).backends is not cast(Any, handler_two).backends
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_active_backend_prefers_handler_backend_for_local_target(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -939,7 +940,7 @@ def test_get_active_backend_prefers_handler_backend_for_local_target(
     assert cast(Any, handler).backends["local-lab"] is sentinel_backend
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_active_backend_normalises_unknown_targets_to_local_lab(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -957,7 +958,7 @@ def test_get_active_backend_normalises_unknown_targets_to_local_lab(
     assert "foo123" not in cast(Any, handler).backends
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_action_failure_uses_target_backend_state(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1001,11 +1002,11 @@ def test_action_failure_uses_target_backend_state(
         thread.join(timeout=2)
 
 
-@pytest.mark.unit
-def test_handle_session_rejects_non_loopback_client() -> None:
+@pytest.mark.unit()
+def test_handle_session_rejects_non_loopback_client(monkeypatch: pytest.MonkeyPatch) -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("10.0.0.2", 12345)
-    handler.api_post_token = "test-token"
+    monkeypatch.setattr(api_server.TerraableRequestHandler, "api_post_token", "test-token")
     called: list[tuple[int, str]] = []
 
     def fake_send_error(code: int, message: str = "") -> None:
@@ -1013,30 +1014,31 @@ def test_handle_session_rejects_non_loopback_client() -> None:
 
     handler.send_error = fake_send_error  # type: ignore[assignment]
 
-    handler._handle_session()
+    cast(Any, handler)._handle_session()
 
     assert called == [(403, "Session token access restricted to localhost")]
 
 
-@pytest.mark.unit
-def test_handle_session_returns_token_for_loopback_client() -> None:
+@pytest.mark.unit()
+def test_handle_session_returns_token_for_loopback_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
-    handler.api_post_token = "test-token-123"
-    sent_json: dict[str, Any] | None = None
+    monkeypatch.setattr(api_server.TerraableRequestHandler, "api_post_token", "test-token-123")
+    sent_json: list[dict[str, Any]] = []
 
     def fake_send_json(payload: dict[str, Any]) -> None:
-        nonlocal sent_json
-        sent_json = payload
+        sent_json.append(payload)
 
     handler._send_json = fake_send_json  # type: ignore[assignment]
 
-    handler._handle_session()
+    cast(Any, handler)._handle_session()
 
-    assert sent_json == {"post_token": "test-token-123"}
+    assert sent_json == [{"post_token": "test-token-123"}]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_make_handler_generates_random_token_when_env_unset(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

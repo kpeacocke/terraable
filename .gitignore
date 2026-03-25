@@ -92,3 +92,5 @@ junit*.xml
 test-results/
 .scannerwork/
 .terraable/
+build_output*.txt
+build_output*.log

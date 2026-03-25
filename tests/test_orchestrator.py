@@ -8,7 +8,7 @@ from terraable.contract import build_handoff_payload
 from terraable.orchestrator import ActionName, ActionStatus, DemoOrchestrator
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_orchestrator_happy_path() -> None:
     orchestrator = DemoOrchestrator()
     payload = build_handoff_payload(
@@ -42,7 +42,7 @@ def test_orchestrator_happy_path() -> None:
     assert len(orchestrator.evidence) == 6
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_orchestrator_scan_failure_when_drift_present() -> None:
     orchestrator = DemoOrchestrator()
 
