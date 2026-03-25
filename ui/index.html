@@ -935,7 +935,14 @@
       if (payload) {
         if (!apiPostToken) {
           // Token missing; try lazy refresh before failing.
-          await refreshSessionToken();
+          try {
+            await refreshSessionToken();
+          } catch (err) {
+            throw new Error(
+              "Unable to refresh session token. Reload the Terraable Control Plane UI and sign in again.",
+              { cause: err }
+            );
+          }
         }
         headers["X-Terraable-Token"] = apiPostToken;
       }

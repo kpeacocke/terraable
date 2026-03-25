@@ -28,6 +28,8 @@ The dev container installs all required tooling automatically on first launch vi
 
 The dev container also includes Docker CLI tooling and bind-mounts the host Docker socket (`/var/run/docker.sock`) so `docker build`, `docker run`, and `docker compose` work from inside the container on Linux, macOS, and Windows (Docker Desktop).
 
+**Security note:** Bind-mounting `/var/run/docker.sock` into the dev container effectively grants the container root-equivalent control over the host Docker daemon. Only use this configuration on trusted, non-production hosts, and review the devcontainer configuration if you need to remove or change this behaviour. See `SECURITY.md` for broader security guidance and responsible disclosure expectations.
+
 If Docker commands fail inside the dev container:
 - Ensure Docker Desktop (macOS/Windows) or Docker Engine (Linux) is running.
 - Rebuild/reopen the dev container after Docker starts.

@@ -8,7 +8,6 @@ services:
       - "127.0.0.1:8888:8000"
     environment:
       # API server configuration
-      - TERRAABLE_WORKSPACE=/workspace
       - TERRAABLE_MODE=${TERRAABLE_MODE:-live-local-lab}
       - TERRAABLE_MOCK_MODE=${TERRAABLE_MOCK_MODE:-false}
 

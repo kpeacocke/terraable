@@ -187,7 +187,7 @@ ports: ["127.0.0.1:8889:8000"]
 ### Container exits immediately
 
 ```bash
-docker-compose logs backend
+docker compose logs backend
 ```
 
 Check for errors in the log output. Common issues:
@@ -207,8 +207,8 @@ docker volume inspect terraable_state
 If volumes are missing, recreate them:
 
 ```bash
-docker-compose down -v
-docker-compose up
+docker compose down -v
+docker compose up
 ```
 
 ### Can't reach API from outside localhost

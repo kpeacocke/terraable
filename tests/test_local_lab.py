@@ -263,7 +263,7 @@ class _ActionLockProbeBackend(LocalLabBackend):
                 self._active_ensures -= 1
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_create_environment_builds_real_local_lab_state(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -288,7 +288,7 @@ def test_create_environment_builds_real_local_lab_state(tmp_path: Path) -> None:
     assert (env_dir / "portal_service.state").exists()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_create_environment_serializes_concurrent_requests(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -322,7 +322,7 @@ def test_create_environment_serializes_concurrent_requests(
     assert backend.max_active_ensures == 1
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -373,7 +373,7 @@ def test_full_local_lab_lifecycle_updates_controls_and_eda_history(tmp_path: Pat
     assert remediation["state"]["jobs"]["last_status"] == "succeeded"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path) -> None:
     backend = _FakeLocalLabBackend(tmp_path)
 
@@ -388,7 +388,7 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
     assert "supported live targets" in result["detail"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 @pytest.mark.parametrize("target", ["vmware", "parallels", "hyper-v"])
 def test_live_virtualisation_targets_are_executable(
     target: str,
@@ -409,7 +409,7 @@ def test_live_virtualisation_targets_are_executable(
     assert result["state"]["mode"].startswith("live-")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_live_gcp_target_is_executable_with_required_credentials(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text(
         "HCP_TERRAFORM_TOKEN=test-token\nGOOGLE_APPLICATION_CREDENTIALS=/tmp/fake-gcp-creds.json\n",
@@ -429,7 +429,7 @@ def test_live_gcp_target_is_executable_with_required_credentials(tmp_path: Path)
     assert result["state"]["mode"] == "live-gcp"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_local_virtualisation_targets_are_executable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -452,7 +452,7 @@ def test_local_virtualisation_targets_are_executable(
     assert result["state"]["current"]["target"] == "vmware"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_default_runner_executes_subprocess() -> None:
     result = default_runner([sys.executable, "-c", "print('ok')"], None, None)
 
@@ -460,7 +460,7 @@ def test_default_runner_executes_subprocess() -> None:
     assert result.stderr == ""
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_load_state_returns_default_for_malformed_json(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.runtime_root.mkdir(parents=True, exist_ok=True)
@@ -472,7 +472,7 @@ def test_load_state_returns_default_for_malformed_json(tmp_path: Path) -> None:
     assert state["controls"] == {"ssh_root_login": False, "portal_service_health": False}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_load_state_returns_default_for_non_object_json(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.runtime_root.mkdir(parents=True, exist_ok=True)
@@ -484,7 +484,7 @@ def test_load_state_returns_default_for_non_object_json(tmp_path: Path) -> None:
     assert state["controls"] == {"ssh_root_login": False, "portal_service_health": False}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_record_action_persists_evidence_entry(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -496,7 +496,7 @@ def test_record_action_persists_evidence_entry(tmp_path: Path) -> None:
     assert state["evidence"][0]["message"] == "unit detail"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_append_eda_event_persists_history_entry(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -507,7 +507,7 @@ def test_append_eda_event_persists_history_entry(tmp_path: Path) -> None:
     assert state["eda_history"][0]["message"] == "eda event detail"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_record_action_caps_evidence_history(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -520,7 +520,7 @@ def test_record_action_caps_evidence_history(tmp_path: Path) -> None:
     assert evidence[0]["message"] == f"detail-{STATE_LOG_LIMIT + 4}"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_append_eda_event_caps_history(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -533,7 +533,7 @@ def test_append_eda_event_caps_history(tmp_path: Path) -> None:
     assert eda_history[0]["message"] == f"event-{STATE_LOG_LIMIT + 4}"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_run_wraps_called_process_error(tmp_path: Path) -> None:
     def boom(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
         del argv, cwd, env
@@ -545,7 +545,7 @@ def test_run_wraps_called_process_error(tmp_path: Path) -> None:
         backend.run_command_for_test(["cmd"], cwd=None, env=None)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_run_wraps_file_not_found_error(tmp_path: Path) -> None:
     def missing(argv: list[str], cwd: Path | None, env: dict[str, str] | None) -> CommandResult:
         del argv, cwd, env
@@ -557,7 +557,7 @@ def test_run_wraps_file_not_found_error(tmp_path: Path) -> None:
         backend.run_command_for_test(["cmd"], cwd=None, env=None)
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_current_environment_requires_active_state(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -565,7 +565,7 @@ def test_current_environment_requires_active_state(tmp_path: Path) -> None:
         backend.current_environment_for_test()
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_terraform_apply_runs_init_apply_and_output(tmp_path: Path) -> None:
     calls: list[list[str]] = []
 
@@ -613,7 +613,7 @@ def test_terraform_apply_runs_init_apply_and_output(tmp_path: Path) -> None:
     assert calls[2][2] == "output"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_terraform_root_mapping_includes_phase3_targets(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -634,7 +634,7 @@ def test_terraform_root_mapping_includes_phase3_targets(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_run_playbook_uses_local_inventory_and_ansible_config(tmp_path: Path) -> None:
     calls: list[tuple[list[str], Path | None, dict[str, str] | None]] = []
 
@@ -680,7 +680,7 @@ def test_run_playbook_uses_local_inventory_and_ansible_config(tmp_path: Path) ->
     assert env["ANSIBLE_CONFIG"] == str(tmp_path / "ansible" / "ansible.cfg")
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_auth_status_uses_dotenv_credentials(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text(
         "HCP_TERRAFORM_TOKEN=from-dotenv\n",
@@ -697,7 +697,7 @@ def test_auth_status_uses_dotenv_credentials(tmp_path: Path) -> None:
     assert auth["credential_sources"] == {tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -717,7 +717,7 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
     )
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_configure_credentials_merges_ui_values(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -729,7 +729,7 @@ def test_configure_credentials_merges_ui_values(tmp_path: Path) -> None:
     assert auth["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_create_environment_requires_ready_auth(tmp_path: Path) -> None:
     backend = _FakeLocalLabBackend(tmp_path)
 
@@ -744,7 +744,7 @@ def test_create_environment_requires_ready_auth(tmp_path: Path) -> None:
     assert "create_environment blocked:" in result["detail"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.get_state()
@@ -755,7 +755,7 @@ def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
     assert "observability" in state
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_observability_dashboard_contract_includes_metrics(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.default_state_for_test()
@@ -830,7 +830,7 @@ def test_observability_dashboard_contract_includes_metrics(tmp_path: Path) -> No
     assert stages[2]["stage"] == "terraform"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_observability_dashboard_ignores_malformed_state_lists(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.default_state_for_test()
@@ -868,7 +868,7 @@ def test_observability_dashboard_ignores_malformed_state_lists(tmp_path: Path) -
     }
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials(
@@ -885,7 +885,7 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
     assert tf_token_key in auth_after_clear["missing_credentials"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_configure_credentials_clear_restores_dotenv_value(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=from-dotenv\n", encoding="utf-8")
     backend = _InspectableLocalLabBackend(tmp_path)
@@ -903,7 +903,7 @@ def test_configure_credentials_clear_restores_dotenv_value(tmp_path: Path) -> No
     }
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_configure_credentials_clear_restores_dotenv_after_ui_update(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=from-dotenv\n", encoding="utf-8")
     backend = _InspectableLocalLabBackend(tmp_path)
@@ -922,7 +922,7 @@ def test_configure_credentials_clear_restores_dotenv_after_ui_update(tmp_path: P
     }
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_configure_credentials_returns_auth_for_requested_target(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -937,7 +937,7 @@ def test_configure_credentials_returns_auth_for_requested_target(tmp_path: Path)
     assert "AWS_ACCESS_KEY_ID" in auth["missing_credentials"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
@@ -949,7 +949,7 @@ def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
     assert "portal=custom is not supported" in auth["blockers"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_local_lab_rhdh_portal_marked_ready(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
@@ -960,7 +960,7 @@ def test_local_lab_rhdh_portal_marked_ready(tmp_path: Path) -> None:
     assert auth["ready"] is True
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_create_environment_allows_local_lab_rhdh(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -976,7 +976,7 @@ def test_create_environment_allows_local_lab_rhdh(tmp_path: Path) -> None:
     assert result["state"]["current"]["portal"] == "rhdh"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_unknown_target_uses_hostname_tf_token_requirement(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -991,7 +991,7 @@ def test_unknown_target_uses_hostname_tf_token_requirement(
     assert "TF_TOKEN_app_terraform_io" not in auth["missing_credentials"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_bootstrap_prefers_environment_over_dotenv(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1006,7 +1006,7 @@ def test_bootstrap_prefers_environment_over_dotenv(
     assert auth["credential_sources"] == {tf_token_key: "env (from HCP_TERRAFORM_TOKEN)"}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_dotenv_missing_file_returns_empty(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1015,7 +1015,7 @@ def test_read_dotenv_missing_file_returns_empty(tmp_path: Path) -> None:
     assert loaded == {}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_read_dotenv_skips_comments_and_invalid_lines(tmp_path: Path) -> None:
     dotenv_path = tmp_path / ".env"
     dotenv_path.write_text(
@@ -1029,7 +1029,7 @@ def test_read_dotenv_skips_comments_and_invalid_lines(tmp_path: Path) -> None:
     assert loaded == {"HCP_TERRAFORM_TOKEN": "from-dotenv"}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_credential_value_prefers_hostname_specific_token_and_non_token_value(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1049,7 +1049,7 @@ def test_credential_value_prefers_hostname_specific_token_and_non_token_value(
     assert backend.credential_value_for_test("AWS_ACCESS_KEY_ID") == "aws-key"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_auth_source_includes_hostname_specific_and_non_token_sources(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1067,7 +1067,7 @@ def test_auth_source_includes_hostname_specific_and_non_token_sources(
     assert sources["AWS_ACCESS_KEY_ID"] == "ui"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_mock_mode_auth_is_always_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
     backend = LocalLabBackend(tmp_path)
@@ -1079,7 +1079,7 @@ def test_mock_mode_auth_is_always_ready(tmp_path: Path, monkeypatch: pytest.Monk
     assert auth["blockers"] == []
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_mock_mode_state_reports_offline_mock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1092,7 +1092,7 @@ def test_mock_mode_state_reports_offline_mock(
     assert state["auth"]["ready"] is True
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_mock_mode_full_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
     backend = LocalLabBackend(tmp_path, clock=lambda: 1_700_000_000.0)
@@ -1134,7 +1134,7 @@ def test_mock_mode_full_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert state["compliance_controls"]["ssh_root_login"] is True
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_mock_mode_eda_events_on_drift_and_remediation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1163,7 +1163,7 @@ def test_mock_mode_eda_events_on_drift_and_remediation(
     assert any("remediation complete" in e["message"] for e in state["eda_history"])
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_inject_synthetic_incident_updates_feed_and_evidence(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1176,7 +1176,7 @@ def test_inject_synthetic_incident_updates_feed_and_evidence(tmp_path: Path) -> 
     assert any("synthetic incident" in item["message"] for item in state["evidence"])
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_inject_synthetic_incident_respects_eda_disabled_state(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.get_state()
@@ -1192,7 +1192,7 @@ def test_inject_synthetic_incident_respects_eda_disabled_state(tmp_path: Path) -
     assert state["eda_history"] == []
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_inject_synthetic_incident_emits_eda_event_when_enabled(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.get_state()
@@ -1208,7 +1208,7 @@ def test_inject_synthetic_incident_emits_eda_event_when_enabled(tmp_path: Path) 
     assert any("synthetic incident emitted" in item["message"] for item in state["eda_history"])
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_execution_mode_requires_awx_connection_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1223,7 +1223,7 @@ def test_awx_execution_mode_requires_awx_connection_env(
     assert any("awx execution mode requires" in blocker for blocker in auth["blockers"])
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_execution_mode_requires_https_host_for_ready_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1240,7 +1240,7 @@ def test_awx_execution_mode_requires_https_host_for_ready_state(
     assert "AWX_HOST must use an https:// URL" in auth["blockers"]
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_run_playbook_awx_mode_launches_template(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1285,7 +1285,7 @@ def test_run_playbook_awx_mode_launches_template(
     assert requests[2][0] == "GET"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_invalid_execution_mode_defaults_to_direct(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1297,7 +1297,7 @@ def test_invalid_execution_mode_defaults_to_direct(
     assert state["controller_mode"] == "direct"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_rejects_unmapped_playbook(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
@@ -1306,7 +1306,7 @@ def test_awx_run_rejects_unmapped_playbook(tmp_path: Path, monkeypatch: pytest.M
         backend.run_awx_job_template_for_test("playbooks/unknown.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_requires_awx_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
@@ -1315,7 +1315,7 @@ def test_awx_run_requires_awx_credentials(tmp_path: Path, monkeypatch: pytest.Mo
         backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_requires_https_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "http://awx.example.invalid")
@@ -1327,7 +1327,7 @@ def test_awx_run_requires_https_host(tmp_path: Path, monkeypatch: pytest.MonkeyP
         backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_raises_when_template_not_found(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1347,7 +1347,7 @@ def test_awx_run_raises_when_template_not_found(
         backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_raises_when_launch_missing_job_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1379,7 +1379,7 @@ def test_awx_run_raises_when_launch_missing_job_id(
         backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_raises_when_job_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
@@ -1411,7 +1411,7 @@ def test_awx_run_raises_when_job_fails(tmp_path: Path, monkeypatch: pytest.Monke
         backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_request_raises_on_non_object_response(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1442,7 +1442,7 @@ def test_awx_request_raises_on_non_object_response(
         )
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_request_wraps_url_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1462,7 +1462,7 @@ def test_awx_request_wraps_url_errors(tmp_path: Path, monkeypatch: pytest.Monkey
         )
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_run_raises_when_job_times_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     monkeypatch.setenv("AWX_HOST", "https://awx.example.invalid")
@@ -1499,7 +1499,7 @@ def test_awx_run_raises_when_job_times_out(tmp_path: Path, monkeypatch: pytest.M
         backend.run_awx_job_template_for_test("playbooks/compliance_scan.yml", {})
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
@@ -1529,7 +1529,7 @@ def test_awx_request_returns_json_object(tmp_path: Path, monkeypatch: pytest.Mon
     assert payload == {"status": "ok"}
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_awx_request_raises_on_json_decode_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1560,7 +1560,7 @@ def test_awx_request_raises_on_json_decode_error(
         )
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_apply_baseline_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -1585,7 +1585,7 @@ def test_apply_baseline_marks_failed_job_status_on_exception(tmp_path: Path) -> 
     assert state["jobs"]["last_status"] == "failed"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_run_compliance_scan_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -1610,7 +1610,7 @@ def test_run_compliance_scan_marks_failed_job_status_on_exception(tmp_path: Path
     assert state["jobs"]["last_status"] == "failed"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_inject_ssh_drift_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -1635,7 +1635,7 @@ def test_inject_ssh_drift_marks_failed_job_status_on_exception(tmp_path: Path) -
     assert state["jobs"]["last_status"] == "failed"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_inject_service_drift_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -1660,7 +1660,7 @@ def test_inject_service_drift_marks_failed_job_status_on_exception(tmp_path: Pat
     assert state["jobs"]["last_status"] == "failed"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_run_remediation_marks_failed_job_status_on_exception(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
@@ -1685,7 +1685,7 @@ def test_run_remediation_marks_failed_job_status_on_exception(tmp_path: Path) ->
     assert state["jobs"]["last_status"] == "failed"
 
 
-@pytest.mark.unit
+@pytest.mark.unit()
 def test_current_environment_requires_runtime_context(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
     backend.save_state_for_test(
