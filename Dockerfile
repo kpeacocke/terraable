@@ -9,9 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+# Install Poetry into a stable path so it can be copied to the runtime stage
+ENV POETRY_HOME=/opt/poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="$POETRY_HOME/bin:$PATH"
 
 # Copy only dependency files first (for better layer caching)
 COPY pyproject.toml poetry.lock* ./
@@ -23,7 +24,9 @@ RUN poetry config virtualenvs.create false && \
 # Runtime stage: Minimal image with only runtime dependencies
 FROM python:3.11-slim
 
-ARG TERRAFORM_VERSION=1.7.5
+ARG TERRAFORM_VERSION=1.9.0
+# TARGETARCH is set automatically by Docker BuildKit (amd64, arm64, etc.)
+ARG TARGETARCH=amd64
 
 WORKDIR /workspace
 
@@ -36,14 +39,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -s /bin/bash terraable \
-    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip \
+    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TARGETARCH}.zip" -o /tmp/terraform.zip \
     && unzip /tmp/terraform.zip -d /usr/local/bin \
     && chmod +x /usr/local/bin/terraform \
     && rm -f /tmp/terraform.zip
 
-# Copy installed packages from builder stage
+# Copy installed packages and Poetry from builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /opt/poetry /opt/poetry
+ENV PATH="/opt/poetry/bin:$PATH"
 
 # Copy application code
 COPY --chown=terraable:terraable . .

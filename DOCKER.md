@@ -5,7 +5,8 @@ This guide explains how to run Terraable using Docker and docker-compose for loc
 ## Prerequisites
 
 - Docker Engine 20.10+
-- docker-compose 1.29+
+- Docker Compose v2 (`docker compose`) — available with Docker Desktop and Docker Engine 23+.
+  If you only have the legacy `docker-compose` v1 binary, substitute `docker-compose` for `docker compose` in all commands below.
 - Port 8888 available on localhost
 
 ## Quick Start
@@ -14,16 +15,16 @@ This guide explains how to run Terraable using Docker and docker-compose for loc
 
 ```bash
 # Build the image
-docker-compose build
+docker compose build
 
 # Start the service
-docker-compose up -d
+docker compose up -d
 
 # Check logs
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # Stop the service
-docker-compose down
+docker compose down
 ```
 
 The API server will be available at `http://localhost:8888`.
@@ -38,7 +39,7 @@ curl http://localhost:8888/healthz
 open http://localhost:8888
 
 # See active backend logs
-docker-compose logs -f backend
+docker compose logs -f backend
 ```
 
 ## Configuration
@@ -47,13 +48,13 @@ Environment variables for the container can be set in `.env` or passed via `dock
 
 ```bash
 # Run with mock mode enabled
-TERRAABLE_MOCK_MODE=true docker-compose up
+TERRAABLE_MOCK_MODE=true docker compose up
 
 # Set Terraform verbosity
-TF_LOG=DEBUG docker-compose up
+TF_LOG=DEBUG docker compose up
 
 # Provide HCP Terraform credentials
-HCP_TERRAFORM_TOKEN=xxxx docker-compose up
+HCP_TERRAFORM_TOKEN=xxxx docker compose up
 ```
 
 ### Persistent Configuration
@@ -72,7 +73,7 @@ ANSIBLE_VERBOSITY=0
 Then run:
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 ## Volume Mounts
@@ -94,35 +95,36 @@ State and cache persist across container restarts, speeding up subsequent runs.
 ```bash
 # Code changes are visible immediately (delegated mounts)
 # Edit terraable/*.py files and restart the service:
-docker-compose restart backend
+docker compose restart backend
 
 # Or rebuild if dependencies changed:
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
 
-### Run tests inside container
+### Run tests from host or devcontainer
 
 ```bash
-docker-compose exec backend poetry run pytest
-docker-compose exec backend poetry run mypy .
-docker-compose exec backend ruff check .
+# From the project root on your host or in a devcontainer
+poetry run pytest
+poetry run mypy .
+poetry run ruff check .
 ```
 
 ### Access the container shell
 
 ```bash
-docker-compose exec backend /bin/bash
+docker compose exec backend /bin/bash
 ```
 
 ### Clean up volumes
 
 ```bash
 # Remove containers only (keep volumes)
-docker-compose down
+docker compose down
 
 # Remove everything including volumes
-docker-compose down -v
+docker compose down -v
 ```
 
 ## For Production / Demos
@@ -149,8 +151,8 @@ State is automatically persisted in the `terraable_state` volume, allowing demos
 
 ```bash
 # Start fresh with clean state
-docker-compose down -v
-docker-compose up
+docker compose down -v
+docker compose up
 ```
 
 ## Networking
