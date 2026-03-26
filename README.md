@@ -2,7 +2,6 @@
 
 Reference demo showing HCP Terraform provisioning and Ansible Automation Platform operationalising, validating, and remediating environments.
 
-
 ## Quick Start
 
 Get an offline demo running in under five minutes — no live credentials required:

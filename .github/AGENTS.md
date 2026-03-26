@@ -5,7 +5,7 @@ This document lists available specialised agents and when to invoke them. Type `
 ## Agent reference
 
 | Agent | Purpose | When to use | Key outputs |
-|-------|---------|-------------|-------------|
+| ------- | --------- | ------------- | ------------- |
 | **mvp-architect** | Architecture design and contracts | Designing new features, targets, or handoff paths; clarifying interfaces before coding. | Problem/scope, constraints, proposed architecture, interface contracts, risks, acceptance criteria, sequenced plan. |
 | **platform-builder** | Feature implementation | Delivering code for milestone features; building end-to-end slices (trigger, logic, status, error handling). | Feature code, tests, docs updates, completion checklist sign-off. |
 | **security-compliance** | Hardening, scanning, drift, remediation | Designing/reviewing controls, compliance logic, evidence collection; strengthening detection and remediation. | Control objectives, detection methods, remediation actions, evidence outputs, security review checklist. |
@@ -36,6 +36,7 @@ This document lists available specialised agents and when to invoke them. Type `
 ## Global Copilot instructions
 
 All agents operate under the constraints defined in [copilot-instructions.md](./copilot-instructions.md):
+
 - MVP first, phase-aligned outcomes.
 - Terraform provisioning ↔ Ansible operations strict separation.
 - Australian English documentation.

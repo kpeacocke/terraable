@@ -11,7 +11,7 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 ## Target status
 
 | Target | Notes |
-|--------|-------|
+| -------- | ------- |
 | `local-lab` | Live-executable. Recommended first target. Runs against localhost or a local VM. Requires `TF_TOKEN_<hostname>` (or `HCP_TERRAFORM_TOKEN` alias). |
 | `gcp` | Live-executable. Requires `GOOGLE_APPLICATION_CREDENTIALS` and `TF_TOKEN_<hostname>` (or alias). |
 | `vmware` | Live-executable. Requires `TF_TOKEN_<hostname>` (or alias). Uses Terraform contract scaffold. |
@@ -27,7 +27,7 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 1. Stand up AWX — see [AWX operator install guide](https://github.com/ansible/awx-operator).
 2. Set environment variables in `.env`:
 
-   ```
+   ```env
    AWX_HOST=https://awx.example.local
    AWX_USERNAME=admin
    AWX_PASSWORD=<redacted>

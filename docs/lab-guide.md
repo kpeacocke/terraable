@@ -19,7 +19,7 @@ Continue reading this guide to verify the setup, choose a mode, and advance to l
 ## Target quick reference
 
 | Target | Live-executable | Credentials required | Notes |
-|--------|----------------|---------------------|-------|
+| -------- | ---------------- | --------------------- | ------- |
 | `local-lab` | Yes | `TF_TOKEN_<hostname>` (or `HCP_TERRAFORM_TOKEN` alias) | Recommended first live target |
 | `gcp` | Yes | `TF_TOKEN_<hostname>` (or alias) + `GOOGLE_APPLICATION_CREDENTIALS` | GCP service account JSON |
 | `vmware` | Yes | `TF_TOKEN_<hostname>` (or alias) | Uses local Terraform data resource |
@@ -39,14 +39,14 @@ This guide walks you through forking the repository and running the Terraable de
 ## Prerequisites
 
 | Tool | Minimum version | Purpose |
-|------|----------------|---------|
+| ------ | ---------------- | --------- |
 | Git | 2.40 | Clone and branch management |
 | Python | 3.11 | `terraable` package and tests |
 | Terraform CLI | 1.9 | Substrate module validation |
 | Ansible | 10.0 | Playbook and role execution |
 | Docker or Podman | latest | Optional: local container target |
 
-Not all tools are required for every demo path. See [Choosing a lab mode](#choosing-a-lab-mode) below.
+Not all tools are required for every demo path. See [Choosing a lab mode](#4-choosing-a-lab-mode) below.
 
 ---
 
@@ -99,7 +99,7 @@ Open `.env` and fill in the required values. See [.env.example](../.env.example)
 
 Minimum required variables for the offline/mock mode:
 
-```
+```env
 TERRAABLE_MOCK_MODE=true
 TERRAABLE_TFC_HOSTNAME=app.terraform.io
 ```
@@ -109,7 +109,7 @@ TERRAABLE_TFC_HOSTNAME=app.terraform.io
 ## 4. Choosing a lab mode
 
 | Mode | Description | Location |
-|------|-------------|----------|
+| ------ | ------------- | ---------- |
 | `showcase` | Full live demo with HCP Terraform and AAP | [modes/showcase](../modes/showcase/README.md) |
 | `lab` | AWX-backed, suitable for workshops | [modes/lab](../modes/lab/README.md) |
 | `offline` | No live infra — uses mock data | [modes/offline](../modes/offline/README.md) |
@@ -133,7 +133,7 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 1. Stand up an AWX instance (community.general or via operator).
 2. Set environment variables in `.env`:
 
-   ```
+   ```env
    AWX_HOST=https://awx.example.local
    AWX_USERNAME=admin
    AWX_PASSWORD=<redacted>
@@ -153,7 +153,7 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 ## 7. Troubleshooting
 
 | Symptom | Likely cause | Remedy |
-|---------|-------------|--------|
+| --------- | ------------- | -------- |
 | Tests fail on import | Missing dependencies | Re-run `poetry install` |
 | AWX bootstrap fails auth | Wrong credentials | Check `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD` in `.env` |
 | EDA webhook not firing | EDA mode disabled | Set EDA mode to `enabled` in the UI |

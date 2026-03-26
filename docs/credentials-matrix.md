@@ -1,9 +1,11 @@
 # Credential Matrix
 
 ## Intent
+
 Define the external credentials required to run Terraable without mocks, with clear ownership, scope, minimum permission policy, and storage guidance per environment.
 
 ## Preconditions
+
 - You are running live mode (not offline/mock).
 - Secrets are stored in an approved secret manager (not committed to this repository).
 - Service accounts are used in preference to personal credentials.
@@ -11,7 +13,7 @@ Define the external credentials required to run Terraable without mocks, with cl
 ## Environment Model
 
 | Environment | Purpose | Suggested Owner | Access Pattern |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Dev | Day-to-day engineering validation | Platform engineering | Shared service accounts, short-lived credentials |
 | Test | CI and integration verification | Platform engineering + security | Dedicated non-human identities, automated rotation |
 | Demo | Customer/demo execution path | Demo operations | Dedicated demo identities, tightly scoped |
@@ -20,7 +22,7 @@ Define the external credentials required to run Terraable without mocks, with cl
 ## Credential Inventory
 
 | Domain | Credential | Used By | Minimum Scope / Permission Policy | Env Required |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | HCP Terraform | HCP API token (`TF_TOKEN_<hostname>`) | `terraable/hcp_terraform.py`, control plane backend | Read runs/applies/state-versions/outputs for required workspaces only; no org-wide admin | Dev, Test, Demo, Prod |
 | HCP Terraform | Workspace execution identity (VCS or API run) | Terraform workflow execution | Execute runs only in approved workspaces; deny unrelated projects | Dev, Test, Demo, Prod |
 | AWS | IAM role or key pair | `terraform/modules/substrate_aws` | Least privilege for VPC, compute, IAM pass-role, storage, DNS only if used; region constrained where possible | Test, Demo, Prod (Dev if AWS path is used) |
@@ -39,7 +41,7 @@ Define the external credentials required to run Terraable without mocks, with cl
 ## Owner And Rotation Matrix
 
 | Credential Domain | Primary Owner | Secondary Owner | Rotation Target |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | HCP Terraform | Platform engineering | Security | 90 days or less |
 | AWS/Azure cloud identities | Platform engineering | Security | 90 days or less (or short-lived role credentials) |
 | OpenShift/OKD tokens | Platform operations | Security | 30-90 days depending on token model |
@@ -49,7 +51,9 @@ Define the external credentials required to run Terraable without mocks, with cl
 | Secrets backend identities | Security | Platform engineering | 30-90 days depending on policy |
 
 ## Required Environment Variables (Reference)
+
 These variables are referenced by the repository today:
+
 - `TF_TOKEN_<hostname>` and optional `TERRAABLE_TFC_HOSTNAME`
 - `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD`
 - `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_SUBSCRIPTION_ID`, `ARM_TENANT_ID`
@@ -60,7 +64,7 @@ See `.env.example` for examples and safe defaults.
 ## Failure Modes And Remediation
 
 | Failure Mode | Typical Symptom | Remediation |
-|---|---|---|
+| --- | --- | --- |
 | Missing HCP token | HCP API calls fail with auth errors | Set `TF_TOKEN_<hostname>` for the configured hostname |
 | Over-scoped cloud identity blocked by policy | Terraform apply denied by organisation policy | Replace with least-privilege role and allowed resource scopes |
 | Under-scoped cloud identity | Terraform plan/apply permission denied | Add only missing service actions required by the module |
@@ -69,6 +73,7 @@ See `.env.example` for examples and safe defaults.
 | EDA secret mismatch | Webhook events rejected | Reconcile webhook source secret and sender configuration |
 
 ## Storage And Handling Rules
+
 - Never commit secrets to git, docs, tests, logs, or generated artefacts.
 - Store credentials in approved secret stores and inject at runtime.
 - Use dedicated service accounts per environment; do not reuse personal identities.

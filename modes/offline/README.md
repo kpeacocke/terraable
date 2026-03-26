@@ -27,7 +27,7 @@ Open `http://127.0.0.1:8000` in a browser. All UI actions (create, baseline, sca
 ## Pre-seeded mock scenarios
 
 | Scenario | How to trigger |
-|----------|---------------|
+| ---------- | --------------- |
 | Clean environment | Open UI, click **Create environment** |
 | SSH drift detected | Click **Inject SSH drift**, then **Run compliance scan** |
 | Service health drift | Click **Inject service drift**, then **Run compliance scan** |

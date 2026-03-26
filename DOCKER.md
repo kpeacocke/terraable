@@ -192,6 +192,7 @@ as `127.0.0.1:8888:8000` — accessible on the Docker host at `http://localhost:
 > endpoints will be rejected with HTTP 403 regardless of how the port is exposed.
 
 This means:
+
 - If you change `ports` in docker-compose.yml to `"0.0.0.0:8888:8000"`, the UI static files
   will load from remote clients, but `/api/session` and all action POSTs will still return 403.
 - For local development and demos, run the browser on the same host as Docker and access
@@ -218,6 +219,7 @@ docker compose logs backend
 ```
 
 Check for errors in the log output. Common issues:
+
 - Missing Python packages (rebuild)
 - Permission issues (check volume mounts)
 - Workspace path issues (verify absolute paths)

@@ -31,6 +31,7 @@ The dev container also includes Docker CLI tooling and bind-mounts the host Dock
 **Security note:** Bind-mounting `/var/run/docker.sock` into the dev container effectively grants the container root-equivalent control over the host Docker daemon. Only use this configuration on trusted, non-production hosts, and review the devcontainer configuration if you need to remove or change this behaviour. See `SECURITY.md` for broader security guidance and responsible disclosure expectations.
 
 If Docker commands fail inside the dev container:
+
 - Ensure Docker Desktop (macOS/Windows) or Docker Engine (Linux) is running.
 - Rebuild/reopen the dev container after Docker starts.
 
@@ -51,7 +52,7 @@ ssh-add ~/.ssh/id_ed25519  # or your preferred key
 ### Local setup — tool versions
 
 | Tool | Minimum version | Install |
-|------|----------------|---------|
+| ------ | ---------------- | --------- |
 | Python | 3.11 | <https://python.org> |
 | Poetry | 1.8 | `curl -sSL https://install.python-poetry.org \| python3 -` |
 | Terraform CLI | 1.9 | <https://developer.hashicorp.com/terraform/install> |
@@ -69,6 +70,7 @@ poetry run bash scripts/check-tools.sh
 ```
 
 Notes:
+
 - Run checks from an activated virtual environment (`.venv`) so Python CLIs resolve on `PATH`.
 - `poetry install` installs project Python dependencies (including `ansible`), but does not install non-Python binaries such as `terraform`, `shellcheck`, `markdownlint-cli2`, or `git`.
 

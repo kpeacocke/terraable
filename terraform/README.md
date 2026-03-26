@@ -5,7 +5,7 @@ Terraform content for substrate provisioning and HCP Terraform handoff outputs.
 ## Substrate modules
 
 | Module | Target | Notes |
-|--------|--------|-------|
+| -------- | -------- | ------- |
 | `modules/substrate_local` | Local lab / workshop | MVP live path; `rhdh` and `backstage` |
 | `modules/substrate_openshift` | Red Hat OpenShift | Phase 2 groundwork; connects to existing cluster |
 | `modules/substrate_aws` | Amazon Web Services | Phase 2; provisions VPC + RHEL 9 EC2 instance |

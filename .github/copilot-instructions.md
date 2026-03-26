@@ -1,11 +1,13 @@
 # Copilot Instructions for terraable
 
 ## Project intent
+
 - Build a reference demo that provisions with HCP Terraform and operationalises with Ansible Automation Platform.
 - Show the full lifecycle: provision, baseline harden, scan, detect drift, remediate, and prove with evidence.
 - Keep the repository easy to fork, run, and demo by contributors.
 
 ## Product outcomes to optimise for
+
 - MVP outcomes:
 - Monorepo structure and clear Terraform-to-Ansible handoff contract.
 - Initial OpenShift substrate path.
@@ -29,6 +31,7 @@
 - Fork-and-run guidance and safe sample environment defaults.
 
 ## Non-negotiable engineering principles
+
 - Preserve clear separation of concerns between provisioning (Terraform) and operational controls (Ansible).
 - Make workflows deterministic and replayable for demos.
 - Prefer explicit contracts and typed data exchange over implicit assumptions.
@@ -36,6 +39,7 @@
 - Keep implementation testable and observable.
 
 ## Security and compliance rules
+
 - Treat security as a first-class feature.
 - Do not introduce credentials, secrets, or tokens into code, docs, examples, tests, logs, or generated artefacts.
 - Prefer environment variables and redacted examples.
@@ -44,6 +48,7 @@
 - For generated first-party code in a Snyk-supported language, run a Snyk code scan and remediate high-confidence findings before completion.
 
 ## Delivery and change quality
+
 - Keep changes small and cohesive.
 - Include acceptance criteria in issue or PR text when implementing scoped work.
 - Add or update tests for changed behaviour.
@@ -52,6 +57,7 @@
 - Explicitly document any breaking change and migration path.
 
 ## Documentation style and language
+
 - Use Australian English in all documentation and user-facing text.
 - Be concise, concrete, and operational.
 - Where relevant, include:
@@ -60,6 +66,7 @@
 - Failure modes and remediation steps.
 
 ## When planning or implementing
+
 - Tie proposed changes to milestone outcomes (MVP, Phase 2, Phase 3, Demo Readiness, Public Forkability).
 - Highlight risks across:
 - Security and compliance impact.
@@ -68,6 +75,7 @@
 - If scope is unclear, default to the smallest increment that advances the current milestone without constraining later phases.
 
 ## Pull request guidance
+
 - PR summaries should include:
 - Problem statement.
 - Approach and trade-offs.
@@ -77,6 +85,7 @@
 - For UI or workflow changes, include before/after notes and execution path details.
 
 ## What to avoid
+
 - Avoid coupling provider-specific logic into shared abstractions.
 - Avoid hidden side effects in automation workflows.
 - Avoid introducing optional complexity before MVP path is clear.

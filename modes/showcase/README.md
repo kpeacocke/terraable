@@ -14,7 +14,7 @@ Showcase mode is the live-infrastructure presentation path for Terraable. The MV
 The repository contains substrate modules for multiple targets. Use the status table below to choose a path that matches your demo risk profile:
 
 | Target | Module | Current status |
-|--------|--------|----------------|
+| -------- | -------- | ---------------- |
 | `local-lab` | `integration/local_lab/terraform` | Executable end-to-end via the control plane |
 | `openshift` | `terraform/modules/substrate_openshift` | Module and contract scaffolding only |
 | `aws` | `terraform/modules/substrate_aws` | Executable via dedicated backend (`AWSBackend`) |
