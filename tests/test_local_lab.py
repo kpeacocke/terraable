@@ -109,14 +109,12 @@ class _FakeLocalLabBackend(LocalLabBackend):
     def _handle_ssh_scan(self, env_dir: Path, extra_vars: dict[str, Any]) -> None:
         ssh_text = (env_dir / "sshd_config").read_text(encoding="utf-8")
         root_login_status = "pass" if "PermitRootLogin no" in ssh_text else "fail"
-        password_auth_status = "pass" if "PasswordAuthentication no" in ssh_text else "fail"
         Path(str(extra_vars["scan_output_path"])).write_text(
             json.dumps(
                 {
                     "control": "ssh_root_login",
                     "status": root_login_status,
                     "evidence": "fake ssh scan",
-                    "ssh_password_authentication": password_auth_status,
                 }
             ),
             encoding="utf-8",
