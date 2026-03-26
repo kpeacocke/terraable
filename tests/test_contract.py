@@ -12,7 +12,7 @@ from terraable.contract import (
 )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_build_handoff_payload_to_runtime_vars() -> None:
     payload = build_handoff_payload(
         environment_name="demo-aue1",
@@ -38,7 +38,7 @@ def test_build_handoff_payload_to_runtime_vars() -> None:
     assert runtime_vars["connection"]["ssh_port"] == 22
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_local_lab_rhdh_combination_is_allowed() -> None:
     validate_target_combination(
         TargetPlatform.LOCAL_LAB,
@@ -46,7 +46,7 @@ def test_local_lab_rhdh_combination_is_allowed() -> None:
     )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_supported_target_portal_combination_accepted() -> None:
     validate_target_combination(
         TargetPlatform.AWS,

@@ -9,7 +9,7 @@ import pytest
 from terraable.local_detect import detect_local_target
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_detect_local_target_from_environment_marker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -21,7 +21,7 @@ def test_detect_local_target_from_environment_marker(
     assert detected["confidence"] == "high"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_detect_local_target_from_binary_marker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -42,7 +42,7 @@ def test_detect_local_target_from_binary_marker(
     assert detected["confidence"] == "medium"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_detect_local_target_defaults_to_local_lab(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -78,7 +78,7 @@ def test_detect_local_target_defaults_to_local_lab(
     assert detected["confidence"] == "low"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_detect_local_target_from_kernel_wsl_marker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -115,7 +115,7 @@ def test_detect_local_target_from_kernel_wsl_marker(
     assert detected["confidence"] == "medium"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_detect_local_target_handles_osrelease_read_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -930,20 +930,40 @@
       updateActionButtons();
     }
 
+    async function ensureApiPostToken() {
+      if (apiPostToken) {
+        return;
+      }
+
+      try {
+        await refreshSessionToken();
+      } catch (err) {
+        throw new Error(
+          "Unable to refresh the session token. Reload the Terraable Control Plane UI and try the action again. If this continues, check that the Terraable API service is running.",
+          { cause: err }
+        );
+      }
+    }
+
+    async function readApiErrorDetail(response) {
+      const responseText = await response.text();
+      if (!responseText) {
+        return "";
+      }
+
+      const trimmed = responseText.trim();
+      try {
+        const parsed = JSON.parse(responseText);
+        return parsed.detail || parsed.message || trimmed;
+      } catch {
+        return trimmed;
+      }
+    }
+
     async function api(path, payload) {
       const headers = { "Content-Type": "application/json" };
       if (payload) {
-        if (!apiPostToken) {
-          // Token missing; try lazy refresh before failing.
-          try {
-            await refreshSessionToken();
-          } catch (err) {
-            throw new Error(
-              "Unable to refresh the session token. Reload the Terraable Control Plane UI and try the action again. If this continues, check that the Terraable API service is running.",
-              { cause: err }
-            );
-          }
-        }
+        await ensureApiPostToken();
         headers["X-Terraable-Token"] = apiPostToken;
       }
       const response = await fetch(path, {
@@ -952,16 +972,7 @@
         body: payload ? JSON.stringify(payload) : undefined,
       });
       if (!response.ok) {
-        const responseText = await response.text();
-        let detail = responseText.trim();
-        if (responseText) {
-          try {
-            const parsed = JSON.parse(responseText);
-            detail = parsed.detail || parsed.message || responseText.trim();
-          } catch {
-            detail = responseText.trim();
-          }
-        }
+        const detail = await readApiErrorDetail(response);
         const suffix = detail ? ` - ${detail}` : "";
         throw new Error(`API request failed: ${response.status}${suffix}`);
       }

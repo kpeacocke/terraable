@@ -58,7 +58,7 @@ def _terraform_outputs(target: str, portal: str = "backstage") -> dict[str, Any]
     }
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_get_auth_status_relaxes_live_target_gate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -85,7 +85,7 @@ def test_aws_get_auth_status_relaxes_live_target_gate(
     assert status["blockers"] == []
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_get_auth_status_relaxes_live_target_gate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -112,7 +112,7 @@ def test_azure_get_auth_status_relaxes_live_target_gate(
     assert status["blockers"] == []
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_get_auth_status_requires_cluster_vars(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -150,7 +150,7 @@ def test_okd_get_auth_status_requires_cluster_vars(
     )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
     backend = AWSBackend(tmp_path, clock=lambda: 1_700_000_000.0)
@@ -167,7 +167,7 @@ def test_aws_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert state["current"]["target"] == "aws"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_create_environment_mock_mode(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -186,7 +186,7 @@ def test_azure_create_environment_mock_mode(
     assert state["current"]["target"] == "azure"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv(MOCK_MODE_ENV_VAR, "true")
     backend = OKDBackend(tmp_path, clock=lambda: 1_700_000_000.0)
@@ -203,7 +203,7 @@ def test_okd_create_environment_mock_mode(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert state["current"]["target"] == "okd"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_cloud_backends_reject_wrong_target(tmp_path: Path) -> None:
     assert (
         AWSBackend(tmp_path).create_environment(
@@ -225,7 +225,7 @@ def test_cloud_backends_reject_wrong_target(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_cloud_backends_get_auth_status_rejects_wrong_target(tmp_path: Path) -> None:
     aws_status = AWSBackend(tmp_path).get_auth_status(target="azure", portal="backstage")
     azure_status = AzureBackend(tmp_path).get_auth_status(target="okd", portal="backstage")
@@ -244,7 +244,7 @@ def test_cloud_backends_get_auth_status_rejects_wrong_target(tmp_path: Path) -> 
     assert okd_status["blockers"] == ["target=aws is not supported by OKD backend"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 @pytest.mark.parametrize(
     ("backend_cls", "expected_mode"),
     [
@@ -263,7 +263,7 @@ def test_cloud_backends_report_target_specific_live_mode(
     assert state["mode"] == expected_mode
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "backend_cls",
     [AWSBackend, AzureBackend, OKDBackend],
@@ -281,7 +281,7 @@ def test_cloud_backends_preserve_offline_mock_mode_label(
     assert state["mode"] == "offline-mock"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_create_environment_live_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -306,7 +306,7 @@ def test_aws_create_environment_live_success(
     assert "Terraform state written to" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_create_environment_live_blocked(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -328,7 +328,7 @@ def test_aws_create_environment_live_blocked(
     assert "create_environment blocked:" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_create_environment_live_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -352,7 +352,7 @@ def test_aws_create_environment_live_failure(
     assert "terraform apply failed" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_create_environment_live_blocked(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -374,7 +374,7 @@ def test_azure_create_environment_live_blocked(
     assert "create_environment blocked:" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_create_environment_live_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -402,7 +402,7 @@ def test_azure_create_environment_live_success(
     assert result["status"] == "succeeded"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_create_environment_live_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -426,7 +426,7 @@ def test_azure_create_environment_live_failure(
     assert "azure terraform failed" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_create_environment_live_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -450,7 +450,7 @@ def test_okd_create_environment_live_failure(
     assert "terraform failed" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_create_environment_live_blocked(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -477,7 +477,7 @@ def test_okd_create_environment_live_blocked(
     assert "create_environment blocked:" in result["detail"]
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_create_environment_live_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -501,7 +501,7 @@ def test_okd_create_environment_live_success(
     assert result["status"] == "succeeded"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_terraform_apply_parses_comma_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -550,7 +550,7 @@ def test_aws_terraform_apply_parses_comma_cidrs(
     assert result["environment_name"] == "aws-env"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_terraform_apply_rejects_invalid_json_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -569,7 +569,7 @@ def test_aws_terraform_apply_rejects_invalid_json_cidrs(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_terraform_apply_requires_ssh_public_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -588,7 +588,7 @@ def test_aws_terraform_apply_requires_ssh_public_key(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_terraform_apply_requires_allowed_cidrs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -608,7 +608,7 @@ def test_aws_terraform_apply_requires_allowed_cidrs(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_terraform_apply_rejects_non_string_json_list(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -628,7 +628,7 @@ def test_aws_terraform_apply_rejects_non_string_json_list(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_aws_terraform_apply_rejects_empty_json_list(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -648,7 +648,7 @@ def test_aws_terraform_apply_rejects_empty_json_list(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_terraform_apply_requires_resource_group(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -667,7 +667,7 @@ def test_azure_terraform_apply_requires_resource_group(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_terraform_apply_requires_ssh_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -687,7 +687,7 @@ def test_azure_terraform_apply_requires_ssh_key(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_terraform_apply_requires_allowed_source(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -709,7 +709,7 @@ def test_azure_terraform_apply_requires_allowed_source(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_azure_terraform_apply_parses_outputs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -754,7 +754,7 @@ def test_azure_terraform_apply_parses_outputs(
     assert result["target_platform"] == "azure"
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_terraform_apply_requires_cluster_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -773,7 +773,7 @@ def test_okd_terraform_apply_requires_cluster_name(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_terraform_apply_requires_base_domain(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -793,7 +793,7 @@ def test_okd_terraform_apply_requires_base_domain(
         )
 
 
-@pytest.mark.unit()
+@pytest.mark.unit
 def test_okd_terraform_apply_parses_outputs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
