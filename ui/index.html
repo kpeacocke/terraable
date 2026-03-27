@@ -763,10 +763,16 @@
       targetAvailabilityListEl.innerHTML = "";
       for (const row of view.rows) {
         const item = document.createElement("li");
-        item.className = row.ready ? "ok" : "warn";
-        item.textContent = row.ready
-          ? `${row.target}: available`
-          : `${row.target}: unavailable - ${row.reason}`;
+        if (row.ready) {
+          item.className = "ok";
+          item.textContent = `${row.target}: available`;
+        } else if (row.selectable) {
+          item.className = "warn";
+          item.textContent = `${row.target}: needs credentials - ${row.reason}`;
+        } else {
+          item.className = "warn";
+          item.textContent = `${row.target}: unavailable - ${row.reason}`;
+        }
         targetAvailabilityListEl.appendChild(item);
       }
     }
