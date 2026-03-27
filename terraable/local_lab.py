@@ -67,7 +67,9 @@ CredentialRequirements = tuple[str, ...]
 CredentialEntry = dict[str, str]
 
 TARGET_CREDENTIAL_REQUIREMENTS: dict[str, CredentialRequirements] = {
-    "local-lab": (HCP_TOKEN_REQUIREMENT,),
+    # local-lab runs entirely on-machine: terraform CLI uses local state and
+    # ansible-playbook runs directly — no HCP Terraform token is required.
+    "local-lab": (),
     "openshift": (HCP_TOKEN_REQUIREMENT, "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
     "okd": (HCP_TOKEN_REQUIREMENT, "OPENSHIFT_API_URL", "OPENSHIFT_TOKEN"),
     "aws": (HCP_TOKEN_REQUIREMENT, "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"),

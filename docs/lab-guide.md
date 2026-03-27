@@ -20,7 +20,7 @@ Continue reading this guide to verify the setup, choose a mode, and advance to l
 
 | Target | Live-executable | Credentials required | Notes |
 | -------- | ---------------- | --------------------- | ------- |
-| `local-lab` | Yes | `TF_TOKEN_<hostname>` (or `HCP_TERRAFORM_TOKEN` alias) | Recommended first live target |
+| `local-lab` | Yes | None — runs `terraform` CLI with local state and `ansible-playbook` directly | Recommended first live target |
 | `gcp` | Yes | `TF_TOKEN_<hostname>` (or alias) + `GOOGLE_APPLICATION_CREDENTIALS` | GCP service account JSON |
 | `vmware` | Yes | `TF_TOKEN_<hostname>` (or alias) | Uses local Terraform data resource |
 | `parallels` | Yes | `TF_TOKEN_<hostname>` (or alias) | Defaults to localhost management host |
@@ -128,7 +128,51 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 
 ---
 
-## 6. Advancing to lab mode
+## 6. Running live with local CLI tools (100% local path)
+
+`local-lab` is the first live-execution target and requires **no credentials**. It runs
+`terraform` CLI against a local state file and dispatches `ansible-playbook` directly —
+no HCP Terraform backend and no AWX/AAP controller are needed.
+
+### Prerequisites
+
+- Terraform CLI ≥ 1.9 — confirm with `terraform version`
+- Ansible ≥ 10.0 — confirm with `ansible --version`
+- Python virtual environment activated with `poetry install` complete
+
+### Procedure
+
+1. Start the API server in live mode (no mock flag):
+
+   ```bash
+   python -m terraable.api_server --host 127.0.0.1 --port 8000
+   ```
+
+2. Open `http://127.0.0.1:8000`. Select **local-lab** as the target — it will show as
+   **Available** in the status strip with no credential blockers.
+
+3. Click **Create environment**. The control plane runs:
+
+   ```bash
+   terraform -chdir=integration/local_lab/terraform init -input=false
+   terraform -chdir=integration/local_lab/terraform apply -auto-approve -state=<runtime-dir>/terraform.tfstate ...
+   ```
+
+4. Click **Apply baseline** — runs `ansible-playbook playbooks/aap_operationalise.yml` directly.
+
+5. Proceed through the remaining lifecycle steps (compliance scan, drift injection, remediation).
+
+### Troubleshooting
+
+| Symptom | Remedy |
+| --------- | -------- |
+| `terraform: command not found` | Install Terraform CLI ≥ 1.9 and confirm it is on `PATH` |
+| `ansible-playbook: command not found` | Install Ansible ≥ 10.0 (`pip install ansible`) and confirm it is on `PATH` |
+| `target local-lab unavailable` in the UI | Container runtime detected; set `TERRAABLE_ALLOW_CONTAINER_HYPERVISOR_TARGETS=true` is not needed for local-lab, check the API server log for the exact blocker |
+
+---
+
+## 7. Advancing to lab mode (AWX)
 
 1. Stand up an AWX instance (community.general or via operator).
 2. Set environment variables in `.env`:
@@ -150,13 +194,14 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom | Likely cause | Remedy |
 | --------- | ------------- | -------- |
 | Tests fail on import | Missing dependencies | Re-run `poetry install` |
 | AWX bootstrap fails auth | Wrong credentials | Check `AWX_HOST`, `AWX_USERNAME`, `AWX_PASSWORD` in `.env` |
 | EDA webhook not firing | EDA mode disabled | Set EDA mode to `enabled` in the UI |
+| `local-lab` auth blocked unexpectedly | Stale state with old blocker | Clear `.terraable/local-lab/state.json`; `local-lab` requires no credentials in direct mode |
 | `gcp` target auth blocked | Missing credentials | Set `GOOGLE_APPLICATION_CREDENTIALS` and `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
 | `vmware` / `parallels` / `hyper-v` auth blocked | Missing HCP Terraform token (`TF_TOKEN_<hostname>` / `HCP_TERRAFORM_TOKEN`) | Set `TF_TOKEN_<hostname>` in `.env` (or set `HCP_TERRAFORM_TOKEN` alias); `TERRAABLE_MOCK_MODE=true` bypasses this |
 | UI stuck on `live-local-lab` after switching target | Persisted local lab state still pinned to previous target | Run **Create environment** again for the new target (or stop the server and delete `.terraable/local-lab/state.json`), then reload the UI |
@@ -165,6 +210,6 @@ Open `http://127.0.0.1:8000` in a browser. All actions use pre-seeded mock state
 
 ---
 
-## 8. Contributing back
+## 9. Contributing back
 
 Refer to [CONTRIBUTING.md](../CONTRIBUTING.md) for branch conventions, PR requirements, and testing guidance.

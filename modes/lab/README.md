@@ -12,7 +12,7 @@ Lab mode targets constrained environments — workshops, learning labs, and fork
 
 | Target | Notes |
 | -------- | ------- |
-| `local-lab` | Live-executable. Recommended first target. Runs against localhost or a local VM. Requires `TF_TOKEN_<hostname>` (or `HCP_TERRAFORM_TOKEN` alias). |
+| `local-lab` | Live-executable. Recommended first target. Runs `terraform` CLI with local state and `ansible-playbook` directly — **no credentials required**. |
 | `gcp` | Live-executable. Requires `GOOGLE_APPLICATION_CREDENTIALS` and `TF_TOKEN_<hostname>` (or alias). |
 | `vmware` | Live-executable. Requires `TF_TOKEN_<hostname>` (or alias). Uses Terraform contract scaffold. |
 | `parallels` | Live-executable. Requires `TF_TOKEN_<hostname>` (or alias). Defaults to `parallels-host.local` as the Parallels host system. Override with `TF_VAR_host_system` when needed. |

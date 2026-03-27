@@ -689,19 +689,25 @@ def test_run_playbook_uses_local_inventory_and_ansible_config(tmp_path: Path) ->
 
 @pytest.mark.unit
 def test_auth_status_uses_dotenv_credentials(tmp_path: Path) -> None:
+    # local-lab has no credential requirements — dotenv values are loaded but not
+    # required, so credential_sources is empty and the target is immediately ready.
     (tmp_path / ".env").write_text(
         "HCP_TERRAFORM_TOKEN=from-dotenv\n",
         encoding="utf-8",
     )
     backend = _InspectableLocalLabBackend(tmp_path)
+    tf_token_key = backend.tf_token_env_var_for_test()
 
     auth = backend.get_auth_status(target="local-lab", portal="backstage")
-    tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth["authenticated"] is True
     assert auth["ready"] is True
     assert auth["missing_credentials"] == []
-    assert auth["credential_sources"] == {tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"}
+    assert auth["credential_sources"] == {}
+
+    # The loaded dotenv value is available to targets that do require credentials.
+    gcp_auth = backend.get_auth_status(target="gcp", portal="backstage")
+    assert gcp_auth["credential_sources"] == {tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"}
 
 
 @pytest.mark.unit
@@ -726,16 +732,51 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
 
 @pytest.mark.unit
 def test_auth_status_uses_human_friendly_tf_token_blocker(tmp_path: Path) -> None:
+    # Targets that require HCP Terraform credentials render a human-friendly label.
     backend = _InspectableLocalLabBackend(tmp_path)
     tf_token_key = backend.tf_token_env_var_for_test()
 
-    auth = backend.get_auth_status(target="local-lab", portal="backstage")
+    # gcp requires HCP Terraform token — missing token produces the friendly label.
+    auth = backend.get_auth_status(target="gcp", portal="backstage")
 
     assert auth["ready"] is False
     assert any(
         f"Terraform Cloud token ({tf_token_key} or HCP_TERRAFORM_TOKEN)" in blocker
         for blocker in auth["blockers"]
     )
+
+
+@pytest.mark.unit
+def test_local_lab_is_ready_without_credentials(tmp_path: Path) -> None:
+    """local-lab runs 100% local: terraform CLI uses local state, ansible-playbook
+    runs directly — no HCP Terraform token or any other cloud credential is required."""
+    backend = _InspectableLocalLabBackend(tmp_path)  # no .env, no env vars
+
+    auth = backend.get_auth_status(target="local-lab", portal="backstage")
+
+    assert auth["authenticated"] is True
+    assert auth["ready"] is True
+    assert auth["required_credentials"] == []
+    assert auth["missing_credentials"] == []
+    assert auth["blockers"] == []
+    assert auth["credential_sources"] == {}
+
+
+@pytest.mark.unit
+def test_create_environment_local_lab_needs_no_credentials(tmp_path: Path) -> None:
+    """create_environment succeeds for local-lab with no credentials set at all."""
+    backend = _FakeLocalLabBackend(tmp_path)  # no .env, no env vars
+
+    result = backend.create_environment(
+        target="local-lab",
+        portal="backstage",
+        profile="baseline",
+        eda="disabled",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["state"]["auth"]["ready"] is True
+    assert result["state"]["auth"]["blockers"] == []
 
 
 @pytest.mark.unit
@@ -796,20 +837,22 @@ def test_auth_status_allows_hypervisor_target_when_runtime_available(
 def test_configure_credentials_merges_ui_values(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
 
-    auth = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
     tf_token_key = backend.tf_token_env_var_for_test()
 
-    assert auth["authenticated"] is True
-    assert auth["ready"] is True
+    # Verify the UI-sourced value is visible when checking a target that requires it.
+    auth = backend.get_auth_status(target="gcp", portal="backstage")
     assert auth["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
 
 
 @pytest.mark.unit
 def test_create_environment_requires_ready_auth(tmp_path: Path) -> None:
+    # local-lab is credential-free; use gcp (requires HCP token + GCP creds) to verify
+    # that create_environment is gated on auth readiness for targets with requirements.
     backend = _FakeLocalLabBackend(tmp_path)
 
     result = backend.create_environment(
-        target="local-lab",
+        target="gcp",
         portal="backstage",
         profile="baseline",
         eda="disabled",
@@ -821,11 +864,12 @@ def test_create_environment_requires_ready_auth(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_get_state_includes_auth_summary(tmp_path: Path) -> None:
+    # local-lab has no credential requirements — it is ready immediately.
     backend = _InspectableLocalLabBackend(tmp_path)
     state = backend.get_state()
 
     assert "auth" in state
-    assert state["auth"]["ready"] is False
+    assert state["auth"]["ready"] is True
     assert "target_suggestion" in state
     assert "observability" in state
 
@@ -953,7 +997,8 @@ def test_configure_credentials_ignores_unknown_and_can_clear_ui_value(tmp_path: 
         }
     )
 
-    auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "})
+    # Use gcp target to observe the effect of clearing: that target requires a token.
+    auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "}, target="gcp")
     tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth_after_clear["authenticated"] is False
@@ -966,13 +1011,14 @@ def test_configure_credentials_clear_restores_dotenv_value(tmp_path: Path) -> No
     backend = _InspectableLocalLabBackend(tmp_path)
     tf_token_key = backend.tf_token_env_var_for_test()
 
-    auth_after_ui = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+    # Override with UI value — use gcp to verify source attribution.
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+    auth_after_ui = backend.get_auth_status(target="gcp", portal="backstage")
     assert auth_after_ui["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
 
-    auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "})
-
-    assert auth_after_clear["authenticated"] is True
-    assert auth_after_clear["ready"] is True
+    # Clear UI value — dotenv fallback should be restored.
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "   "})
+    auth_after_clear = backend.get_auth_status(target="gcp", portal="backstage")
     assert auth_after_clear["credential_sources"] == {
         tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"
     }
@@ -985,13 +1031,12 @@ def test_configure_credentials_clear_restores_dotenv_after_ui_update(tmp_path: P
     tf_token_key = backend.tf_token_env_var_for_test()
 
     backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-1"})
-    auth_after_second_ui = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-2"})
-    assert auth_after_second_ui["credential_sources"] == {
-        tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"
-    }
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui-2"})
+    auth_after_ui = backend.get_auth_status(target="gcp", portal="backstage")
+    assert auth_after_ui["credential_sources"] == {tf_token_key: "ui (from HCP_TERRAFORM_TOKEN)"}
 
-    auth_after_clear = backend.configure_credentials({"HCP_TERRAFORM_TOKEN": ""})
-
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": ""})
+    auth_after_clear = backend.get_auth_status(target="gcp", portal="backstage")
     assert auth_after_clear["credential_sources"] == {
         tf_token_key: "dotenv (from HCP_TERRAFORM_TOKEN)"
     }
@@ -1015,7 +1060,6 @@ def test_configure_credentials_returns_auth_for_requested_target(tmp_path: Path)
 @pytest.mark.unit
 def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
-    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
 
     auth = backend.get_auth_status(target="local-lab", portal="custom")
 
@@ -1027,7 +1071,6 @@ def test_get_auth_status_includes_portal_blocker(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_local_lab_rhdh_portal_marked_ready(tmp_path: Path) -> None:
     backend = _InspectableLocalLabBackend(tmp_path)
-    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
 
     auth = backend.get_auth_status(target="local-lab", portal="rhdh")
 
@@ -1075,7 +1118,8 @@ def test_bootstrap_prefers_environment_over_dotenv(
     monkeypatch.setenv("HCP_TERRAFORM_TOKEN", "from-env")
 
     backend = _InspectableLocalLabBackend(tmp_path)
-    auth = backend.get_auth_status(target="local-lab", portal="backstage")
+    # Use gcp (requires HCP token) to verify env takes precedence over dotenv.
+    auth = backend.get_auth_status(target="gcp", portal="backstage")
     tf_token_key = backend.tf_token_env_var_for_test()
 
     assert auth["credential_sources"] == {tf_token_key: "env (from HCP_TERRAFORM_TOKEN)"}
@@ -1289,7 +1333,6 @@ def test_awx_execution_mode_requires_awx_connection_env(
 ) -> None:
     monkeypatch.setenv(EXECUTION_MODE_ENV_VAR, "awx")
     backend = _InspectableLocalLabBackend(tmp_path)
-    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "token"})
 
     auth = backend.get_auth_status(target="local-lab", portal="backstage")
 
