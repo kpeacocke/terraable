@@ -725,6 +725,20 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
 
 
 @pytest.mark.unit
+def test_auth_status_uses_human_friendly_tf_token_blocker(tmp_path: Path) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    tf_token_key = backend.tf_token_env_var_for_test()
+
+    auth = backend.get_auth_status(target="local-lab", portal="backstage")
+
+    assert auth["ready"] is False
+    assert any(
+        f"Terraform Cloud token ({tf_token_key} or HCP_TERRAFORM_TOKEN)" in blocker
+        for blocker in auth["blockers"]
+    )
+
+
+@pytest.mark.unit
 def test_auth_status_blocks_hypervisor_target_when_runtime_unavailable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

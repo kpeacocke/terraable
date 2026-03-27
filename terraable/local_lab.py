@@ -249,7 +249,8 @@ class LocalLabBackend:
 
         blockers: list[str] = []
         if missing:
-            blockers.append(f"missing credentials: {', '.join(display_missing)}")
+            missing_labels = [self._credential_requirement_label(key) for key in missing]
+            blockers.append(f"missing credentials: {', '.join(missing_labels)}")
         if not target_ready:
             supported = ", ".join(sorted(LIVE_EXECUTION_TARGETS))
             blockers.append(
@@ -1483,6 +1484,12 @@ class LocalLabBackend:
 
     def _display_requirement_key(self, key: str) -> str:
         return self._tf_token_env_var() if key == HCP_TOKEN_REQUIREMENT else key
+
+    def _credential_requirement_label(self, key: str) -> str:
+        if key == HCP_TOKEN_REQUIREMENT:
+            tf_key = self._tf_token_env_var()
+            return f"Terraform Cloud token ({tf_key} or HCP_TERRAFORM_TOKEN)"
+        return self._display_requirement_key(key)
 
     def _credential_keys(self) -> tuple[str, ...]:
         return (*CREDENTIAL_KEYS, self._tf_token_env_var())

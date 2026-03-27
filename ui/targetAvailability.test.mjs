@@ -28,10 +28,12 @@ test("falls back to first ready target when selected target unavailable", () => 
     ["aws", "azure", "local-lab"],
   );
 
-  assert.equal(view.fallbackTarget, "local-lab");
+  assert.equal(view.fallbackTarget, "aws");
   assert.equal(view.rows[0].target, "aws");
   assert.equal(view.rows[0].ready, false);
+  assert.equal(view.rows[0].selectable, true);
   assert.match(view.rows[0].reason, /missing credentials/i);
+  assert.match(view.selectedMessage, /needs credentials before actions can run/i);
 });
 
 test("keeps selected target when none are ready and reports blocker reason", () => {
@@ -50,6 +52,27 @@ test("keeps selected target when none are ready and reports blocker reason", () 
   assert.equal(view.fallbackTarget, "aws");
   assert.match(view.selectedMessage, /unavailable/i);
   assert.match(view.selectedMessage, /AWX_HOST must use an https:\/\//i);
+});
+
+test("marks credential-only blockers as selectable", () => {
+  const view = buildTargetAvailability(
+    {
+      "local-lab": {
+        ready: false,
+        blockers: [
+          "missing credentials: Terraform Cloud token (TF_TOKEN_app_terraform_io or HCP_TERRAFORM_TOKEN)",
+        ],
+      },
+      aws: { ready: true, blockers: [] },
+    },
+    "local-lab",
+    ["local-lab", "aws"],
+  );
+
+  const localRow = view.rows.find((r) => r.target === "local-lab");
+  assert.equal(localRow?.ready, false);
+  assert.equal(localRow?.selectable, true);
+  assert.equal(view.fallbackTarget, "local-lab");
 });
 
 test("reports availability-unknown reason when auth entry is missing", () => {

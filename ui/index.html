@@ -752,11 +752,11 @@
       for (const option of options) {
         const row = rowByTarget.get(option.value);
         const isUnknown = row ? !row.known : true;
-        const ready = Boolean(row?.ready);
+        const selectable = Boolean(row?.selectable);
         // Keep selected option enabled so users can inspect requirements.
         // When availability data is missing for a target (unknown), keep it enabled
         // rather than treating it as unavailable.
-        option.disabled = !ready && !isUnknown && option.value !== selectedTarget;
+        option.disabled = !selectable && !isUnknown && option.value !== selectedTarget;
       }
 
       targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}`;
