@@ -1,10 +1,10 @@
-"""
-Tests for demo configuration and service orchestration.
-"""
+"""Tests for demo configuration and service orchestration."""
+
+import subprocess
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError
 
 import pytest
-from unittest.mock import patch, MagicMock
-from urllib.error import HTTPError
 from terraable import demo_config
 from terraable.demo_config import (
     ProvisioningBackend,
@@ -244,19 +244,15 @@ class TestStartService:
     """Test start_service function."""
 
     def test_start_terraform_local_lab_mode(self) -> None:
-        """Test starting terraform in local lab mode (always ready immediately)."""
+        """Test starting terraform in local lab mode via docker compose."""
         apply_profile(DemoProfile.LAB)
-        status = start_service("terraform")
-        # In docker-compose mode with docker socket available, should report
-        # estimated wait time, not immediately ready
-        if not hasattr(status, 'error_message') or not status.error_message:
-            # Docker socket is available
-            assert status.service == "terraform"
-            # Could be ready or have estimated wait, depending on environment
-        else:
-            # Docker socket not available
-            assert status.is_ready is False
-            assert "Docker socket not available" in status.error_message
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run"):
+                status = start_service("terraform")
+
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        assert status.estimated_wait_seconds == 20
 
     def test_start_terraform_offline_mode(self) -> None:
         """Test starting terraform in offline mode (always immediately ready)."""
@@ -289,6 +285,40 @@ class TestStartService:
         assert status.is_ready is False
         assert "Unknown service" in status.error_message
 
+    def test_start_service_orchestration_disabled(self, monkeypatch) -> None:
+        """Test docker-compose service start is blocked when orchestration is disabled."""
+        apply_profile(DemoProfile.LAB)
+        monkeypatch.setenv("TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION", "false")
+        status = start_service("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        assert "orchestration disabled" in (status.error_message or "")
+
+    def test_start_service_docker_cli_missing(self) -> None:
+        """Test service start error when docker CLI is unavailable."""
+        apply_profile(DemoProfile.LAB)
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run", side_effect=FileNotFoundError):
+                status = start_service("terraform")
+
+        assert status.is_ready is False
+        assert status.error_message == "docker CLI is not available"
+
+    def test_start_service_docker_compose_failure(self) -> None:
+        """Test service start error when docker compose command fails."""
+        apply_profile(DemoProfile.LAB)
+        error = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["docker", "compose"],
+            stderr="compose failed",
+        )
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run", side_effect=error):
+                status = start_service("ansible")
+
+        assert status.is_ready is False
+        assert "docker compose failed" in (status.error_message or "")
+
 
 class TestCheckServiceReadiness:
     """Test check_service_readiness function."""
@@ -306,6 +336,17 @@ class TestCheckServiceReadiness:
         status = check_service_readiness("ansible")
         assert status.service == "ansible"
         assert status.is_ready is True
+
+    def test_check_service_readiness_during_startup_window(self, monkeypatch) -> None:
+        """Test docker-compose startup window keeps service not-ready temporarily."""
+        apply_profile(DemoProfile.LAB)
+        monkeypatch.setattr(demo_config, "_service_startup_times", {"terraform": 100.0})
+        with patch("time.time", return_value=110.0):
+            status = check_service_readiness("terraform")
+
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        assert status.estimated_wait_seconds == 10
 
     def test_check_terraform_tfc_no_token(self) -> None:
         """Test terraform TFC with no token configured is not ready."""
@@ -556,42 +597,97 @@ class TestStartServiceDocker:
     def test_start_ansible_docker_compose_mode_with_socket(self) -> None:
         """Test starting ansible in docker-compose mode with socket available."""
         apply_profile(DemoProfile.LAB)
-        
-        with patch("os.path.exists", return_value=True):
-            status = start_service("ansible")
-            assert status.service == "ansible"
-            assert status.is_ready is False
-            # Ansible service estimated wait is 30 seconds
-            assert status.estimated_wait_seconds == 30
+
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run"):
+                status = start_service("ansible")
+
+        assert status.service == "ansible"
+        assert status.is_ready is False
+        # Ansible service estimated wait is 30 seconds
+        assert status.estimated_wait_seconds == 30
 
     def test_start_terraform_docker_compose_mode_with_socket(self) -> None:
         """Test starting terraform in docker-compose mode with socket available."""
         apply_profile(DemoProfile.LAB)
-        
-        with patch("os.path.exists", return_value=True):
-            status = start_service("terraform")
-            assert status.service == "terraform"
-            assert status.is_ready is False
-            # Terraform service estimated wait is 20 seconds
-            assert status.estimated_wait_seconds == 20
+
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run"):
+                status = start_service("terraform")
+
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        # Terraform service estimated wait is 20 seconds
+        assert status.estimated_wait_seconds == 20
+
+    def test_start_service_docker_compose_with_override_file(self) -> None:
+        """Test compose command includes base and override files when both exist."""
+        apply_profile(DemoProfile.LAB)
+
+        def fake_exists(path: str) -> bool:
+            if path in {
+                "/var/run/docker.sock",
+                "/workspace/docker-compose.yml",
+                "/workspace/docker-compose.demo-overrides.yml",
+            }:
+                return True
+            return False
+
+        with patch("os.path.exists", side_effect=fake_exists):
+            with patch("os.getcwd", return_value="/workspace"):
+                with patch("subprocess.run") as run_mock:
+                    status = start_service("ansible")
+
+        assert status.is_ready is False
+        cmd = run_mock.call_args.args[0]
+        assert cmd == [
+            "docker",
+            "compose",
+            "-f",
+            "/workspace/docker-compose.yml",
+            "-f",
+            "/workspace/docker-compose.demo-overrides.yml",
+            "up",
+            "-d",
+            "demo-ansible",
+        ]
+
+    def test_start_service_docker_compose_no_base_file(self) -> None:
+        """Test compose command falls back when workspace compose files are missing."""
+        apply_profile(DemoProfile.LAB)
+
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run") as run_mock:
+                status = start_service("terraform")
+
+        assert status.is_ready is False
+        cmd = run_mock.call_args.args[0]
+        assert cmd == ["docker", "compose", "up", "-d", "demo-terraform"]
 
     def test_start_service_docker_compose_no_socket(self) -> None:
         """Test starting service in docker-compose mode without socket."""
         apply_profile(DemoProfile.LAB)
-        
+
         with patch("os.path.exists", return_value=False):
-            status = start_service("terraform")
-            assert status.service == "terraform"
-            assert status.is_ready is False
-            assert "Docker socket not available" in status.error_message
+            status = start_service("ansible")
+        assert status.service == "ansible"
+        assert status.is_ready is False
+        assert "Docker socket not available" in (status.error_message or "")
 
     def test_start_service_docker_compose_exception(self) -> None:
         """Test starting service in docker-compose mode with exception."""
         apply_profile(DemoProfile.LAB)
-        
+
         # Simulate time.time() raising an exception
-        with patch("time.time", side_effect=Exception("Time error")):
-            status = start_service("terraform")
-            assert status.service == "terraform"
-            assert status.is_ready is False
-            assert "Time error" in status.error_message
+        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+            with patch("subprocess.run"):
+                with patch("time.time", side_effect=Exception("Time error")):
+                    status = start_service("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        assert "Time error" in (status.error_message or "")
+
+    def test_run_compose_up_unknown_service_raises(self) -> None:
+        """Test compose helper rejects unknown service names."""
+        with pytest.raises(ValueError, match="Unknown service"):
+            demo_config._run_compose_up("unknown")

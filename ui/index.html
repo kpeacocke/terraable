@@ -142,6 +142,86 @@
       gap: 8px;
       margin-top: 4px;
     }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0 10px;
+    }
+    .button-row button {
+      flex: 1 1 140px;
+      min-width: 120px;
+      padding: 8px 10px;
+      font-size: 0.77rem;
+      background: #2b2e33;
+      border-color: var(--border);
+      color: var(--ink);
+    }
+    .button-row button:hover {
+      background: #34383e;
+      border-color: #4d5258;
+    }
+    .button-row button.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .readiness-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .readiness-card {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: #1a1c1f;
+      padding: 8px;
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+    }
+    .readiness-card strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #fff;
+      font-size: 0.8rem;
+    }
+    .readiness-card.ok {
+      border-color: var(--ok);
+      background: var(--ok-bg);
+      color: #78c26f;
+    }
+    .readiness-card.warn {
+      border-color: var(--warn);
+      background: var(--warn-bg);
+      color: #f6c447;
+    }
+    .readiness-card.fail {
+      border-color: var(--fail);
+      background: var(--fail-bg);
+      color: #f56d63;
+    }
+    .demo-status {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      min-height: 20px;
+      color: var(--ink-muted);
+    }
+    .demo-status.ok { color: #5ba352; }
+    .demo-status.warn { color: var(--warn); }
+    .demo-status.fail { color: #f56d63; }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--ink-muted);
+    }
+    .checkbox-row input {
+      width: auto;
+      margin: 0;
+    }
     button {
       border: 1px solid var(--accent);
       border-radius: 3px;
@@ -439,6 +519,106 @@
       </article>
 
       <article class="panel">
+        <h2>Demo Configuration</h2>
+        <div class="field">
+          <div style="font-size:0.82rem; margin-bottom:4px; color:var(--ink-muted);">Profile presets</div>
+          <div class="button-row" id="demo-profile-buttons">
+            <button type="button" data-profile="lab" class="active">Lab</button>
+            <button type="button" data-profile="enterprise-mirror">Enterprise mirror</button>
+            <button type="button" data-profile="custom">Custom</button>
+            <button type="button" data-profile="offline-fallback">Offline fallback</button>
+          </div>
+        </div>
+
+        <details class="cred-group" open>
+          <summary>Terraform backend</summary>
+          <div class="field">
+            <label for="demo-tf-backend">Provisioning backend</label>
+            <select id="demo-tf-backend">
+              <option value="terraform-cli">terraform-cli</option>
+              <option value="tfc">tfc</option>
+              <option value="tfe">tfe</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="demo-tf-mode">Connection mode</label>
+            <select id="demo-tf-mode">
+              <option value="docker-compose-service">docker-compose-service</option>
+              <option value="external-endpoint">external-endpoint</option>
+              <option value="offline-mock">offline-mock</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="demo-tf-host">Hostname</label>
+            <input id="demo-tf-host" type="text" autocomplete="off" placeholder="app.terraform.io" />
+          </div>
+          <div class="field">
+            <label for="demo-tf-org">Organisation</label>
+            <input id="demo-tf-org" type="text" autocomplete="off" placeholder="customer-org" />
+          </div>
+          <div class="field">
+            <label for="demo-tf-token">Token (write only)</label>
+            <input id="demo-tf-token" type="password" autocomplete="off" placeholder="Only sent when entered" />
+          </div>
+        </details>
+
+        <details class="cred-group" open>
+          <summary>Ansible backend</summary>
+          <div class="field">
+            <label for="demo-ans-backend">Automation backend</label>
+            <select id="demo-ans-backend">
+              <option value="ansible-cli">ansible-cli</option>
+              <option value="aap">aap</option>
+              <option value="awx">awx</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="demo-ans-mode">Connection mode</label>
+            <select id="demo-ans-mode">
+              <option value="docker-compose-service">docker-compose-service</option>
+              <option value="external-endpoint">external-endpoint</option>
+              <option value="offline-mock">offline-mock</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="demo-ans-host">Hostname</label>
+            <input id="demo-ans-host" type="text" autocomplete="off" placeholder="awx.example.internal" />
+          </div>
+          <div class="field">
+            <label for="demo-ans-user">Username</label>
+            <input id="demo-ans-user" type="text" autocomplete="off" placeholder="admin" />
+          </div>
+          <div class="field">
+            <label for="demo-ans-pass">Password (write only)</label>
+            <input id="demo-ans-pass" type="password" autocomplete="off" placeholder="Only sent when entered" />
+          </div>
+          <label class="checkbox-row" for="demo-ans-skip-verify">
+            <input id="demo-ans-skip-verify" type="checkbox" />
+            Skip TLS certificate verification (demo only)
+          </label>
+        </details>
+
+        <div class="actions">
+          <button id="demo-apply">Apply demo config</button>
+          <button class="secondary" id="demo-refresh">Refresh status</button>
+          <button class="secondary" id="demo-start-terraform">Start Terraform service</button>
+          <button class="secondary" id="demo-start-ansible">Start Ansible service</button>
+        </div>
+
+        <p id="demo-status" class="demo-status warn">Loading demo readiness...</p>
+        <div class="readiness-grid">
+          <div id="demo-tf-readiness" class="readiness-card warn">
+            <strong>Terraform</strong>
+            Waiting for status...
+          </div>
+          <div id="demo-ans-readiness" class="readiness-card warn">
+            <strong>Ansible</strong>
+            Waiting for status...
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
         <h2>Evidence and Status</h2>
         <div style="margin-bottom:10px; font-size:0.8rem; color:var(--ink-muted);">Runtime status</div>
         <output id="runtime-status" aria-live="polite" aria-relevant="additions text" aria-atomic="false" style="display:block; margin-bottom:10px;"></output>
@@ -521,6 +701,21 @@
     const targetAvailabilityListEl = document.getElementById("target-availability-list");
     const targetSelectEl = document.getElementById("target");
     const actionButtons = Array.from(document.querySelectorAll(".actions button"));
+    const demoProfileButtons = Array.from(document.querySelectorAll("#demo-profile-buttons button"));
+    const demoStatusEl = document.getElementById("demo-status");
+    const demoTfReadinessEl = document.getElementById("demo-tf-readiness");
+    const demoAnsReadinessEl = document.getElementById("demo-ans-readiness");
+    const demoTfBackendEl = document.getElementById("demo-tf-backend");
+    const demoTfModeEl = document.getElementById("demo-tf-mode");
+    const demoTfHostEl = document.getElementById("demo-tf-host");
+    const demoTfOrgEl = document.getElementById("demo-tf-org");
+    const demoTfTokenEl = document.getElementById("demo-tf-token");
+    const demoAnsBackendEl = document.getElementById("demo-ans-backend");
+    const demoAnsModeEl = document.getElementById("demo-ans-mode");
+    const demoAnsHostEl = document.getElementById("demo-ans-host");
+    const demoAnsUserEl = document.getElementById("demo-ans-user");
+    const demoAnsPassEl = document.getElementById("demo-ans-pass");
+    const demoAnsSkipVerifyEl = document.getElementById("demo-ans-skip-verify");
 
     const controls = {
       ssh_root_login: false,
@@ -536,6 +731,10 @@
     let apiPostToken = "";
     let pendingAction = false;
     let latestState = {};
+    let demoState = null;
+    let demoPollTimer = null;
+    let demoPollTick = 0;
+    const demoCountdown = { terraform: 0, ansible: 0 };
 
     function applyTargetAvailability() {
       const options = Array.from(targetSelectEl.options);
@@ -866,6 +1065,222 @@
       });
     }
 
+    function setActiveDemoProfile(profile) {
+      demoProfileButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.profile === profile);
+      });
+    }
+
+    function setDemoStatus(message, tone = "warn") {
+      demoStatusEl.textContent = message;
+      demoStatusEl.className = `demo-status ${tone}`;
+    }
+
+    function renderDemoServiceCard(cardEl, label, status, countdownValue) {
+      const isReady = Boolean(status?.is_ready);
+      const hasError = Boolean(status?.error_message);
+      let tone = "warn";
+      if (isReady) {
+        tone = "ok";
+      } else if (hasError) {
+        tone = "fail";
+      }
+      let detail = "Waiting for readiness check";
+
+      if (isReady) {
+        detail = "Ready";
+      } else if (hasError) {
+        detail = status.error_message;
+      } else if (countdownValue > 0) {
+        detail = `Starting, approx ${countdownValue}s remaining`;
+      }
+
+      cardEl.className = `readiness-card ${tone}`;
+      cardEl.innerHTML = `<strong>${label}</strong>${detail}`;
+    }
+
+    function applyDemoFormEnabledState() {
+      const activeProfile = demoState?.configuration?.active_profile || "lab";
+      const isCustom = activeProfile === "custom";
+      const fields = [
+        demoTfBackendEl,
+        demoTfModeEl,
+        demoTfHostEl,
+        demoTfOrgEl,
+        demoAnsBackendEl,
+        demoAnsModeEl,
+        demoAnsHostEl,
+        demoAnsUserEl,
+        demoAnsSkipVerifyEl,
+      ];
+      fields.forEach((field) => {
+        field.disabled = !isCustom;
+      });
+    }
+
+    function applyDemoConfigurationToForm(configuration) {
+      if (!configuration) {
+        return;
+      }
+      demoTfBackendEl.value = configuration.terraform?.backend || "terraform-cli";
+      demoTfModeEl.value = configuration.terraform?.connection_mode || "docker-compose-service";
+      demoTfHostEl.value = configuration.terraform?.hostname || "";
+      demoTfOrgEl.value = configuration.terraform?.organization || "";
+      demoAnsBackendEl.value = configuration.ansible?.backend || "ansible-cli";
+      demoAnsModeEl.value = configuration.ansible?.connection_mode || "docker-compose-service";
+      demoAnsHostEl.value = configuration.ansible?.hostname || "";
+      demoAnsUserEl.value = configuration.ansible?.username || "";
+      demoAnsSkipVerifyEl.checked = Boolean(configuration.ansible?.insecure_skip_verify);
+      setActiveDemoProfile(configuration.active_profile || "lab");
+      applyDemoFormEnabledState();
+    }
+
+    function renderDemoReadiness(readiness) {
+      const tfStatus = readiness?.terraform || {};
+      const ansStatus = readiness?.ansible || {};
+      const allReady = Boolean(readiness?.all_ready);
+
+      renderDemoServiceCard(demoTfReadinessEl, "Terraform", tfStatus, demoCountdown.terraform);
+      renderDemoServiceCard(demoAnsReadinessEl, "Ansible", ansStatus, demoCountdown.ansible);
+
+      if (allReady) {
+        setDemoStatus("All configured services are available. Demo path is green.", "ok");
+        if (demoPollTimer) {
+          clearInterval(demoPollTimer);
+          demoPollTimer = null;
+        }
+        return;
+      }
+
+      const tfError = tfStatus?.error_message;
+      const ansError = ansStatus?.error_message;
+      if (tfError || ansError) {
+        const combined = [tfError, ansError].filter(Boolean).join(" | ");
+        setDemoStatus(`Service check failed: ${combined}`, "fail");
+      } else {
+        setDemoStatus("Waiting for required services to become available...", "warn");
+      }
+    }
+
+    function renderDemoPanel(payload) {
+      demoState = payload || demoState;
+      if (!demoState) {
+        setDemoStatus("Unable to load demo status", "fail");
+        return;
+      }
+      applyDemoConfigurationToForm(demoState.configuration);
+      renderDemoReadiness(demoState.readiness);
+    }
+
+    function collectDemoPayload() {
+      const payload = {
+        profile: "custom",
+        terraform: {
+          backend: demoTfBackendEl.value,
+          connection_mode: demoTfModeEl.value,
+          hostname: demoTfHostEl.value.trim() || null,
+          organization: demoTfOrgEl.value.trim() || null,
+        },
+        ansible: {
+          backend: demoAnsBackendEl.value,
+          connection_mode: demoAnsModeEl.value,
+          hostname: demoAnsHostEl.value.trim() || null,
+          username: demoAnsUserEl.value.trim() || null,
+          insecure_skip_verify: demoAnsSkipVerifyEl.checked,
+        },
+      };
+
+      const tfToken = demoTfTokenEl.value.trim();
+      if (tfToken) {
+        payload.terraform.token = tfToken;
+      }
+      const ansPass = demoAnsPassEl.value.trim();
+      if (ansPass) {
+        payload.ansible.password = ansPass;
+      }
+
+      return payload;
+    }
+
+    async function refreshDemoStatus() {
+      const payload = await api("/api/demo/status");
+      renderDemoPanel(payload);
+    }
+
+    async function configureDemoProfile(profile) {
+      const payload = await api("/api/demo/configure", { profile });
+      demoTfTokenEl.value = "";
+      demoAnsPassEl.value = "";
+      renderDemoPanel(payload);
+    }
+
+    async function applyCustomDemoConfiguration() {
+      const payload = await api("/api/demo/configure", collectDemoPayload());
+      demoTfTokenEl.value = "";
+      demoAnsPassEl.value = "";
+      renderDemoPanel(payload);
+    }
+
+    async function pollDemoReadiness() {
+      try {
+        demoPollTick += 1;
+        demoCountdown.terraform = Math.max(0, demoCountdown.terraform - 1);
+        demoCountdown.ansible = Math.max(0, demoCountdown.ansible - 1);
+
+        if (demoPollTick % 3 === 0) {
+          const [terraform, ansible] = await Promise.all([
+            api("/api/demo/service-ready/terraform", {}),
+            api("/api/demo/service-ready/ansible", {}),
+          ]);
+
+          const readiness = {
+            terraform: {
+              is_ready: terraform.is_ready,
+              error_message: terraform.error_message || null,
+            },
+            ansible: {
+              is_ready: ansible.is_ready,
+              error_message: ansible.error_message || null,
+            },
+          };
+          readiness.all_ready = readiness.terraform.is_ready && readiness.ansible.is_ready;
+          renderDemoReadiness(readiness);
+        } else {
+          renderDemoReadiness(demoState?.readiness || {});
+        }
+      } catch (error) {
+        setDemoStatus(`Readiness polling error: ${String(error)}`, "fail");
+      }
+    }
+
+    async function startDemoService(service) {
+      const response = await api(`/api/demo/start-service/${service}`, {});
+      if (response.estimated_wait_seconds) {
+        demoCountdown[service] = Number(response.estimated_wait_seconds);
+      }
+
+      if (response.error_message) {
+        setDemoStatus(`${service} service start failed: ${response.error_message}`, "fail");
+      } else if (response.is_ready) {
+        setDemoStatus(`${service} service is ready.`, "ok");
+      } else {
+        setDemoStatus(
+          `${service} service started. Waiting for readiness (${demoCountdown[service]}s estimate).`,
+          "warn"
+        );
+      }
+
+      demoPollTick = 0;
+      if (!demoPollTimer) {
+        demoPollTimer = setInterval(() => {
+          pollDemoReadiness().catch((error) => {
+            setDemoStatus(`Readiness polling error: ${String(error)}`, "fail");
+          });
+        }, 1000);
+      }
+      await pollDemoReadiness();
+    }
+
     function renderAuthStatus() {
       const selectedTarget = selected("target");
       const selectedPortal = selected("portal");
@@ -1162,6 +1577,74 @@
       }
     });
 
+    demoProfileButtons.forEach((button) => {
+      button.addEventListener("click", async function() {
+        const profile = this.dataset.profile || "lab";
+        try {
+          await configureDemoProfile(profile);
+        } catch (error) {
+          setDemoStatus(`Unable to apply profile: ${String(error)}`, "fail");
+        }
+      });
+    });
+
+    document.getElementById("demo-apply").addEventListener("click", async function() {
+      const original = this.textContent;
+      this.disabled = true;
+      this.textContent = "Applying...";
+      try {
+        await applyCustomDemoConfiguration();
+        setDemoStatus("Custom demo configuration applied.", "ok");
+      } catch (error) {
+        setDemoStatus(`Unable to apply custom configuration: ${String(error)}`, "fail");
+      } finally {
+        this.textContent = original;
+        this.disabled = false;
+      }
+    });
+
+    document.getElementById("demo-refresh").addEventListener("click", async function() {
+      const original = this.textContent;
+      this.disabled = true;
+      this.textContent = "Refreshing...";
+      try {
+        await refreshDemoStatus();
+      } catch (error) {
+        setDemoStatus(`Unable to refresh demo status: ${String(error)}`, "fail");
+      } finally {
+        this.textContent = original;
+        this.disabled = false;
+      }
+    });
+
+    document.getElementById("demo-start-terraform").addEventListener("click", async function() {
+      const original = this.textContent;
+      this.disabled = true;
+      this.textContent = "Starting...";
+      try {
+        await startDemoService("terraform");
+      } catch (error) {
+        setDemoStatus(`Unable to start Terraform service: ${String(error)}`, "fail");
+      } finally {
+        this.textContent = original;
+        this.disabled = false;
+      }
+    });
+
+    document.getElementById("demo-start-ansible").addEventListener("click", async function() {
+      const original = this.textContent;
+      this.disabled = true;
+      this.textContent = "Starting...";
+      try {
+        await startDemoService("ansible");
+      } catch (error) {
+        setDemoStatus(`Unable to start Ansible service: ${String(error)}`, "fail");
+      } finally {
+        this.textContent = original;
+        this.disabled = false;
+      }
+    });
+
     document.getElementById("target").addEventListener("change", async () => {
       syncCredentialGroups(selected("target"));
       applyTargetAvailability();
@@ -1193,6 +1676,11 @@
       await refreshAuthMatrix();
     } catch (error) {
       console.error("Failed to refresh auth matrix during startup:", error);
+    }
+    try {
+      await refreshDemoStatus();
+    } catch (error) {
+      setDemoStatus(`Unable to load demo status: ${String(error)}`, "fail");
     }
   </script>
 </body>

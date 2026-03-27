@@ -9,6 +9,7 @@ from email.message import Message
 from pathlib import Path
 from typing import Any, cast
 from urllib.error import HTTPError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import pytest
@@ -1058,3 +1059,84 @@ def test_make_handler_generates_random_token_when_env_unset(
     token = handler.api_post_token  # type: ignore[attr-defined]
     assert token
     assert token != "terraable-local-token"
+
+
+@pytest.mark.unit
+def test_handle_demo_request_rejects_unknown_demo_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.headers = _headers({"Content-Length": "2"})
+    handler.rfile = io.BytesIO(b"{}")
+    sent_errors: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        sent_errors.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    cast(Any, handler)._handle_demo_request(urlparse("/api/demo/unknown"))
+
+    assert sent_errors == [(404, "")]
+
+
+@pytest.mark.unit
+def test_safe_post_request_rejects_non_local_origin_host() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.client_address = ("127.0.0.1", 12345)
+    handler.headers = _headers(
+        {
+            "Origin": "https://evil.example",
+            "X-Terraable-Token": "terraable-local-token",
+        }
+    )
+    handler.api_post_token = "terraable-local-token"
+    called: list[tuple[int, str]] = []
+
+    def fake_send_error(code: int, message: str = "") -> None:
+        called.append((code, message))
+
+    handler.send_error = fake_send_error  # type: ignore[assignment]
+
+    allowed = cast(Any, handler)._require_safe_post_request()
+
+    assert allowed is False
+    assert called == [(403, "POST origin must be localhost")]
+
+
+@pytest.mark.unit
+def test_private_host_helper_handles_private_and_invalid_hosts() -> None:
+    h = cast(Any, api_server.TerraableRequestHandler)
+
+    assert h._is_private_host("10.0.0.5") is True
+    assert h._is_private_host("localhost") is False
+    assert h._is_private_host(":not-an-ip") is False
+
+
+@pytest.mark.unit
+def test_trusted_local_request_accepts_private_client_with_loopback_origin() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = _headers({"Origin": "http://localhost:8888"})
+
+    trusted = cast(Any, handler)._is_trusted_local_request("172.17.0.2")
+
+    assert trusted is True
+
+
+@pytest.mark.unit
+def test_trusted_local_request_rejects_private_client_with_remote_origin() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = _headers({"Origin": "https://evil.example"})
+
+    trusted = cast(Any, handler)._is_trusted_local_request("172.17.0.2")
+
+    assert trusted is False
+
+
+@pytest.mark.unit
+def test_trusted_local_request_rejects_private_client_with_hostless_origin() -> None:
+    handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
+    handler.headers = _headers({"Origin": "file:///tmp/index.html"})
+
+    trusted = cast(Any, handler)._is_trusted_local_request("172.17.0.2")
+
+    assert trusted is False

@@ -5,7 +5,6 @@ Manages multi-backend demo setup including provisioning/automation backend
 selection, connection modes, and service lifecycle orchestration.
 """
 
-import json
 import os
 import subprocess
 import time
@@ -116,6 +115,57 @@ class ServiceReadinessStatus:
 # Global demo configuration state
 _demo_config: DemoConfiguration = DemoConfiguration()
 _service_startup_times: Dict[str, float] = {}  # Track when services were started
+_docker_service_names: Dict[str, str] = {
+    "terraform": "demo-terraform",
+    "ansible": "demo-ansible",
+}
+_estimated_wait_seconds: Dict[str, int] = {
+    "terraform": 20,
+    "ansible": 30,
+}
+
+
+def _is_orchestration_enabled() -> bool:
+    """Return True when docker orchestration is enabled via environment."""
+    value = os.getenv("TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION", "true")
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _workspace_root() -> str:
+    """Return workspace root used for compose file resolution."""
+    return os.getenv("TERRAABLE_WORKSPACE_ROOT", os.getcwd())
+
+
+def _compose_files() -> list[str]:
+    """Build docker compose file list in deterministic order."""
+    root = _workspace_root()
+    files: list[str] = []
+    base = os.path.join(root, "docker-compose.yml")
+    override = os.path.join(root, "docker-compose.demo-overrides.yml")
+
+    if os.path.exists(base):
+        files.append(base)
+    if os.path.exists(override):
+        files.append(override)
+    return files
+
+
+def _service_wait_seconds(service: str) -> int:
+    return _estimated_wait_seconds.get(service, 0)
+
+
+def _run_compose_up(service: str) -> None:
+    """Run docker compose up for the mapped demo service."""
+    service_name = _docker_service_names.get(service)
+    if not service_name:
+        raise ValueError(f"Unknown service: {service}")
+
+    cmd = ["docker", "compose"]
+    for compose_file in _compose_files():
+        cmd.extend(["-f", compose_file])
+    cmd.extend(["up", "-d", service_name])
+
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
 def get_demo_config() -> DemoConfiguration:
@@ -132,6 +182,7 @@ def set_demo_config(config: DemoConfiguration) -> None:
 def apply_profile(profile: DemoProfile) -> None:
     """Apply a preset demo profile."""
     global _demo_config
+    _service_startup_times.clear()
 
     if profile == DemoProfile.LAB:
         _demo_config = DemoConfiguration(
@@ -206,15 +257,16 @@ def start_service(service: str) -> ServiceReadinessStatus:
             estimated_wait_seconds=0,
         )
 
+    if not _is_orchestration_enabled():
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message="Demo orchestration disabled via environment",
+            estimated_wait_seconds=0,
+        )
+
     # For docker-compose mode, attempt to start the service
     try:
-        # Record start time for this service
-        _service_startup_times[service] = time.time()
-
-        # Build docker compose command
-        # In a real implementation, this would call docker compose with a profile or override file
-        cmd = ["docker", "compose", "up", "-d", f"demo-{service}"]
-
         # Check if we're in a container with docker socket available
         docker_sock_available = os.path.exists("/var/run/docker.sock")
         if not docker_sock_available:
@@ -225,13 +277,33 @@ def start_service(service: str) -> ServiceReadinessStatus:
                 estimated_wait_seconds=0,
             )
 
+        _run_compose_up(service)
+
+        # Record start time only after compose startup succeeds.
+        _service_startup_times[service] = time.time()
+
         # Estimate wait time based on service type
-        estimated_wait = 30 if service == "ansible" else 20
+        estimated_wait = _service_wait_seconds(service)
 
         return ServiceReadinessStatus(
             service=service,
             is_ready=False,
             estimated_wait_seconds=estimated_wait,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip()
+        stdout = (e.stdout or "").strip()
+        detail = stderr or stdout or str(e)
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message=f"docker compose failed: {detail}",
+        )
+    except FileNotFoundError:
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message="docker CLI is not available",
         )
     except Exception as e:
         return ServiceReadinessStatus(
@@ -252,6 +324,26 @@ def check_service_readiness(service: str) -> ServiceReadinessStatus:
         ServiceReadinessStatus with current readiness state.
     """
     config = _demo_config
+
+    if service == "terraform":
+        connection_mode = config.terraform.connection_mode
+    elif service == "ansible":
+        connection_mode = config.ansible.connection_mode
+    else:
+        connection_mode = None
+
+    if (
+        connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
+        and service in _service_startup_times
+    ):
+        elapsed = max(0.0, time.time() - _service_startup_times[service])
+        wait_seconds = _service_wait_seconds(service)
+        if elapsed < wait_seconds:
+            return ServiceReadinessStatus(
+                service=service,
+                is_ready=False,
+                estimated_wait_seconds=max(0, wait_seconds - int(elapsed)),
+            )
 
     if service == "terraform":
         tf_config = config.terraform

@@ -21,7 +21,10 @@ The default compose configuration uses these effective inputs:
 - `TF_LOG_PATH=/workspace/.terraable/terraform.log`
 - `ANSIBLE_VERBOSITY=0`
 - `ANSIBLE_HOST_KEY_CHECKING=True`
+- `TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION=true`
 - Optional credentials via `HCP_TERRAFORM_TOKEN` or `TF_TOKEN_app_terraform_io`
+
+Demo service lifecycle helpers also use `docker-compose.demo-overrides.yml` when present. This file defines placeholder `demo-terraform` and `demo-ansible` services so the UI can trigger deterministic startup flows for demo storytelling.
 
 Runtime data is written under the repo root bind mounts:
 
@@ -82,6 +85,24 @@ TF_LOG=DEBUG docker compose up
 
 # Provide HCP Terraform credentials
 HCP_TERRAFORM_TOKEN=xxxx docker compose up
+
+# Disable demo service orchestration (UI still works, start-service will be blocked)
+TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION=false docker compose up
+```
+
+### Start demo helper services
+
+When you need to demonstrate explicit service startup actions from the UI:
+
+```bash
+# Start only the demo Terraform helper
+docker compose -f docker-compose.yml -f docker-compose.demo-overrides.yml up -d demo-terraform
+
+# Start only the demo Ansible helper
+docker compose -f docker-compose.yml -f docker-compose.demo-overrides.yml up -d demo-ansible
+
+# Stop helper services
+docker compose -f docker-compose.yml -f docker-compose.demo-overrides.yml stop demo-terraform demo-ansible
 ```
 
 ### Persistent Configuration
