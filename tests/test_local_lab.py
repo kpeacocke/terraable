@@ -391,7 +391,16 @@ def test_non_local_target_is_rejected_until_provider_path_exists(tmp_path: Path)
 def test_live_virtualisation_targets_are_executable(
     target: str,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("TERRAABLE_ALLOW_CONTAINER_HYPERVISOR_TARGETS", "true")
+    marker_by_target = {
+        "vmware": ("VMWARE_VERSION", "17"),
+        "parallels": ("PARALLELS_VM_NAME", "demo-vm"),
+        "hyper-v": ("WSL_DISTRO_NAME", "Ubuntu"),
+    }
+    marker_key, marker_value = marker_by_target[target]
+    monkeypatch.setenv(marker_key, marker_value)
     (tmp_path / ".env").write_text("HCP_TERRAFORM_TOKEN=test-token\n", encoding="utf-8")
     backend = _FakeLocalLabBackend(tmp_path)
 
@@ -713,6 +722,60 @@ def test_auth_status_marks_missing_and_unsupported_target(tmp_path: Path) -> Non
         blocker.startswith("target=aws is not executable in live mode; supported live targets:")
         for blocker in auth["blockers"]
     )
+
+
+@pytest.mark.unit
+def test_auth_status_blocks_hypervisor_target_when_runtime_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+
+    monkeypatch.setattr(
+        "terraable.local_lab.runtime_target_availability",
+        lambda: {
+            "local-lab": {"available": True, "reason": "local-lab is executable"},
+            "vmware": {
+                "available": False,
+                "reason": "container runtime detected; host hypervisor substrate is unavailable from this runtime",
+            },
+            "parallels": {"available": False, "reason": "not available"},
+            "hyper-v": {"available": False, "reason": "not available"},
+            "gcp": {"available": True, "reason": "ok"},
+        },
+    )
+
+    auth = backend.get_auth_status(target="vmware", portal="backstage")
+
+    assert auth["authenticated"] is True
+    assert auth["ready"] is False
+    assert any("container runtime detected" in blocker for blocker in auth["blockers"])
+
+
+@pytest.mark.unit
+def test_auth_status_allows_hypervisor_target_when_runtime_available(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = _InspectableLocalLabBackend(tmp_path)
+    backend.configure_credentials({"HCP_TERRAFORM_TOKEN": "from-ui"})
+
+    monkeypatch.setattr(
+        "terraable.local_lab.runtime_target_availability",
+        lambda: {
+            "local-lab": {"available": True, "reason": "local-lab is executable"},
+            "vmware": {"available": True, "reason": "detected local substrate for vmware"},
+            "parallels": {"available": True, "reason": "detected local substrate for parallels"},
+            "hyper-v": {"available": True, "reason": "detected local substrate for hyper-v"},
+            "gcp": {"available": True, "reason": "ok"},
+        },
+    )
+
+    auth = backend.get_auth_status(target="vmware", portal="backstage")
+
+    assert auth["authenticated"] is True
+    assert auth["ready"] is True
 
 
 @pytest.mark.unit

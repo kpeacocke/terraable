@@ -1,3 +1,4 @@
+from . import demo_config
 from .contract import (
     ConnectionDetails,
     HandoffPayload,
@@ -29,6 +30,7 @@ __all__ = [
     "TargetPlatform",
     "__version__",
     "build_handoff_payload",
+    "demo_config",
     "detect_local_target",
     "validate_target_combination",
 ]

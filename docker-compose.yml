@@ -23,6 +23,16 @@ services:
       - HCP_TERRAFORM_TOKEN=${HCP_TERRAFORM_TOKEN:-}
       - TF_TOKEN_app_terraform_io=${TF_TOKEN_app_terraform_io:-}
 
+      # Demo configuration and orchestration
+      - TERRAABLE_PROVISIONING_BACKEND=${TERRAABLE_PROVISIONING_BACKEND:-terraform-cli}
+      - TERRAABLE_AUTOMATION_BACKEND=${TERRAABLE_AUTOMATION_BACKEND:-ansible-cli}
+      - TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION=${TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION:-true}
+      - TERRAABLE_TFC_HOSTNAME=${TERRAABLE_TFC_HOSTNAME:-app.terraform.io}
+      - TERRAABLE_TFC_ORGANIZATION=${TERRAABLE_TFC_ORGANIZATION:-}
+      - TERRAABLE_AWX_HOST=${TERRAABLE_AWX_HOST:-}
+      - TERRAABLE_AWX_USERNAME=${TERRAABLE_AWX_USERNAME:-}
+      - TERRAABLE_AWX_PASSWORD=${TERRAABLE_AWX_PASSWORD:-}
+
     volumes:
       # Project root for workspace access
       - .:/workspace:delegated
@@ -38,6 +48,9 @@ services:
 
       # UI files
       - ./ui:/workspace/ui:ro
+
+      # Docker socket for demo service orchestration
+      - /var/run/docker.sock:/var/run/docker.sock
 
     working_dir: /workspace
 

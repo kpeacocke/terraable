@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import ParseResult, parse_qs, urlparse
 
+from . import demo_config
 from .local_lab import LocalLabBackend  # kept for test monkeypatching
 
 
@@ -117,6 +118,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             "/api/auth/status": lambda: self._handle_auth_status(parsed),
             "/api/auth/matrix": lambda: self._handle_auth_matrix(parsed),
             "/api/session": lambda: self._handle_session(),
+            "/api/demo/status": lambda: self._handle_demo_status(),
             "/healthz": lambda: self._send_json({"status": "ok"}),
         }
         handler = simple_routes.get(parsed.path)
@@ -193,10 +195,123 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
     def _handle_session(self) -> None:
         """Handle GET /api/session request with loopback restriction."""
         client_host = self.client_address[0] if self.client_address else ""
-        if not self._is_loopback_host(client_host):
+        if not self._is_trusted_local_request(client_host):
             self.send_error(HTTPStatus.FORBIDDEN, "Session token access restricted to localhost")
             return
         self._send_json({"post_token": self.api_post_token})
+
+    def _handle_demo_status(self) -> None:
+        """Handle GET /api/demo/status request."""
+        config = demo_config.get_demo_config()
+        readiness = demo_config.get_overall_readiness()
+        response = {
+            "configuration": config.to_dict(),
+            "readiness": readiness,
+        }
+        self._send_json(response)
+
+    def _handle_demo_request(self, parsed: ParseResult) -> None:
+        """Handle demo configuration POST requests."""
+        try:
+            payload = self._read_json_payload()
+            path_parts = parsed.path.split("/")
+
+            if len(path_parts) >= 4 and path_parts[3] == "configure":
+                # POST /api/demo/configure
+                # Payload: { "profile": "lab|enterprise-mirror|custom|offline-fallback", ... }
+                profile_name = payload.get("profile", "lab")
+                try:
+                    profile = demo_config.DemoProfile(profile_name)
+                except ValueError:
+                    profile = demo_config.DemoProfile.LAB
+
+                demo_config.apply_profile(profile)
+
+                # Merge any custom configuration
+                if profile == demo_config.DemoProfile.CUSTOM:
+                    config = demo_config.get_demo_config()
+
+                    # Update Terraform config if provided
+                    if "terraform" in payload:
+                        tf_updates = payload["terraform"]
+                        if "backend" in tf_updates:
+                            config.terraform.backend = demo_config.ProvisioningBackend(
+                                tf_updates["backend"]
+                            )
+                        if "connection_mode" in tf_updates:
+                            config.terraform.connection_mode = demo_config.ConnectionMode(
+                                tf_updates["connection_mode"]
+                            )
+                        if "hostname" in tf_updates:
+                            config.terraform.hostname = tf_updates["hostname"]
+                        if "token" in tf_updates:
+                            config.terraform.token = tf_updates["token"]
+                        if "organization" in tf_updates:
+                            config.terraform.organization = tf_updates["organization"]
+
+                    # Update Ansible config if provided
+                    if "ansible" in payload:
+                        ans_updates = payload["ansible"]
+                        if "backend" in ans_updates:
+                            config.ansible.backend = demo_config.AutomationBackend(
+                                ans_updates["backend"]
+                            )
+                        if "connection_mode" in ans_updates:
+                            config.ansible.connection_mode = demo_config.ConnectionMode(
+                                ans_updates["connection_mode"]
+                            )
+                        if "hostname" in ans_updates:
+                            config.ansible.hostname = ans_updates["hostname"]
+                        if "username" in ans_updates:
+                            config.ansible.username = ans_updates["username"]
+                        if "password" in ans_updates:
+                            config.ansible.password = ans_updates["password"]
+                        if "insecure_skip_verify" in ans_updates:
+                            config.ansible.insecure_skip_verify = bool(
+                                ans_updates["insecure_skip_verify"]
+                            )
+
+                    demo_config.set_demo_config(config)
+
+                config = demo_config.get_demo_config()
+                readiness = demo_config.get_overall_readiness()
+                self._send_json(
+                    {
+                        "configuration": config.to_dict(),
+                        "readiness": readiness,
+                    }
+                )
+
+            elif len(path_parts) >= 5 and path_parts[3] == "start-service":
+                # POST /api/demo/start-service/<service>
+                service = path_parts[4]
+                status = demo_config.start_service(service)
+                self._send_json(
+                    {
+                        "service": status.service,
+                        "is_ready": status.is_ready,
+                        "error_message": status.error_message,
+                        "estimated_wait_seconds": status.estimated_wait_seconds,
+                    }
+                )
+
+            elif len(path_parts) >= 5 and path_parts[3] == "service-ready":
+                # POST /api/demo/service-ready/<service>
+                service = path_parts[4]
+                status = demo_config.check_service_readiness(service)
+                self._send_json(
+                    {
+                        "service": status.service,
+                        "is_ready": status.is_ready,
+                        "error_message": status.error_message,
+                    }
+                )
+
+            else:
+                self.send_error(HTTPStatus.NOT_FOUND)
+
+        except Exception as exc:
+            self.send_error(HTTPStatus.BAD_REQUEST, str(exc))
 
     def do_POST(self) -> None:
         if not self._require_safe_post_request():
@@ -204,6 +319,9 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/auth/configure":
             self._handle_auth_configure()
+            return
+        if parsed.path.startswith("/api/demo/"):
+            self._handle_demo_request(parsed)
             return
         if not parsed.path.startswith("/api/actions/"):
             self.send_error(HTTPStatus.NOT_FOUND)
@@ -263,7 +381,7 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
 
     def _require_safe_post_request(self) -> bool:
         client_host = self.client_address[0] if self.client_address else ""
-        if not self._is_loopback_host(client_host):
+        if not self._is_trusted_local_request(client_host):
             self.send_error(HTTPStatus.FORBIDDEN, "POST access restricted to localhost")
             return False
 
@@ -299,6 +417,33 @@ class TerraableRequestHandler(BaseHTTPRequestHandler):
             return ipaddress.ip_address(hostname).is_loopback
         except ValueError:
             return False
+
+    @staticmethod
+    def _is_private_host(hostname: str) -> bool:
+        if hostname in {"", "localhost"}:
+            return False
+        try:
+            return ipaddress.ip_address(hostname).is_private
+        except ValueError:
+            return False
+
+    def _is_trusted_local_request(self, client_host: str) -> bool:
+        if self._is_loopback_host(client_host):
+            return True
+
+        # Docker/compose port forwarding can present the host as a private bridge IP.
+        # Accept only when the browser origin/referer remains loopback.
+        headers = getattr(self, "headers", None)
+        origin = None
+        if headers is not None:
+            origin = headers.get("Origin") or headers.get("Referer")
+        if not origin or origin.strip().lower() == "null":
+            return False
+        parsed_origin = urlparse(origin)
+        origin_host = parsed_origin.hostname
+        if not origin_host:
+            return False
+        return self._is_private_host(client_host) and self._is_loopback_host(origin_host)
 
     def _dispatch_action(
         self,

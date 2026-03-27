@@ -19,7 +19,7 @@ from urllib.request import Request, urlopen
 
 from .contract import build_handoff_payload
 from .hcp_terraform import TFC_HOSTNAME_ENV_VAR, hostname_to_token_env_var
-from .local_detect import detect_local_target
+from .local_detect import detect_local_target, runtime_target_availability
 from .orchestrator import ActionName, ActionStatus
 
 DRIFT_SERVICE_PLAYBOOK = "playbooks/drift_service_health.yml"
@@ -255,6 +255,10 @@ class LocalLabBackend:
             blockers.append(
                 f"target={target} is not executable in live mode; supported live targets: {supported}"
             )
+        capability = runtime_target_availability().get(target)
+        if capability and not bool(capability.get("available", False)):
+            blockers.append(str(capability.get("reason", "target runtime prerequisites not met")))
+            ready = False
         if not portal_ready:
             blockers.append(f"portal={portal} is not supported")
         if self._execution_mode == "awx":

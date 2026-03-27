@@ -33,13 +33,14 @@ ARG TARGETARCH=amd64
 
 WORKDIR /workspace
 
-# Install runtime dependencies and Terraform CLI
+# Install runtime dependencies, Docker CLI, and Terraform CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
     curl \
     ca-certificates \
     unzip \
+    docker.io \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -s /bin/bash terraable \
     && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TARGETARCH}.zip" -o /tmp/terraform.zip \

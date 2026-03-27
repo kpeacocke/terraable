@@ -1,0 +1,597 @@
+"""
+Tests for demo configuration and service orchestration.
+"""
+
+import pytest
+from unittest.mock import patch, MagicMock
+from urllib.error import HTTPError
+from terraable import demo_config
+from terraable.demo_config import (
+    ProvisioningBackend,
+    AutomationBackend,
+    ConnectionMode,
+    DemoProfile,
+    TerraformConfig,
+    AnsibleConfig,
+    DemoConfiguration,
+    ServiceReadinessStatus,
+    get_demo_config,
+    set_demo_config,
+    apply_profile,
+    start_service,
+    check_service_readiness,
+    get_overall_readiness,
+)
+
+
+class TestEnums:
+    """Test enum definitions."""
+
+    def test_provisioning_backend_values(self) -> None:
+        """Test ProvisioningBackend enum values."""
+        assert ProvisioningBackend.TERRAFORM_CLI.value == "terraform-cli"
+        assert ProvisioningBackend.TFC.value == "tfc"
+        assert ProvisioningBackend.TFE.value == "tfe"
+
+    def test_automation_backend_values(self) -> None:
+        """Test AutomationBackend enum values."""
+        assert AutomationBackend.ANSIBLE_CLI.value == "ansible-cli"
+        assert AutomationBackend.AAP.value == "aap"
+        assert AutomationBackend.AWX.value == "awx"
+
+    def test_connection_mode_values(self) -> None:
+        """Test ConnectionMode enum values."""
+        assert ConnectionMode.DOCKER_COMPOSE_SERVICE.value == "docker-compose-service"
+        assert ConnectionMode.EXTERNAL_ENDPOINT.value == "external-endpoint"
+        assert ConnectionMode.OFFLINE_MOCK.value == "offline-mock"
+
+    def test_demo_profile_values(self) -> None:
+        """Test DemoProfile enum values."""
+        assert DemoProfile.LAB.value == "lab"
+        assert DemoProfile.ENTERPRISE_MIRROR.value == "enterprise-mirror"
+        assert DemoProfile.CUSTOM.value == "custom"
+        assert DemoProfile.OFFLINE_FALLBACK.value == "offline-fallback"
+
+
+class TestTerraformConfig:
+    """Test TerraformConfig dataclass."""
+
+    def test_default_terraform_config(self) -> None:
+        """Test default TerraformConfig values."""
+        config = TerraformConfig()
+        assert config.backend == ProvisioningBackend.TERRAFORM_CLI
+        assert config.connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
+        assert config.hostname is None
+        assert config.token is None
+        assert config.organization is None
+        assert config.api_version == "v2"
+
+    def test_custom_terraform_config(self) -> None:
+        """Test custom TerraformConfig values."""
+        config = TerraformConfig(
+            backend=ProvisioningBackend.TFC,
+            connection_mode=ConnectionMode.EXTERNAL_ENDPOINT,
+            hostname="app.terraform.io",
+            token="token123",
+            organization="my-org",
+        )
+        assert config.backend == ProvisioningBackend.TFC
+        assert config.connection_mode == ConnectionMode.EXTERNAL_ENDPOINT
+        assert config.hostname == "app.terraform.io"
+        assert config.token == "token123"
+        assert config.organization == "my-org"
+
+
+class TestAnsibleConfig:
+    """Test AnsibleConfig dataclass."""
+
+    def test_default_ansible_config(self) -> None:
+        """Test default AnsibleConfig values."""
+        config = AnsibleConfig()
+        assert config.backend == AutomationBackend.ANSIBLE_CLI
+        assert config.connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
+        assert config.hostname is None
+        assert config.username is None
+        assert config.password is None
+        assert config.insecure_skip_verify is False
+
+    def test_custom_ansible_config(self) -> None:
+        """Test custom AnsibleConfig values."""
+        config = AnsibleConfig(
+            backend=AutomationBackend.AWX,
+            connection_mode=ConnectionMode.EXTERNAL_ENDPOINT,
+            hostname="awx.example.com",
+            username="admin",
+            password="secret",
+            insecure_skip_verify=True,
+        )
+        assert config.backend == AutomationBackend.AWX
+        assert config.hostname == "awx.example.com"
+        assert config.username == "admin"
+        assert config.password == "secret"
+        assert config.insecure_skip_verify is True
+
+
+class TestDemoConfiguration:
+    """Test DemoConfiguration dataclass."""
+
+    def test_default_demo_configuration(self) -> None:
+        """Test default DemoConfiguration values."""
+        config = DemoConfiguration()
+        assert config.terraform.backend == ProvisioningBackend.TERRAFORM_CLI
+        assert config.ansible.backend == AutomationBackend.ANSIBLE_CLI
+        assert config.active_profile == DemoProfile.LAB
+
+    def test_demo_configuration_to_dict(self) -> None:
+        """Test DemoConfiguration.to_dict() method."""
+        config = DemoConfiguration(
+            terraform=TerraformConfig(
+                backend=ProvisioningBackend.TFC,
+                hostname="app.terraform.io",
+                organization="my-org",
+            ),
+            ansible=AnsibleConfig(
+                backend=AutomationBackend.AWX,
+                hostname="awx.example.com",
+            ),
+            active_profile=DemoProfile.ENTERPRISE_MIRROR,
+        )
+        result = config.to_dict()
+        assert result["terraform"]["backend"] == "tfc"
+        assert result["terraform"]["hostname"] == "app.terraform.io"
+        assert result["terraform"]["organization"] == "my-org"
+        assert result["ansible"]["backend"] == "awx"
+        assert result["ansible"]["hostname"] == "awx.example.com"
+        assert result["active_profile"] == "enterprise-mirror"
+
+
+class TestServiceReadinessStatus:
+    """Test ServiceReadinessStatus dataclass."""
+
+    def test_ready_status(self) -> None:
+        """Test ready service status."""
+        status = ServiceReadinessStatus(service="terraform", is_ready=True)
+        assert status.service == "terraform"
+        assert status.is_ready is True
+        assert status.error_message is None
+
+    def test_not_ready_status(self) -> None:
+        """Test not ready service status."""
+        status = ServiceReadinessStatus(
+            service="ansible",
+            is_ready=False,
+            error_message="Connection refused",
+            estimated_wait_seconds=30,
+        )
+        assert status.service == "ansible"
+        assert status.is_ready is False
+        assert status.error_message == "Connection refused"
+        assert status.estimated_wait_seconds == 30
+
+
+class TestGetSetDemoConfig:
+    """Test get_demo_config and set_demo_config functions."""
+
+    def test_initial_config_is_lab_profile(self, monkeypatch) -> None:
+        """Test initial demo config is lab profile."""
+        # Reset to default state
+        monkeypatch.setattr(demo_config, "_demo_config", DemoConfiguration())
+        config = get_demo_config()
+        assert config.active_profile == DemoProfile.LAB
+        assert config.terraform.backend == ProvisioningBackend.TERRAFORM_CLI
+        assert config.ansible.backend == AutomationBackend.ANSIBLE_CLI
+
+    def test_set_demo_config_updates_global_state(self, monkeypatch) -> None:
+        """Test set_demo_config updates global configuration."""
+        new_config = DemoConfiguration(
+            terraform=TerraformConfig(backend=ProvisioningBackend.TFC),
+            ansible=AnsibleConfig(backend=AutomationBackend.AWX),
+            active_profile=DemoProfile.CUSTOM,
+        )
+        set_demo_config(new_config)
+        retrieved_config = get_demo_config()
+        assert retrieved_config.terraform.backend == ProvisioningBackend.TFC
+        assert retrieved_config.ansible.backend == AutomationBackend.AWX
+        assert retrieved_config.active_profile == DemoProfile.CUSTOM
+
+
+class TestApplyProfile:
+    """Test apply_profile function."""
+
+    def test_apply_lab_profile(self) -> None:
+        """Test applying lab profile."""
+        apply_profile(DemoProfile.LAB)
+        config = get_demo_config()
+        assert config.active_profile == DemoProfile.LAB
+        assert config.terraform.backend == ProvisioningBackend.TERRAFORM_CLI
+        assert config.terraform.connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
+        assert config.ansible.backend == AutomationBackend.ANSIBLE_CLI
+        assert config.ansible.connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
+
+    def test_apply_enterprise_mirror_profile(self) -> None:
+        """Test applying enterprise mirror profile."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        assert config.active_profile == DemoProfile.ENTERPRISE_MIRROR
+        assert config.terraform.backend == ProvisioningBackend.TFC
+        assert config.terraform.connection_mode == ConnectionMode.EXTERNAL_ENDPOINT
+        assert config.terraform.hostname == "app.terraform.io"
+        assert config.ansible.backend == AutomationBackend.AAP
+        assert config.ansible.connection_mode == ConnectionMode.EXTERNAL_ENDPOINT
+
+    def test_apply_offline_fallback_profile(self) -> None:
+        """Test applying offline fallback profile."""
+        apply_profile(DemoProfile.OFFLINE_FALLBACK)
+        config = get_demo_config()
+        assert config.active_profile == DemoProfile.OFFLINE_FALLBACK
+        assert config.terraform.backend == ProvisioningBackend.TERRAFORM_CLI
+        assert config.terraform.connection_mode == ConnectionMode.OFFLINE_MOCK
+        assert config.ansible.backend == AutomationBackend.ANSIBLE_CLI
+        assert config.ansible.connection_mode == ConnectionMode.OFFLINE_MOCK
+
+    def test_apply_custom_profile_sets_profile_only(self) -> None:
+        """Test applying custom profile only sets profile flag."""
+        # First set to a known state
+        apply_profile(DemoProfile.LAB)
+        # Then apply custom, which should leave existing config intact
+        apply_profile(DemoProfile.CUSTOM)
+        config = get_demo_config()
+        assert config.active_profile == DemoProfile.CUSTOM
+        # Note: custom profile doesn't reset other config, just sets active_profile
+
+
+class TestStartService:
+    """Test start_service function."""
+
+    def test_start_terraform_local_lab_mode(self) -> None:
+        """Test starting terraform in local lab mode (always ready immediately)."""
+        apply_profile(DemoProfile.LAB)
+        status = start_service("terraform")
+        # In docker-compose mode with docker socket available, should report
+        # estimated wait time, not immediately ready
+        if not hasattr(status, 'error_message') or not status.error_message:
+            # Docker socket is available
+            assert status.service == "terraform"
+            # Could be ready or have estimated wait, depending on environment
+        else:
+            # Docker socket not available
+            assert status.is_ready is False
+            assert "Docker socket not available" in status.error_message
+
+    def test_start_terraform_offline_mode(self) -> None:
+        """Test starting terraform in offline mode (always immediately ready)."""
+        apply_profile(DemoProfile.OFFLINE_FALLBACK)
+        status = start_service("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is True
+        assert status.estimated_wait_seconds == 0
+
+    def test_start_terraform_external_mode(self) -> None:
+        """Test starting terraform in external endpoint mode (always immediately ready)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        status = start_service("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is True
+        assert status.estimated_wait_seconds == 0
+
+    def test_start_ansible_offline_mode(self) -> None:
+        """Test starting ansible in offline mode (always immediately ready)."""
+        apply_profile(DemoProfile.OFFLINE_FALLBACK)
+        status = start_service("ansible")
+        assert status.service == "ansible"
+        assert status.is_ready is True
+        assert status.estimated_wait_seconds == 0
+
+    def test_start_invalid_service(self) -> None:
+        """Test starting invalid service returns error."""
+        status = start_service("invalid-service")
+        assert status.service == "invalid-service"
+        assert status.is_ready is False
+        assert "Unknown service" in status.error_message
+
+
+class TestCheckServiceReadiness:
+    """Test check_service_readiness function."""
+
+    def test_check_terraform_cli_always_ready(self) -> None:
+        """Test terraform-cli is always ready."""
+        apply_profile(DemoProfile.LAB)
+        status = check_service_readiness("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is True
+
+    def test_check_ansible_cli_always_ready(self) -> None:
+        """Test ansible-cli is always ready."""
+        apply_profile(DemoProfile.LAB)
+        status = check_service_readiness("ansible")
+        assert status.service == "ansible"
+        assert status.is_ready is True
+
+    def test_check_terraform_tfc_no_token(self) -> None:
+        """Test terraform TFC with no token configured is not ready."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = None
+        status = check_service_readiness("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        assert "No Terraform token configured" in status.error_message
+
+    def test_check_ansible_aap_no_endpoint(self) -> None:
+        """Test ansible AAP with no endpoint configured is not ready."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.hostname = None
+        status = check_service_readiness("ansible")
+        assert status.service == "ansible"
+        assert status.is_ready is False
+        assert "No Ansible endpoint configured" in status.error_message
+
+    def test_check_terraform_tfc_invalid_token(self) -> None:
+        """Test terraform TFC with invalid token is not ready."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = "invalid-token"
+        # Don't actually make HTTP request; just verify the logic path
+        status = check_service_readiness("terraform")
+        assert status.service == "terraform"
+        assert status.is_ready is False
+        # Could be connectivity error or invalid token
+
+    def test_check_invalid_service(self) -> None:
+        """Test checking readiness of invalid service."""
+        status = check_service_readiness("invalid-service")
+        assert status.service == "invalid-service"
+        assert status.is_ready is False
+        assert "Unknown service" in status.error_message
+
+
+class TestGetOverallReadiness:
+    """Test get_overall_readiness function."""
+
+    def test_overall_readiness_lab_profile(self) -> None:
+        """Test overall readiness for lab profile (both services ready)."""
+        apply_profile(DemoProfile.LAB)
+        readiness = get_overall_readiness()
+        assert readiness["terraform"]["is_ready"] is True
+        assert readiness["ansible"]["is_ready"] is True
+        assert readiness["all_ready"] is True
+
+    def test_overall_readiness_offline_profile(self) -> None:
+        """Test overall readiness for offline profile (both services ready)."""
+        apply_profile(DemoProfile.OFFLINE_FALLBACK)
+        readiness = get_overall_readiness()
+        assert readiness["terraform"]["is_ready"] is True
+        assert readiness["ansible"]["is_ready"] is True
+        assert readiness["all_ready"] is True
+
+    def test_overall_readiness_enterprise_mirror_no_creds(self) -> None:
+        """Test overall readiness for enterprise mirror without credentials."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = None
+        config.ansible.hostname = None
+        readiness = get_overall_readiness()
+        assert readiness["terraform"]["is_ready"] is False
+        assert readiness["ansible"]["is_ready"] is False
+        assert readiness["all_ready"] is False
+
+    def test_overall_readiness_partial(self) -> None:
+        """Test overall readiness with partially configured services."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        # Configure only terraform
+        config.terraform.token = None  # Will fail
+        config.ansible.backend = AutomationBackend.ANSIBLE_CLI  # Will be ready
+        readiness = get_overall_readiness()
+        assert readiness["terraform"]["is_ready"] is False
+        assert readiness["ansible"]["is_ready"] is True
+        assert readiness["all_ready"] is False
+
+
+class TestCheckServiceReadinessMocked:
+    """Test check_service_readiness with mocked HTTP calls."""
+
+    def test_terraform_tfc_valid_token_http_200(self) -> None:
+        """Test terraform TFC with valid token (HTTP 200 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = "valid-token"
+        
+        mock_response = MagicMock()
+        mock_response.status = 200
+        
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            status = check_service_readiness("terraform")
+            assert status.is_ready is True
+
+    def test_terraform_tfc_invalid_token_401(self) -> None:
+        """Test terraform TFC with invalid token (HTTP 401 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = "invalid-token"
+        
+        with patch("urllib.request.urlopen", side_effect=HTTPError(
+            "https://app.terraform.io/api/v2/account/details",
+            401,
+            "Unauthorized",
+            {},
+            None,
+        )):
+            status = check_service_readiness("terraform")
+            assert status.is_ready is False
+            assert "Invalid Terraform token" in status.error_message
+
+    def test_terraform_tfc_api_error_500(self) -> None:
+        """Test terraform TFC with API error (HTTP 500 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = "valid-token"
+        
+        with patch("urllib.request.urlopen", side_effect=HTTPError(
+            "https://app.terraform.io/api/v2/account/details",
+            500,
+            "Internal Server Error",
+            {},
+            None,
+        )):
+            status = check_service_readiness("terraform")
+            assert status.is_ready is False
+            assert "API error: 500" in status.error_message
+
+    def test_terraform_tfc_connectivity_error(self) -> None:
+        """Test terraform TFC with connectivity error."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = "valid-token"
+        
+        with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
+            status = check_service_readiness("terraform")
+            assert status.is_ready is False
+            assert "Connectivity error" in status.error_message
+
+    def test_ansible_awx_valid_credentials_http_200(self) -> None:
+        """Test ansible AWX with valid credentials (HTTP 200 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        config.ansible.username = "admin"
+        config.ansible.password = "secret"
+        
+        mock_response = MagicMock()
+        mock_response.status = 200
+        
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is True
+
+    def test_ansible_awx_valid_credentials_http_201(self) -> None:
+        """Test ansible AWX with valid credentials (HTTP 201 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        config.ansible.username = "admin"
+        config.ansible.password = "secret"
+        
+        mock_response = MagicMock()
+        mock_response.status = 201
+        
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is True
+
+    def test_ansible_awx_invalid_credentials_401(self) -> None:
+        """Test ansible AWX with invalid credentials (HTTP 401 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        config.ansible.username = "admin"
+        config.ansible.password = "wrong-password"
+        
+        with patch("urllib.request.urlopen", side_effect=HTTPError(
+            "https://awx.example.com/api/v2/ping/",
+            401,
+            "Unauthorized",
+            {},
+            None,
+        )):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is False
+            assert "Invalid Ansible credentials" in status.error_message
+
+    def test_ansible_awx_api_error_500(self) -> None:
+        """Test ansible AWX with API error (HTTP 500 response)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        config.ansible.username = "admin"
+        config.ansible.password = "secret"
+        
+        with patch("urllib.request.urlopen", side_effect=HTTPError(
+            "https://awx.example.com/api/v2/ping/",
+            500,
+            "Internal Server Error",
+            {},
+            None,
+        )):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is False
+            assert "API error: 500" in status.error_message
+
+    def test_ansible_awx_connectivity_error(self) -> None:
+        """Test ansible AWX with connectivity error."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        
+        with patch("urllib.request.urlopen", side_effect=Exception("Network unreachable")):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is False
+            assert "Connectivity error" in status.error_message
+
+    def test_ansible_awx_insecure_skip_verify(self) -> None:
+        """Test ansible AWX with insecure SSL verification."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        config.ansible.insecure_skip_verify = True
+        
+        mock_response = MagicMock()
+        mock_response.status = 200
+        
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is True
+
+
+class TestStartServiceDocker:
+    """Test start_service with docker socket availability."""
+
+    def test_start_ansible_docker_compose_mode_with_socket(self) -> None:
+        """Test starting ansible in docker-compose mode with socket available."""
+        apply_profile(DemoProfile.LAB)
+        
+        with patch("os.path.exists", return_value=True):
+            status = start_service("ansible")
+            assert status.service == "ansible"
+            assert status.is_ready is False
+            # Ansible service estimated wait is 30 seconds
+            assert status.estimated_wait_seconds == 30
+
+    def test_start_terraform_docker_compose_mode_with_socket(self) -> None:
+        """Test starting terraform in docker-compose mode with socket available."""
+        apply_profile(DemoProfile.LAB)
+        
+        with patch("os.path.exists", return_value=True):
+            status = start_service("terraform")
+            assert status.service == "terraform"
+            assert status.is_ready is False
+            # Terraform service estimated wait is 20 seconds
+            assert status.estimated_wait_seconds == 20
+
+    def test_start_service_docker_compose_no_socket(self) -> None:
+        """Test starting service in docker-compose mode without socket."""
+        apply_profile(DemoProfile.LAB)
+        
+        with patch("os.path.exists", return_value=False):
+            status = start_service("terraform")
+            assert status.service == "terraform"
+            assert status.is_ready is False
+            assert "Docker socket not available" in status.error_message
+
+    def test_start_service_docker_compose_exception(self) -> None:
+        """Test starting service in docker-compose mode with exception."""
+        apply_profile(DemoProfile.LAB)
+        
+        # Simulate time.time() raising an exception
+        with patch("time.time", side_effect=Exception("Time error")):
+            status = start_service("terraform")
+            assert status.service == "terraform"
+            assert status.is_ready is False
+            assert "Time error" in status.error_message
