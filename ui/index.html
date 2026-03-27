@@ -763,10 +763,20 @@
       targetAvailabilityListEl.innerHTML = "";
       for (const row of view.rows) {
         const item = document.createElement("li");
+        const reasonText = String(row.reason || "");
+        const reasonParts = reasonText
+          .split(";")
+          .map((part) => part.trim())
+          .filter(Boolean);
+        const inferredCredentialOnly =
+          !row.ready &&
+          reasonParts.length > 0 &&
+          reasonParts.every((part) => /^missing credentials:/i.test(part));
+        const rowSelectable = Boolean(row.selectable) || inferredCredentialOnly;
         if (row.ready) {
           item.className = "ok";
           item.textContent = `${row.target}: available`;
-        } else if (row.selectable) {
+        } else if (rowSelectable) {
           item.className = "warn";
           item.textContent = `${row.target}: needs credentials - ${row.reason}`;
         } else {
