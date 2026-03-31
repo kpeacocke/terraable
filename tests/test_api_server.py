@@ -585,7 +585,7 @@ def test_safe_post_request_rejects_non_loopback_client() -> None:
     def fake_send_error(code: int, message: str = "") -> None:
         called.append((code, message))
 
-    handler.send_error = fake_send_error  # type: ignore[assignment]
+    cast(Any, handler).send_error = fake_send_error
 
     allowed = cast(Any, handler)._require_safe_post_request()
 
@@ -1038,7 +1038,7 @@ def test_handle_session_returns_token_for_loopback_client(
     def fake_send_json(payload: dict[str, Any]) -> None:
         sent_json.append(payload)
 
-    handler._send_json = fake_send_json  # type: ignore[assignment]
+    cast(Any, handler)._send_json = fake_send_json
 
     cast(Any, handler)._handle_session()
 
@@ -1080,7 +1080,9 @@ def test_handle_demo_request_rejects_unknown_demo_route(monkeypatch: pytest.Monk
 
 
 @pytest.mark.unit
-def test_safe_post_request_rejects_non_local_origin_host() -> None:
+def test_safe_post_request_rejects_non_local_origin_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     handler = api_server.TerraableRequestHandler.__new__(api_server.TerraableRequestHandler)
     handler.client_address = ("127.0.0.1", 12345)
     handler.headers = _headers(
@@ -1089,13 +1091,15 @@ def test_safe_post_request_rejects_non_local_origin_host() -> None:
             "X-Terraable-Token": "terraable-local-token",
         }
     )
-    handler.api_post_token = "terraable-local-token"
+    monkeypatch.setattr(
+        api_server.TerraableRequestHandler, "api_post_token", "terraable-local-token"
+    )
     called: list[tuple[int, str]] = []
 
     def fake_send_error(code: int, message: str = "") -> None:
         called.append((code, message))
 
-    handler.send_error = fake_send_error  # type: ignore[assignment]
+    cast(Any, handler).send_error = fake_send_error
 
     allowed = cast(Any, handler)._require_safe_post_request()
 

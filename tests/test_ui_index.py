@@ -23,6 +23,6 @@ def test_demo_api_routes_are_wired_in_frontend() -> None:
 
     assert 'api("/api/demo/status")' in html
     assert 'api("/api/demo/configure", { profile })' in html
-    assert 'api(`/api/demo/start-service/${service}`, {})' in html
+    assert "api(`/api/demo/start-service/${service}`, {})" in html
     assert 'api("/api/demo/service-ready/terraform", {})' in html
     assert 'api("/api/demo/service-ready/ansible", {})' in html

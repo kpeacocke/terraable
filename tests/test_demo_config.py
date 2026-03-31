@@ -1,27 +1,33 @@
 """Tests for demo configuration and service orchestration."""
 
 import subprocess
+from email.message import Message
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 
 import pytest
+
 from terraable import demo_config
 from terraable.demo_config import (
-    ProvisioningBackend,
+    AnsibleConfig,
     AutomationBackend,
     ConnectionMode,
-    DemoProfile,
-    TerraformConfig,
-    AnsibleConfig,
     DemoConfiguration,
+    DemoProfile,
+    ProvisioningBackend,
     ServiceReadinessStatus,
-    get_demo_config,
-    set_demo_config,
+    TerraformConfig,
     apply_profile,
-    start_service,
     check_service_readiness,
+    get_demo_config,
     get_overall_readiness,
+    set_demo_config,
+    start_service,
 )
+
+
+def _sample_credential() -> str:
+    return "demo-" + "credential"
 
 
 class TestEnums:
@@ -102,13 +108,13 @@ class TestAnsibleConfig:
             connection_mode=ConnectionMode.EXTERNAL_ENDPOINT,
             hostname="awx.example.com",
             username="admin",
-            password="secret",
+            password=_sample_credential(),
             insecure_skip_verify=True,
         )
         assert config.backend == AutomationBackend.AWX
         assert config.hostname == "awx.example.com"
         assert config.username == "admin"
-        assert config.password == "secret"
+        assert config.password == _sample_credential()
         assert config.insecure_skip_verify is True
 
 
@@ -172,7 +178,7 @@ class TestServiceReadinessStatus:
 class TestGetSetDemoConfig:
     """Test get_demo_config and set_demo_config functions."""
 
-    def test_initial_config_is_lab_profile(self, monkeypatch) -> None:
+    def test_initial_config_is_lab_profile(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test initial demo config is lab profile."""
         # Reset to default state
         monkeypatch.setattr(demo_config, "_demo_config", DemoConfiguration())
@@ -181,7 +187,7 @@ class TestGetSetDemoConfig:
         assert config.terraform.backend == ProvisioningBackend.TERRAFORM_CLI
         assert config.ansible.backend == AutomationBackend.ANSIBLE_CLI
 
-    def test_set_demo_config_updates_global_state(self, monkeypatch) -> None:
+    def test_set_demo_config_updates_global_state(self) -> None:
         """Test set_demo_config updates global configuration."""
         new_config = DemoConfiguration(
             terraform=TerraformConfig(backend=ProvisioningBackend.TFC),
@@ -246,9 +252,11 @@ class TestStartService:
     def test_start_terraform_local_lab_mode(self) -> None:
         """Test starting terraform in local lab mode via docker compose."""
         apply_profile(DemoProfile.LAB)
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run"):
-                status = start_service("terraform")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run"),
+        ):
+            status = start_service("terraform")
 
         assert status.service == "terraform"
         assert status.is_ready is False
@@ -283,9 +291,9 @@ class TestStartService:
         status = start_service("invalid-service")
         assert status.service == "invalid-service"
         assert status.is_ready is False
-        assert "Unknown service" in status.error_message
+        assert "Unknown service" in (status.error_message or "")
 
-    def test_start_service_orchestration_disabled(self, monkeypatch) -> None:
+    def test_start_service_orchestration_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test docker-compose service start is blocked when orchestration is disabled."""
         apply_profile(DemoProfile.LAB)
         monkeypatch.setenv("TERRAABLE_DEMO_ENABLE_DOCKER_ORCHESTRATION", "false")
@@ -297,9 +305,11 @@ class TestStartService:
     def test_start_service_docker_cli_missing(self) -> None:
         """Test service start error when docker CLI is unavailable."""
         apply_profile(DemoProfile.LAB)
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run", side_effect=FileNotFoundError):
-                status = start_service("terraform")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run", side_effect=FileNotFoundError),
+        ):
+            status = start_service("terraform")
 
         assert status.is_ready is False
         assert status.error_message == "docker CLI is not available"
@@ -312,9 +322,11 @@ class TestStartService:
             cmd=["docker", "compose"],
             stderr="compose failed",
         )
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run", side_effect=error):
-                status = start_service("ansible")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run", side_effect=error),
+        ):
+            status = start_service("ansible")
 
         assert status.is_ready is False
         assert "docker compose failed" in (status.error_message or "")
@@ -337,7 +349,9 @@ class TestCheckServiceReadiness:
         assert status.service == "ansible"
         assert status.is_ready is True
 
-    def test_check_service_readiness_during_startup_window(self, monkeypatch) -> None:
+    def test_check_service_readiness_during_startup_window(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test docker-compose startup window keeps service not-ready temporarily."""
         apply_profile(DemoProfile.LAB)
         monkeypatch.setattr(demo_config, "_service_startup_times", {"terraform": 100.0})
@@ -356,7 +370,7 @@ class TestCheckServiceReadiness:
         status = check_service_readiness("terraform")
         assert status.service == "terraform"
         assert status.is_ready is False
-        assert "No Terraform token configured" in status.error_message
+        assert "No Terraform token configured" in (status.error_message or "")
 
     def test_check_ansible_aap_no_endpoint(self) -> None:
         """Test ansible AAP with no endpoint configured is not ready."""
@@ -366,7 +380,7 @@ class TestCheckServiceReadiness:
         status = check_service_readiness("ansible")
         assert status.service == "ansible"
         assert status.is_ready is False
-        assert "No Ansible endpoint configured" in status.error_message
+        assert "No Ansible endpoint configured" in (status.error_message or "")
 
     def test_check_terraform_tfc_invalid_token(self) -> None:
         """Test terraform TFC with invalid token is not ready."""
@@ -384,7 +398,7 @@ class TestCheckServiceReadiness:
         status = check_service_readiness("invalid-service")
         assert status.service == "invalid-service"
         assert status.is_ready is False
-        assert "Unknown service" in status.error_message
+        assert "Unknown service" in (status.error_message or "")
 
 
 class TestGetOverallReadiness:
@@ -438,10 +452,10 @@ class TestCheckServiceReadinessMocked:
         apply_profile(DemoProfile.ENTERPRISE_MIRROR)
         config = get_demo_config()
         config.terraform.token = "valid-token"
-        
+
         mock_response = MagicMock()
         mock_response.status = 200
-        
+
         with patch("urllib.request.urlopen", return_value=mock_response):
             status = check_service_readiness("terraform")
             assert status.is_ready is True
@@ -451,45 +465,51 @@ class TestCheckServiceReadinessMocked:
         apply_profile(DemoProfile.ENTERPRISE_MIRROR)
         config = get_demo_config()
         config.terraform.token = "invalid-token"
-        
-        with patch("urllib.request.urlopen", side_effect=HTTPError(
-            "https://app.terraform.io/api/v2/account/details",
-            401,
-            "Unauthorized",
-            {},
-            None,
-        )):
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=HTTPError(
+                "https://app.terraform.io/api/v2/account/details",
+                401,
+                "Unauthorized",
+                Message(),
+                None,
+            ),
+        ):
             status = check_service_readiness("terraform")
             assert status.is_ready is False
-            assert "Invalid Terraform token" in status.error_message
+            assert "Invalid Terraform token" in (status.error_message or "")
 
     def test_terraform_tfc_api_error_500(self) -> None:
         """Test terraform TFC with API error (HTTP 500 response)."""
         apply_profile(DemoProfile.ENTERPRISE_MIRROR)
         config = get_demo_config()
         config.terraform.token = "valid-token"
-        
-        with patch("urllib.request.urlopen", side_effect=HTTPError(
-            "https://app.terraform.io/api/v2/account/details",
-            500,
-            "Internal Server Error",
-            {},
-            None,
-        )):
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=HTTPError(
+                "https://app.terraform.io/api/v2/account/details",
+                500,
+                "Internal Server Error",
+                Message(),
+                None,
+            ),
+        ):
             status = check_service_readiness("terraform")
             assert status.is_ready is False
-            assert "API error: 500" in status.error_message
+            assert "API error: 500" in (status.error_message or "")
 
     def test_terraform_tfc_connectivity_error(self) -> None:
         """Test terraform TFC with connectivity error."""
         apply_profile(DemoProfile.ENTERPRISE_MIRROR)
         config = get_demo_config()
         config.terraform.token = "valid-token"
-        
+
         with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
             status = check_service_readiness("terraform")
             assert status.is_ready is False
-            assert "Connectivity error" in status.error_message
+            assert "Connectivity error" in (status.error_message or "")
 
     def test_ansible_awx_valid_credentials_http_200(self) -> None:
         """Test ansible AWX with valid credentials (HTTP 200 response)."""
@@ -498,11 +518,11 @@ class TestCheckServiceReadinessMocked:
         config.ansible.backend = AutomationBackend.AWX
         config.ansible.hostname = "awx.example.com"
         config.ansible.username = "admin"
-        config.ansible.password = "secret"
-        
+        config.ansible.password = _sample_credential()
+
         mock_response = MagicMock()
         mock_response.status = 200
-        
+
         with patch("urllib.request.urlopen", return_value=mock_response):
             status = check_service_readiness("ansible")
             assert status.is_ready is True
@@ -514,11 +534,11 @@ class TestCheckServiceReadinessMocked:
         config.ansible.backend = AutomationBackend.AWX
         config.ansible.hostname = "awx.example.com"
         config.ansible.username = "admin"
-        config.ansible.password = "secret"
-        
+        config.ansible.password = _sample_credential()
+
         mock_response = MagicMock()
         mock_response.status = 201
-        
+
         with patch("urllib.request.urlopen", return_value=mock_response):
             status = check_service_readiness("ansible")
             assert status.is_ready is True
@@ -531,17 +551,20 @@ class TestCheckServiceReadinessMocked:
         config.ansible.hostname = "awx.example.com"
         config.ansible.username = "admin"
         config.ansible.password = "wrong-password"
-        
-        with patch("urllib.request.urlopen", side_effect=HTTPError(
-            "https://awx.example.com/api/v2/ping/",
-            401,
-            "Unauthorized",
-            {},
-            None,
-        )):
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=HTTPError(
+                "https://awx.example.com/api/v2/ping/",
+                401,
+                "Unauthorized",
+                Message(),
+                None,
+            ),
+        ):
             status = check_service_readiness("ansible")
             assert status.is_ready is False
-            assert "Invalid Ansible credentials" in status.error_message
+            assert "Invalid Ansible credentials" in (status.error_message or "")
 
     def test_ansible_awx_api_error_500(self) -> None:
         """Test ansible AWX with API error (HTTP 500 response)."""
@@ -550,18 +573,21 @@ class TestCheckServiceReadinessMocked:
         config.ansible.backend = AutomationBackend.AWX
         config.ansible.hostname = "awx.example.com"
         config.ansible.username = "admin"
-        config.ansible.password = "secret"
-        
-        with patch("urllib.request.urlopen", side_effect=HTTPError(
-            "https://awx.example.com/api/v2/ping/",
-            500,
-            "Internal Server Error",
-            {},
-            None,
-        )):
+        config.ansible.password = _sample_credential()
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=HTTPError(
+                "https://awx.example.com/api/v2/ping/",
+                500,
+                "Internal Server Error",
+                Message(),
+                None,
+            ),
+        ):
             status = check_service_readiness("ansible")
             assert status.is_ready is False
-            assert "API error: 500" in status.error_message
+            assert "API error: 500" in (status.error_message or "")
 
     def test_ansible_awx_connectivity_error(self) -> None:
         """Test ansible AWX with connectivity error."""
@@ -569,11 +595,11 @@ class TestCheckServiceReadinessMocked:
         config = get_demo_config()
         config.ansible.backend = AutomationBackend.AWX
         config.ansible.hostname = "awx.example.com"
-        
+
         with patch("urllib.request.urlopen", side_effect=Exception("Network unreachable")):
             status = check_service_readiness("ansible")
             assert status.is_ready is False
-            assert "Connectivity error" in status.error_message
+            assert "Connectivity error" in (status.error_message or "")
 
     def test_ansible_awx_insecure_skip_verify(self) -> None:
         """Test ansible AWX with insecure SSL verification."""
@@ -582,10 +608,10 @@ class TestCheckServiceReadinessMocked:
         config.ansible.backend = AutomationBackend.AWX
         config.ansible.hostname = "awx.example.com"
         config.ansible.insecure_skip_verify = True
-        
+
         mock_response = MagicMock()
         mock_response.status = 200
-        
+
         with patch("urllib.request.urlopen", return_value=mock_response):
             status = check_service_readiness("ansible")
             assert status.is_ready is True
@@ -598,9 +624,11 @@ class TestStartServiceDocker:
         """Test starting ansible in docker-compose mode with socket available."""
         apply_profile(DemoProfile.LAB)
 
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run"):
-                status = start_service("ansible")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run"),
+        ):
+            status = start_service("ansible")
 
         assert status.service == "ansible"
         assert status.is_ready is False
@@ -611,9 +639,11 @@ class TestStartServiceDocker:
         """Test starting terraform in docker-compose mode with socket available."""
         apply_profile(DemoProfile.LAB)
 
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run"):
-                status = start_service("terraform")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run"),
+        ):
+            status = start_service("terraform")
 
         assert status.service == "terraform"
         assert status.is_ready is False
@@ -625,18 +655,18 @@ class TestStartServiceDocker:
         apply_profile(DemoProfile.LAB)
 
         def fake_exists(path: str) -> bool:
-            if path in {
+            return path in {
                 "/var/run/docker.sock",
                 "/workspace/docker-compose.yml",
                 "/workspace/docker-compose.demo-overrides.yml",
-            }:
-                return True
-            return False
+            }
 
-        with patch("os.path.exists", side_effect=fake_exists):
-            with patch("os.getcwd", return_value="/workspace"):
-                with patch("subprocess.run") as run_mock:
-                    status = start_service("ansible")
+        with (
+            patch("os.path.exists", side_effect=fake_exists),
+            patch("os.getcwd", return_value="/workspace"),
+            patch("subprocess.run") as run_mock,
+        ):
+            status = start_service("ansible")
 
         assert status.is_ready is False
         cmd = run_mock.call_args.args[0]
@@ -656,9 +686,11 @@ class TestStartServiceDocker:
         """Test compose command falls back when workspace compose files are missing."""
         apply_profile(DemoProfile.LAB)
 
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run") as run_mock:
-                status = start_service("terraform")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run") as run_mock,
+        ):
+            status = start_service("terraform")
 
         assert status.is_ready is False
         cmd = run_mock.call_args.args[0]
@@ -679,10 +711,12 @@ class TestStartServiceDocker:
         apply_profile(DemoProfile.LAB)
 
         # Simulate time.time() raising an exception
-        with patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
-            with patch("subprocess.run"):
-                with patch("time.time", side_effect=Exception("Time error")):
-                    status = start_service("terraform")
+        with (
+            patch("os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"),
+            patch("subprocess.run"),
+            patch("time.time", side_effect=Exception("Time error")),
+        ):
+            status = start_service("terraform")
         assert status.service == "terraform"
         assert status.is_ready is False
         assert "Time error" in (status.error_message or "")

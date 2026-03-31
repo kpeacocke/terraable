@@ -79,10 +79,64 @@
       color: #fff;
     }
     .subtitle { margin: 0 0 20px; color: var(--ink-muted); font-size: 0.9rem; }
+    .status-strip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border);
+      background: #1a1c1f;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin: 0 0 12px;
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+    }
+    .status-badge {
+      padding: 2px 8px;
+      border-radius: 2px;
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--ink-muted);
+      background: #2b2e33;
+      flex-shrink: 0;
+    }
+    .status-badge.ok { border-color: var(--ok); color: #78c26f; background: var(--ok-bg); }
+    .status-badge.warn { border-color: var(--warn); color: #f6c447; background: var(--warn-bg); }
+    .status-badge.fail { border-color: var(--fail); color: #f56d63; background: var(--fail-bg); }
+    .tab-nav {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin: 0 0 14px;
+    }
+    .tab-btn {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 8px 12px;
+      background: #2b2e33;
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .tab-btn:hover { background: #34383e; border-color: #4d5258; }
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(280px, 1fr));
       gap: 16px;
+    }
+    .uoi-grid {
+      grid-template-columns: 1fr;
     }
     .grid-3 {
       display: grid;
@@ -404,8 +458,20 @@
     <h1 class="page-title">Environment Management</h1>
     <p class="subtitle">Action panel &middot; compliance posture &middot; EDA history &middot; evidence timeline</p>
 
-    <section class="grid">
-      <article class="panel">
+    <div class="status-strip" aria-live="polite">
+      <span class="status-badge warn" id="target-status-badge">Loading</span>
+      <span id="target-status-text">Resolving selected target status...</span>
+    </div>
+
+    <nav class="tab-nav" aria-label="Environment management sections">
+      <button class="tab-btn active" id="tab-btn-request" data-tab="request" aria-controls="tab-panel-request">Request</button>
+      <button class="tab-btn" id="tab-btn-credentials" data-tab="credentials" aria-controls="tab-panel-credentials">Credentials</button>
+      <button class="tab-btn" id="tab-btn-demo" data-tab="demo" aria-controls="tab-panel-demo">Demo Setup</button>
+      <button class="tab-btn" id="tab-btn-operations" data-tab="operations" aria-controls="tab-panel-operations">Operations &amp; Evidence</button>
+    </nav>
+
+    <section class="grid uoi-grid">
+      <article class="panel" id="tab-panel-request" data-tab-panel="request" role="tabpanel" aria-labelledby="tab-btn-request">
         <h2>Environment Request</h2>
         <div class="field">
           <label for="target">Target platform</label>
@@ -456,7 +522,7 @@
         <div class="hint" id="target-suggestion">Detecting local target suggestion...</div>
       </article>
 
-      <article class="panel">
+      <article class="panel" id="tab-panel-credentials" data-tab-panel="credentials" role="tabpanel" aria-labelledby="tab-btn-credentials" hidden>
         <h2>Credential Authentication</h2>
         <details class="cred-group" id="creds-hcp" open>
           <summary>HCP Terraform &mdash; required for all targets</summary>
@@ -518,7 +584,7 @@
         <div class="hint">Credentials can be sourced from .env or entered here. Action buttons stay locked until authentication and execution readiness checks pass.</div>
       </article>
 
-      <article class="panel">
+      <article class="panel" id="tab-panel-demo" data-tab-panel="demo" role="tabpanel" aria-labelledby="tab-btn-demo" hidden>
         <h2>Demo Configuration</h2>
         <div class="field">
           <div style="font-size:0.82rem; margin-bottom:4px; color:var(--ink-muted);">Profile presets</div>
@@ -618,7 +684,7 @@
         </div>
       </article>
 
-      <article class="panel">
+      <article class="panel" id="tab-panel-operations" data-tab-panel="operations" role="tabpanel" aria-labelledby="tab-btn-operations" hidden>
         <h2>Evidence and Status</h2>
         <div style="margin-bottom:10px; font-size:0.8rem; color:var(--ink-muted);">Runtime status</div>
         <output id="runtime-status" aria-live="polite" aria-relevant="additions text" aria-atomic="false" style="display:block; margin-bottom:10px;"></output>
@@ -626,7 +692,7 @@
       </article>
     </section>
 
-    <section class="grid-3">
+    <section class="grid-3" data-tab-panel="operations" hidden>
       <article class="panel">
         <h2>Compliance Score</h2>
         <p class="score-pct" id="score-pct">--</p>
@@ -649,7 +715,7 @@
 
     </section>
 
-    <section class="grid-3">
+    <section class="grid-3" data-tab-panel="operations" hidden>
 
       <article class="panel">
         <h2>Portal Feature Catalogue</h2>
@@ -700,6 +766,10 @@
     const targetAvailabilityEl = document.getElementById("target-availability");
     const targetAvailabilityListEl = document.getElementById("target-availability-list");
     const targetSelectEl = document.getElementById("target");
+    const targetStatusBadgeEl = document.getElementById("target-status-badge");
+    const targetStatusTextEl = document.getElementById("target-status-text");
+    const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+    const tabPanels = Array.from(document.querySelectorAll("[data-tab-panel]"));
     const actionButtons = Array.from(document.querySelectorAll(".actions button"));
     const demoProfileButtons = Array.from(document.querySelectorAll("#demo-profile-buttons button"));
     const demoStatusEl = document.getElementById("demo-status");
@@ -736,6 +806,52 @@
     let demoPollTick = 0;
     const demoCountdown = { terraform: 0, ansible: 0 };
 
+    function switchTab(tabName) {
+      tabButtons.forEach((button) => {
+        const isActive = button.dataset.tab === tabName;
+        button.classList.toggle("active", isActive);
+      });
+
+      tabPanels.forEach((panel) => {
+        const isActive = panel.dataset.tabPanel === tabName;
+        panel.hidden = !isActive;
+      });
+    }
+
+    function setTargetStatusSummary(row, portal) {
+      if (!row) {
+        targetStatusBadgeEl.textContent = "Unknown";
+        targetStatusBadgeEl.className = "status-badge warn";
+        targetStatusTextEl.textContent = `Status is still loading for portal ${portal}.`;
+        return;
+      }
+
+      const reasonText = String(row.reason || "");
+      const reasonParts = reasonText
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const inferredCredentialOnly =
+        !row.ready &&
+        reasonParts.length > 0 &&
+        reasonParts.every((part) => /^missing credentials:/i.test(part));
+      const rowSelectable = Boolean(row.selectable) || inferredCredentialOnly;
+
+      if (row.ready) {
+        targetStatusBadgeEl.textContent = "Available";
+        targetStatusBadgeEl.className = "status-badge ok";
+        targetStatusTextEl.textContent = `${row.target} is ready for portal ${portal}.`;
+      } else if (rowSelectable) {
+        targetStatusBadgeEl.textContent = "Needs Credentials";
+        targetStatusBadgeEl.className = "status-badge warn";
+        targetStatusTextEl.textContent = `${row.target}: ${row.reason}`;
+      } else {
+        targetStatusBadgeEl.textContent = "Unavailable";
+        targetStatusBadgeEl.className = "status-badge fail";
+        targetStatusTextEl.textContent = `${row.target}: ${row.reason}`;
+      }
+    }
+
     function applyTargetAvailability() {
       const options = Array.from(targetSelectEl.options);
       const targetOrder = options.map((option) => option.value);
@@ -760,6 +876,7 @@
       }
 
       targetAvailabilityEl.textContent = `${view.selectedMessage} Portal: ${selected("portal")}`;
+      setTargetStatusSummary(rowByTarget.get(selected("target")), selected("portal"));
       targetAvailabilityListEl.innerHTML = "";
       for (const row of view.rows) {
         const item = document.createElement("li");
@@ -1672,7 +1789,14 @@
       await refreshAuthMatrix();
     });
 
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        switchTab(button.dataset.tab || "request");
+      });
+    });
+
     syncCredentialGroups(selected("target"));
+    switchTab("request");
     try {
       await refreshSessionToken();
     } catch (error) {

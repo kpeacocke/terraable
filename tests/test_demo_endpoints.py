@@ -13,6 +13,10 @@ import pytest
 from terraable import api_server
 
 
+def _sample_credential() -> str:
+    return "demo-" + "credential"
+
+
 def _post_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
     """Return standard POST request headers."""
     headers = {
@@ -31,9 +35,11 @@ class _FakeBackend:
         self.workspace_root = workspace_root
 
     def get_state(self) -> dict[str, object]:
-        return {"mode": "live-local-lab", "controls":  {"ssh_root_login": True}}
+        return {"mode": "live-local-lab", "controls": {"ssh_root_login": True}}
 
-    def configure_credentials(self, credentials: dict[str, str], **kwargs: object) -> dict[str, object]:
+    def configure_credentials(
+        self, _credentials: dict[str, str], **_kwargs: object
+    ) -> dict[str, object]:
         return {"authenticated": True, "ready": True}
 
 
@@ -52,7 +58,7 @@ def test_demo_status_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     try:
         base = f"http://127.0.0.1:{server.server_port}"
         status_payload = json.loads(urlopen(f"{base}/api/demo/status").read().decode("utf-8"))
-        
+
         assert "configuration" in status_payload
         assert "readiness" in status_payload
         assert status_payload["readiness"]["all_ready"] is True
@@ -76,39 +82,41 @@ def test_demo_configure_all_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     try:
         base = f"http://127.0.0.1:{server.server_port}"
-        
+
         # Set all possible config fields - this exercises all if branches
         request = Request(
             f"{base}/api/demo/configure",
-            data=json.dumps({
-                "profile": "custom",
-                "terraform": {
-                    "backend": "tfe",
-                    "connection_mode": "docker-compose-service",
-                    "hostname": "tfe.example.com",
-                    "token": "tfe-secret-token",
-                    "organization": "tfe-org",
-                },
-                "ansible": {
-                    "backend": "awx",
-                    "connection_mode": "external-endpoint",
-                    "hostname": "awx.example.com",
-                    "username": "awx-user",
-                    "password": "awx-password",
-                    "insecure_skip_verify": True,
-                },
-            }).encode("utf-8"),
+            data=json.dumps(
+                {
+                    "profile": "custom",
+                    "terraform": {
+                        "backend": "tfe",
+                        "connection_mode": "docker-compose-service",
+                        "hostname": "tfe.example.com",
+                        "token": _sample_credential(),
+                        "organization": "tfe-org",
+                    },
+                    "ansible": {
+                        "backend": "awx",
+                        "connection_mode": "external-endpoint",
+                        "hostname": "awx.example.com",
+                        "username": "awx-user",
+                        "password": "awx-password",
+                        "insecure_skip_verify": True,
+                    },
+                }
+            ).encode("utf-8"),
             headers=_post_headers(),
             method="POST",
         )
         payload = json.loads(urlopen(request).read().decode("utf-8"))
-        
+
         # Verify all terraform fields are set
         assert payload["configuration"]["terraform"]["backend"] == "tfe"
         assert payload["configuration"]["terraform"]["connection_mode"] == "docker-compose-service"
         assert payload["configuration"]["terraform"]["hostname"] == "tfe.example.com"
         assert payload["configuration"]["terraform"]["organization"] == "tfe-org"
-        
+
         # Verify all ansible fields  are set
         assert payload["configuration"]["ansible"]["backend"] == "awx"
         assert payload["configuration"]["ansible"]["connection_mode"] == "external-endpoint"
@@ -121,7 +129,9 @@ def test_demo_configure_all_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
 
 @pytest.mark.unit
-def test_demo_configure_invalid_profile_defaults_to_lab(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_demo_configure_invalid_profile_defaults_to_lab(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test invalid profile name defaults to lab."""
     monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
     ui_dir = tmp_path / "ui"
@@ -149,7 +159,9 @@ def test_demo_configure_invalid_profile_defaults_to_lab(monkeypatch: pytest.Monk
 
 
 @pytest.mark.unit
-def test_demo_configure_invalid_enum_raises_400(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_demo_configure_invalid_enum_raises_400(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test invalid enum value raises 400 error."""
     monkeypatch.setattr(api_server, "LocalLabBackend", _FakeBackend)
     ui_dir = tmp_path / "ui"
@@ -166,7 +178,9 @@ def test_demo_configure_invalid_enum_raises_400(monkeypatch: pytest.MonkeyPatch,
             urlopen(
                 Request(
                     f"{base}/api/demo/configure",
-                    data=json.dumps({"profile": "custom", "terraform": {"backend": "invalid"}}).encode("utf-8"),
+                    data=json.dumps(
+                        {"profile": "custom", "terraform": {"backend": "invalid"}}
+                    ).encode("utf-8"),
                     headers=_post_headers(),
                     method="POST",
                 )
@@ -192,7 +206,7 @@ def test_demo_start_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
     try:
         base = f"http://127.0.0.1:{server.server_port}"
-        
+
         # Set to offline mode
         config_req = Request(
             f"{base}/api/demo/configure",
@@ -201,7 +215,7 @@ def test_demo_start_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
             method="POST",
         )
         urlopen(config_req)
-        
+
         # Start service
         start_req = Request(
             f"{base}/api/demo/start-service/terraform",

@@ -5,6 +5,7 @@ Manages multi-backend demo setup including provisioning/automation backend
 selection, connection modes, and service lifecycle orchestration.
 """
 
+import base64
 import os
 import subprocess
 import time
@@ -12,7 +13,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional
+from typing import Any
 
 
 class ProvisioningBackend(str, Enum):
@@ -54,9 +55,9 @@ class TerraformConfig:
 
     backend: ProvisioningBackend = ProvisioningBackend.TERRAFORM_CLI
     connection_mode: ConnectionMode = ConnectionMode.DOCKER_COMPOSE_SERVICE
-    hostname: Optional[str] = None  # For TFC/TFE
-    token: Optional[str] = None
-    organization: Optional[str] = None
+    hostname: str | None = None  # For TFC/TFE
+    token: str | None = None
+    organization: str | None = None
     api_version: str = "v2"
 
 
@@ -66,9 +67,9 @@ class AnsibleConfig:
 
     backend: AutomationBackend = AutomationBackend.ANSIBLE_CLI
     connection_mode: ConnectionMode = ConnectionMode.DOCKER_COMPOSE_SERVICE
-    hostname: Optional[str] = None  # For AAP/AWX
-    username: Optional[str] = None
-    password: Optional[str] = None
+    hostname: str | None = None  # For AAP/AWX
+    username: str | None = None
+    password: str | None = None
     insecure_skip_verify: bool = False
 
 
@@ -80,7 +81,7 @@ class DemoConfiguration:
     ansible: AnsibleConfig = field(default_factory=AnsibleConfig)
     active_profile: DemoProfile = DemoProfile.LAB
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary for API responses."""
         return {
             "terraform": {
@@ -107,19 +108,19 @@ class ServiceReadinessStatus:
 
     service: str  # "terraform" or "ansible"
     is_ready: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
     estimated_wait_seconds: int = 0
-    last_checked_at: Optional[float] = None
+    last_checked_at: float | None = None
 
 
 # Global demo configuration state
 _demo_config: DemoConfiguration = DemoConfiguration()
-_service_startup_times: Dict[str, float] = {}  # Track when services were started
-_docker_service_names: Dict[str, str] = {
+_service_startup_times: dict[str, float] = {}  # Track when services were started
+_docker_service_names: dict[str, str] = {
     "terraform": "demo-terraform",
     "ansible": "demo-ansible",
 }
-_estimated_wait_seconds: Dict[str, int] = {
+_estimated_wait_seconds: dict[str, int] = {
     "terraform": 20,
     "ansible": 30,
 }
@@ -166,6 +167,133 @@ def _run_compose_up(service: str) -> None:
     cmd.extend(["up", "-d", service_name])
 
     subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+
+def _service_connection_mode(config: DemoConfiguration, service: str) -> ConnectionMode | None:
+    if service == "terraform":
+        return config.terraform.connection_mode
+    if service == "ansible":
+        return config.ansible.connection_mode
+    return None
+
+
+def _startup_wait_status(
+    service: str, connection_mode: ConnectionMode | None
+) -> ServiceReadinessStatus | None:
+    if (
+        connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
+        and service in _service_startup_times
+    ):
+        elapsed = max(0.0, time.time() - _service_startup_times[service])
+        wait_seconds = _service_wait_seconds(service)
+        if elapsed < wait_seconds:
+            return ServiceReadinessStatus(
+                service=service,
+                is_ready=False,
+                estimated_wait_seconds=max(0, wait_seconds - int(elapsed)),
+            )
+    return None
+
+
+def _terraform_readiness(service: str, tf_config: TerraformConfig) -> ServiceReadinessStatus:
+    hostname = tf_config.hostname or "localhost"
+
+    if tf_config.backend == ProvisioningBackend.TERRAFORM_CLI:
+        return ServiceReadinessStatus(service=service, is_ready=True)
+
+    if not tf_config.token:
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message="No Terraform token configured",
+        )
+
+    try:
+        api_url = f"https://{hostname}/api/v2/account/details"
+        req = urllib.request.Request(api_url)
+        req.add_header("Authorization", f"Bearer {tf_config.token}")
+        req.add_header("User-Agent", "Terraable-Demo")
+
+        response = urllib.request.urlopen(req, timeout=5)
+        if response.status == 200:
+            return ServiceReadinessStatus(service=service, is_ready=True)
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return ServiceReadinessStatus(
+                service=service,
+                is_ready=False,
+                error_message="Invalid Terraform token",
+            )
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message=f"API error: {e.code}",
+        )
+    except Exception as e:
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message=f"Connectivity error: {e!s}",
+        )
+
+    return ServiceReadinessStatus(
+        service=service,
+        is_ready=False,
+        error_message="Terraform service readiness check failed",
+    )
+
+
+def _ansible_readiness(service: str, ansible_config: AnsibleConfig) -> ServiceReadinessStatus:
+    hostname = ansible_config.hostname or "localhost"
+
+    if ansible_config.backend == AutomationBackend.ANSIBLE_CLI:
+        return ServiceReadinessStatus(service=service, is_ready=True)
+
+    if not ansible_config.hostname:
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message="No Ansible endpoint configured",
+        )
+
+    try:
+        api_url = f"https://{hostname}/api/v2/ping/"
+        req = urllib.request.Request(api_url)
+        req.add_header("User-Agent", "Terraable-Demo")
+
+        if ansible_config.username and ansible_config.password:
+            credentials = base64.b64encode(
+                f"{ansible_config.username}:{ansible_config.password}".encode()
+            ).decode()
+            req.add_header("Authorization", f"Basic {credentials}")
+
+        response = urllib.request.urlopen(req, timeout=5)
+        if response.status in (200, 201):
+            return ServiceReadinessStatus(service=service, is_ready=True)
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return ServiceReadinessStatus(
+                service=service,
+                is_ready=False,
+                error_message="Invalid Ansible credentials",
+            )
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message=f"API error: {e.code}",
+        )
+    except Exception as e:
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message=f"Connectivity error: {e!s}",
+        )
+
+    return ServiceReadinessStatus(
+        service=service,
+        is_ready=False,
+        error_message="Ansible service readiness check failed",
+    )
 
 
 def get_demo_config() -> DemoConfiguration:
@@ -324,140 +452,24 @@ def check_service_readiness(service: str) -> ServiceReadinessStatus:
         ServiceReadinessStatus with current readiness state.
     """
     config = _demo_config
+    connection_mode = _service_connection_mode(config, service)
+    if connection_mode is None:
+        return ServiceReadinessStatus(
+            service=service,
+            is_ready=False,
+            error_message=f"Unknown service: {service}",
+        )
+
+    startup_status = _startup_wait_status(service, connection_mode)
+    if startup_status:
+        return startup_status
 
     if service == "terraform":
-        connection_mode = config.terraform.connection_mode
-    elif service == "ansible":
-        connection_mode = config.ansible.connection_mode
-    else:
-        connection_mode = None
-
-    if (
-        connection_mode == ConnectionMode.DOCKER_COMPOSE_SERVICE
-        and service in _service_startup_times
-    ):
-        elapsed = max(0.0, time.time() - _service_startup_times[service])
-        wait_seconds = _service_wait_seconds(service)
-        if elapsed < wait_seconds:
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                estimated_wait_seconds=max(0, wait_seconds - int(elapsed)),
-            )
-
-    if service == "terraform":
-        tf_config = config.terraform
-        hostname = tf_config.hostname or "localhost"
-
-        # For terraform-cli, always ready (no external endpoint)
-        if tf_config.backend == ProvisioningBackend.TERRAFORM_CLI:
-            return ServiceReadinessStatus(service=service, is_ready=True)
-
-        # For TFC/TFE, check token validity via API
-        if not tf_config.token:
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                error_message="No Terraform token configured",
-            )
-
-        try:
-            # Use OAuth token to validate connectivity to TFC/TFE
-            api_url = f"https://{hostname}/api/v2/account/details"
-            req = urllib.request.Request(api_url)
-            req.add_header("Authorization", f"Bearer {tf_config.token}")
-            req.add_header("User-Agent", "Terraable-Demo")
-
-            response = urllib.request.urlopen(req, timeout=5)
-            if response.status == 200:
-                return ServiceReadinessStatus(service=service, is_ready=True)
-        except urllib.error.HTTPError as e:
-            if e.code == 401:
-                return ServiceReadinessStatus(
-                    service=service,
-                    is_ready=False,
-                    error_message="Invalid Terraform token",
-                )
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                error_message=f"API error: {e.code}",
-            )
-        except Exception as e:
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                error_message=f"Connectivity error: {str(e)}",
-            )
-
-    elif service == "ansible":
-        ansible_config = config.ansible
-        hostname = ansible_config.hostname or "localhost"
-
-        # For ansible-cli, always ready (no external endpoint)
-        if ansible_config.backend == AutomationBackend.ANSIBLE_CLI:
-            return ServiceReadinessStatus(service=service, is_ready=True)
-
-        # For AAP/AWX, check basic connectivity
-        if not ansible_config.hostname:
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                error_message="No Ansible endpoint configured",
-            )
-
-        try:
-            api_url = f"https://{hostname}/api/v2/ping/"
-            req = urllib.request.Request(api_url)
-            req.add_header("User-Agent", "Terraable-Demo")
-
-            # Add basic auth if credentials available
-            if ansible_config.username and ansible_config.password:
-                import base64
-
-                credentials = base64.b64encode(
-                    f"{ansible_config.username}:{ansible_config.password}".encode()
-                ).decode()
-                req.add_header("Authorization", f"Basic {credentials}")
-
-            # Skip SSL verification if requested (for demo environments)
-            import ssl
-
-            ctx = ssl.create_default_context()
-            if ansible_config.insecure_skip_verify:
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-
-            response = urllib.request.urlopen(req, context=ctx, timeout=5)
-            if response.status in (200, 201):
-                return ServiceReadinessStatus(service=service, is_ready=True)
-        except urllib.error.HTTPError as e:
-            if e.code == 401:
-                return ServiceReadinessStatus(
-                    service=service,
-                    is_ready=False,
-                    error_message="Invalid Ansible credentials",
-                )
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                error_message=f"API error: {e.code}",
-            )
-        except Exception as e:
-            return ServiceReadinessStatus(
-                service=service,
-                is_ready=False,
-                error_message=f"Connectivity error: {str(e)}",
-            )
-
-    return ServiceReadinessStatus(
-        service=service,
-        is_ready=False,
-        error_message=f"Unknown service: {service}",
-    )
+        return _terraform_readiness(service, config.terraform)
+    return _ansible_readiness(service, config.ansible)
 
 
-def get_overall_readiness() -> Dict:
+def get_overall_readiness() -> dict[str, Any]:
     """Get readiness status for all services."""
     terraform_status = check_service_readiness("terraform")
     ansible_status = check_service_readiness("ansible")
