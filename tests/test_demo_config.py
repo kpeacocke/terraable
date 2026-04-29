@@ -460,6 +460,20 @@ class TestCheckServiceReadinessMocked:
             status = check_service_readiness("terraform")
             assert status.is_ready is True
 
+    def test_terraform_tfc_unexpected_status_code(self) -> None:
+        """Test terraform TFC when response returns an unexpected status code (not 200/201)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.terraform.token = "valid-token"
+
+        mock_response = MagicMock()
+        mock_response.status = 202
+
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            status = check_service_readiness("terraform")
+            assert status.is_ready is False
+            assert "Terraform service readiness check failed" in (status.error_message or "")
+
     def test_terraform_tfc_invalid_token_401(self) -> None:
         """Test terraform TFC with invalid token (HTTP 401 response)."""
         apply_profile(DemoProfile.ENTERPRISE_MIRROR)
@@ -542,6 +556,23 @@ class TestCheckServiceReadinessMocked:
         with patch("urllib.request.urlopen", return_value=mock_response):
             status = check_service_readiness("ansible")
             assert status.is_ready is True
+
+    def test_ansible_awx_unexpected_status_code(self) -> None:
+        """Test ansible AWX when response returns an unexpected status code (not 200/201)."""
+        apply_profile(DemoProfile.ENTERPRISE_MIRROR)
+        config = get_demo_config()
+        config.ansible.backend = AutomationBackend.AWX
+        config.ansible.hostname = "awx.example.com"
+        config.ansible.username = "admin"
+        config.ansible.password = _sample_credential()
+
+        mock_response = MagicMock()
+        mock_response.status = 202
+
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            status = check_service_readiness("ansible")
+            assert status.is_ready is False
+            assert "Ansible service readiness check failed" in (status.error_message or "")
 
     def test_ansible_awx_invalid_credentials_401(self) -> None:
         """Test ansible AWX with invalid credentials (HTTP 401 response)."""
